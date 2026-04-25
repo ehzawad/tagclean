@@ -1,0 +1,42 @@
+{
+  "cleaned": {
+    "confusions": [
+      {
+        "count": 3,
+        "predicted_tag": "account_locked",
+        "true_tag": "account_locked_unlock_request"
+      },
+      {
+        "count": 1,
+        "predicted_tag": "account_locked_unlock_request",
+        "true_tag": "account_locked"
+      },
+      {
+        "count": 1,
+        "predicted_tag": "account_locked_unlock_request",
+        "true_tag": "account_locked_retrials"
+      }
+    ],
+    "rows": 194,
+    "top1_accuracy": 0.9742268041237113,
+    "top5_accuracy": 1.0
+  },
+  "low_support_tags": [],
+  "top40": {
+    "confusions": [
+      {
+        "count": 2,
+        "predicted_tag": "account_locked",
+        "true_tag": "account_locked_unlock_request"
+      },
+      {
+        "count": 1,
+        "predicted_tag": "account_locked_unlock_request",
+        "true_tag": "account_locked_retrials"
+      }
+    ],
+    "rows": 120,
+    "top1_accuracy": 0.975,
+    "top5_accuracy": 1.0
+  }
+}

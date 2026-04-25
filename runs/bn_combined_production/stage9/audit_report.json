@@ -1,0 +1,85 @@
+{
+  "audit_top_k": 10,
+  "drop_on_top1_mismatch": true,
+  "input_csv": "/Users/ehz/tagclean/runs/bn_combined_production.csv",
+  "median_own_share_top_k": 1.0,
+  "per_tag": [
+    {
+      "dropped": 0,
+      "input_rows": 75,
+      "median_own_share": 1.0,
+      "tag": "account_locked",
+      "top1_accuracy": 1.0
+    },
+    {
+      "dropped": 0,
+      "input_rows": 72,
+      "median_own_share": 1.0,
+      "tag": "account_locked_retrials",
+      "top1_accuracy": 1.0
+    },
+    {
+      "dropped": 0,
+      "input_rows": 41,
+      "median_own_share": 0.9,
+      "tag": "account_locked_unlock_request",
+      "top1_accuracy": 1.0
+    },
+    {
+      "dropped": 0,
+      "input_rows": 58,
+      "median_own_share": 1.0,
+      "tag": "name_correction_in_nid_card",
+      "top1_accuracy": 1.0
+    },
+    {
+      "dropped": 0,
+      "input_rows": 79,
+      "median_own_share": 1.0,
+      "tag": "otp_delivery_time",
+      "top1_accuracy": 1.0
+    },
+    {
+      "dropped": 0,
+      "input_rows": 57,
+      "median_own_share": 1.0,
+      "tag": "otp_not_received",
+      "top1_accuracy": 1.0
+    },
+    {
+      "dropped": 0,
+      "input_rows": 73,
+      "median_own_share": 1.0,
+      "tag": "otp_send_button",
+      "top1_accuracy": 1.0
+    },
+    {
+      "dropped": 1,
+      "input_rows": 32,
+      "median_own_share": 0.7,
+      "tag": "parents_name_correction_new",
+      "top1_accuracy": 0.96875
+    },
+    {
+      "dropped": 0,
+      "input_rows": 67,
+      "median_own_share": 1.0,
+      "tag": "spouse_name_correction_new",
+      "top1_accuracy": 1.0
+    }
+  ],
+  "rows_dropped": 1,
+  "rows_in": 554,
+  "rows_kept": 553,
+  "top1_accuracy_in": 0.9981949458483754,
+  "top_drop_examples": [
+    {
+      "neighbor_tag_dist": "{\"name_correction_in_nid_card\": 5, \"parents_name_correction_new\": 4, \"spouse_name_correction_new\": 1}",
+      "own_share_top_k": 0.4,
+      "question": "বাবা ও মায়ের নামের বানান সংশোধনে কোন সার্টিফিকেটগুলো দরকার?",
+      "tag": "parents_name_correction_new",
+      "top1_neighbor_question": "নাম বানান ত্রুটি সংশোধনে কোন কোন প্রমাণপত্র প্রয়োজন হয়?",
+      "top1_neighbor_tag": "name_correction_in_nid_card"
+    }
+  ]
+}

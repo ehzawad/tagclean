@@ -1,0 +1,180 @@
+{
+  "packet_id": "audit_packet:000000",
+  "pass_idx": 0,
+  "result": {
+    "decisions": [
+      {
+        "decision": "keep",
+        "rationale": "Self-contained question about how long an SMS OTP takes to arrive in the inbox for Postal Vote BD.",
+        "reason_code": "clean",
+        "row_id": 52700
+      },
+      {
+        "decision": "keep",
+        "rationale": "Directly asks the approximate waiting time to receive an OTP in the postal voting system.",
+        "reason_code": "clean",
+        "row_id": 52757
+      },
+      {
+        "decision": "keep",
+        "rationale": "Clearly asks whether receiving the OTP in the Postal Vote app can take a few minutes, matching OTP delivery-time intent.",
+        "reason_code": "clean",
+        "row_id": 52730
+      },
+      {
+        "decision": "keep",
+        "rationale": "Direct clean example asking how long OTP arrival takes in the Postal Vote BD app.",
+        "reason_code": "clean",
+        "row_id": 47499
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks the usual wait time to get an OTP in the Postal Vote BD app; self-contained and on tag.",
+        "reason_code": "clean",
+        "row_id": 52697
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks the estimated time to receive the OTP for the Election Commission postal vote app.",
+        "reason_code": "clean",
+        "row_id": 52732
+      },
+      {
+        "decision": "keep",
+        "rationale": "Intent is clear: asks the usual time needed to receive an OTP for the EC postal vote service.",
+        "reason_code": "clean",
+        "row_id": 52755
+      },
+      {
+        "decision": "keep",
+        "rationale": "Clearly asks how long to wait for a Postal Vote BD OTP to arrive.",
+        "reason_code": "clean",
+        "row_id": 52721
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks the usual time for an OTP to arrive in the inbox for the Election Commission postal vote app.",
+        "reason_code": "clean",
+        "row_id": 52786
+      },
+      {
+        "decision": "keep",
+        "rationale": "Self-contained question about how many minutes a Postal Vote BD OTP usually takes to arrive.",
+        "reason_code": "clean",
+        "row_id": 52766
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks how long a verification OTP takes to arrive in the inbox for Postal Vote BD.",
+        "reason_code": "clean",
+        "row_id": 52728
+      },
+      {
+        "decision": "keep",
+        "rationale": "Security code arrival time for the Postal Vote app fits the OTP/confirmation code delivery-time tag.",
+        "reason_code": "clean",
+        "row_id": 52705
+      },
+      {
+        "decision": "keep",
+        "rationale": "Directly asks how many minutes it usually takes to receive OTP from the Postal Vote BD app.",
+        "reason_code": "clean",
+        "row_id": 52746
+      },
+      {
+        "decision": "keep",
+        "rationale": "Verification code sent for postal vote and its average arrival time clearly matches the tag.",
+        "reason_code": "clean",
+        "row_id": 52734
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks the average arrival time of an OTP in the postal vote system; clean and self-contained.",
+        "reason_code": "clean",
+        "row_id": 52718
+      },
+      {
+        "decision": "keep",
+        "rationale": "Despite slightly wordy phrasing, it clearly asks how long a confirmation code takes to arrive in the inbox.",
+        "reason_code": "clean",
+        "row_id": 52756
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks how long it takes to receive an OTP sent from the EC postal voting app.",
+        "reason_code": "clean",
+        "row_id": 52727
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks the time required for a verification code to arrive from the EC Postal Vote BD app.",
+        "reason_code": "clean",
+        "row_id": 52699
+      },
+      {
+        "decision": "keep",
+        "rationale": "Security code arrival wait time for the Postal Vote BD app is directly within this tag.",
+        "reason_code": "clean",
+        "row_id": 52783
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks how long a generated code takes to reach the phone in the Postal Vote app, matching code delivery time.",
+        "reason_code": "clean",
+        "row_id": 52747
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks whether receiving the code in the Postal Vote BD app requires a 2–3 minute wait.",
+        "reason_code": "clean",
+        "row_id": 52771
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks how long to wait to get a security code in the postal voting app; clear tag fit.",
+        "reason_code": "clean",
+        "row_id": 52719
+      },
+      {
+        "decision": "keep",
+        "rationale": "One-time code delivery time for the postal voting app is effectively OTP delivery time.",
+        "reason_code": "clean",
+        "row_id": 52739
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks the estimated code delivery time in the EC postal vote app, which matches OTP/security-code timing.",
+        "reason_code": "clean",
+        "row_id": 52794
+      }
+    ],
+    "packet_id": "audit_packet:000000",
+    "packet_rationale": "All rows are self-contained questions about how long an OTP, security code, verification code, confirmation code, or one-time code takes to arrive or be received for the Postal Vote BD/app/service. None involve password reset/update timing, non-time intents, or require prior context."
+  },
+  "row_ids": [
+    52700,
+    52757,
+    52730,
+    47499,
+    52697,
+    52732,
+    52755,
+    52721,
+    52786,
+    52766,
+    52728,
+    52705,
+    52746,
+    52734,
+    52718,
+    52756,
+    52727,
+    52699,
+    52783,
+    52747,
+    52771,
+    52719,
+    52739,
+    52794
+  ]
+}

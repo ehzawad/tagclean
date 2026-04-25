@@ -1,0 +1,68 @@
+{
+  "packet_id": "audit_packet:000007",
+  "pass_idx": 0,
+  "result": {
+    "decisions": [
+      {
+        "decision": "keep",
+        "rationale": "Self-contained Postal Vote BD app question about verification/OTP code not arriving and how to get it again; fits the tag intent.",
+        "reason_code": "clean",
+        "row_id": 53032
+      },
+      {
+        "decision": "keep",
+        "rationale": "Clearly asks what to do when the verification code does not arrive and how to send/request it again in Postal Vote BD; fits OTP not received.",
+        "reason_code": "clean",
+        "row_id": 53073
+      },
+      {
+        "decision": "flag",
+        "rationale": "Intent is related, but the wording 'কাকে চাপ দেব' is malformed/unnatural for an app action and reads like a synthetic artifact.",
+        "reason_code": "synthetic_artifact",
+        "row_id": 53035
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks about a 6-digit code not being received in the postal vote app and what steps to take; clean OTP-not-received example.",
+        "reason_code": "clean",
+        "row_id": 53039
+      },
+      {
+        "decision": "keep",
+        "rationale": "Self-contained question about the verify code not arriving in the postal vote app and how to proceed; matches the tag.",
+        "reason_code": "clean",
+        "row_id": 53045
+      },
+      {
+        "decision": "flag",
+        "rationale": "Near-paraphrase of row 53073: both ask how to resend when a verification/confirmation code does not arrive in Postal Vote BD.",
+        "reason_code": "duplicate",
+        "row_id": 53081
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks when the user can request the code again after it does not arrive in the Postal Vote BD app; fits OTP not received/resend handling.",
+        "reason_code": "clean",
+        "row_id": 53048
+      },
+      {
+        "decision": "flag",
+        "rationale": "Near-paraphrase of row 53032: both ask how to get the code again when it is not received in Postal Vote BD.",
+        "reason_code": "duplicate",
+        "row_id": 53013
+      }
+    ],
+    "packet_id": "audit_packet:000007",
+    "packet_rationale": "Most rows are self-contained and clearly about an OTP/verification code not being received in the Postal Vote BD app, including resend or retry actions, which is central to the tag. I flagged one malformed synthetic-sounding row and two near-duplicate paraphrases within the packet."
+  },
+  "row_ids": [
+    53032,
+    53073,
+    53035,
+    53039,
+    53045,
+    53081,
+    53048,
+    53013
+  ]
+}

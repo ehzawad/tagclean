@@ -1,0 +1,180 @@
+{
+  "packet_id": "audit_packet:000006",
+  "pass_idx": 0,
+  "result": {
+    "decisions": [
+      {
+        "decision": "keep",
+        "rationale": "Self-contained NID question about correcting mother's name and required paperwork; directly matches the tag.",
+        "reason_code": "clean",
+        "row_id": 21907
+      },
+      {
+        "decision": "flag",
+        "rationale": "Near-paraphrase of the kept father-name NID document question in row 21910.",
+        "reason_code": "duplicate",
+        "row_id": 21858
+      },
+      {
+        "decision": "flag",
+        "rationale": "Mentions mother's name spelling correction documents but does not specify NID/national identity context, so it could fit other records.",
+        "reason_code": "too_generic",
+        "row_id": 21964
+      },
+      {
+        "decision": "flag",
+        "rationale": "Repeats the same NID mother-name correction document/proof requirement intent as row 21907.",
+        "reason_code": "duplicate",
+        "row_id": 21838
+      },
+      {
+        "decision": "flag",
+        "rationale": "Near-paraphrase of row 21907, asking required documents for correcting mother's name in the national ID.",
+        "reason_code": "duplicate",
+        "row_id": 21854
+      },
+      {
+        "decision": "flag",
+        "rationale": "Same intent as row 21907: NID mother's name correction and which papers/copies to submit.",
+        "reason_code": "duplicate",
+        "row_id": 21863
+      },
+      {
+        "decision": "keep",
+        "rationale": "Specific NID father-name correction question asking whether sibling NID documents are needed; fits the tag clearly.",
+        "reason_code": "clean",
+        "row_id": 21806
+      },
+      {
+        "decision": "flag",
+        "rationale": "Near-duplicate of row 21806 about needing a brother's or sister's ID copy for correcting father's name in NID.",
+        "reason_code": "duplicate",
+        "row_id": 21833
+      },
+      {
+        "decision": "keep",
+        "rationale": "Clear national ID question about correcting father's name and required documents; central to the tag.",
+        "reason_code": "clean",
+        "row_id": 21910
+      },
+      {
+        "decision": "keep",
+        "rationale": "Self-contained NID question about father's name error and whom to approach; asks about the correction process.",
+        "reason_code": "clean",
+        "row_id": 21867
+      },
+      {
+        "decision": "keep",
+        "rationale": "Clearly asks about correcting parent names in NID and required supporting documents; matches the tag.",
+        "reason_code": "clean",
+        "row_id": 21865
+      },
+      {
+        "decision": "flag",
+        "rationale": "Semantically repeats the NID mother-name document-needed question already represented by row 21907, just using 'বদলাতে'.",
+        "reason_code": "duplicate",
+        "row_id": 21786
+      },
+      {
+        "decision": "keep",
+        "rationale": "Specific NID father's surname correction question asking whether a family certificate is needed; fits parent-name correction.",
+        "reason_code": "clean",
+        "row_id": 21849
+      },
+      {
+        "decision": "flag",
+        "rationale": "Near-paraphrase of row 21907 about NID mother's/maternal name update and required documents.",
+        "reason_code": "duplicate",
+        "row_id": 21818
+      },
+      {
+        "decision": "flag",
+        "rationale": "Asks about parent-name correction and identity cards but does not state the NID/national identity record being corrected.",
+        "reason_code": "too_generic",
+        "row_id": 21878
+      },
+      {
+        "decision": "flag",
+        "rationale": "Near-paraphrase of row 21910 asking what documents are needed to correct father's name in a national ID.",
+        "reason_code": "duplicate",
+        "row_id": 21860
+      },
+      {
+        "decision": "keep",
+        "rationale": "Self-contained national ID question about where to submit papers for correcting mother's name; process-focused and on tag.",
+        "reason_code": "clean",
+        "row_id": 21843
+      },
+      {
+        "decision": "flag",
+        "rationale": "Only says 'card' and does not identify NID/national ID, so the parent-name spelling correction context is not self-contained.",
+        "reason_code": "too_generic",
+        "row_id": 21827
+      },
+      {
+        "decision": "keep",
+        "rationale": "National ID father-name correction/change question asking whether both parents' NIDs are required; clearly in-scope.",
+        "reason_code": "clean",
+        "row_id": 21846
+      },
+      {
+        "decision": "flag",
+        "rationale": "Mentions mother's name correction and school certificates but lacks NID/national identity context.",
+        "reason_code": "too_generic",
+        "row_id": 21949
+      },
+      {
+        "decision": "flag",
+        "rationale": "Near-duplicate of row 21867 about where/whom to contact for an NID father's name error.",
+        "reason_code": "duplicate",
+        "row_id": 21825
+      },
+      {
+        "decision": "flag",
+        "rationale": "Only refers to a generic 'card' and not NID/national ID, so it is not sufficiently self-contained for this tag.",
+        "reason_code": "too_generic",
+        "row_id": 21826
+      },
+      {
+        "decision": "flag",
+        "rationale": "Asks about mother's name correction and inheritance certificate but does not specify NID/national identity context.",
+        "reason_code": "too_generic",
+        "row_id": 21937
+      },
+      {
+        "decision": "flag",
+        "rationale": "Repeats the NID mother-name correction document question already covered by row 21907.",
+        "reason_code": "duplicate",
+        "row_id": 21792
+      }
+    ],
+    "packet_id": "audit_packet:000006",
+    "packet_rationale": "Kept rows that are self-contained NID/national ID parent-name correction questions with distinct document or process intent. Flagged rows missing explicit NID context as too generic, and flagged close template-level paraphrases within the packet as duplicates."
+  },
+  "row_ids": [
+    21907,
+    21858,
+    21964,
+    21838,
+    21854,
+    21863,
+    21806,
+    21833,
+    21910,
+    21867,
+    21865,
+    21786,
+    21849,
+    21818,
+    21878,
+    21860,
+    21843,
+    21827,
+    21846,
+    21949,
+    21825,
+    21826,
+    21937,
+    21792
+  ]
+}

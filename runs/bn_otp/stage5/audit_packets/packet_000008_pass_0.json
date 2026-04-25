@@ -1,0 +1,180 @@
+{
+  "packet_id": "audit_packet:000008",
+  "pass_idx": 0,
+  "result": {
+    "decisions": [
+      {
+        "decision": "keep",
+        "rationale": "Self-contained question asking which button to click in Postal Vote BD app to send OTP; directly matches the tag intent.",
+        "reason_code": "clean",
+        "row_id": 47498
+      },
+      {
+        "decision": "keep",
+        "rationale": "Clearly asks which button to tap in the Postal Vote BD app for OTP sending; clean fit.",
+        "reason_code": "clean",
+        "row_id": 53192
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks which button to press in the Postal Vote app to send a verification OTP; matches the send-button intent.",
+        "reason_code": "clean",
+        "row_id": 53118
+      },
+      {
+        "decision": "keep",
+        "rationale": "Self-contained request for the button to click in Postal Vote BD to send verification OTP; fits the tag.",
+        "reason_code": "clean",
+        "row_id": 53134
+      },
+      {
+        "decision": "keep",
+        "rationale": "Directly asks which option to click inside the Postal Vote BD app to send OTP; clean central example.",
+        "reason_code": "clean",
+        "row_id": 53117
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks which exact button is for sending OTP in the Postal Vote BD app; clearly within tag intent.",
+        "reason_code": "clean",
+        "row_id": 53133
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks which button to touch in the Postal Vote app to send OTP; minor typo does not affect intent.",
+        "reason_code": "clean",
+        "row_id": 53101
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks which green button to press to send OTP in Postal Vote BD; still specifically about the OTP send button.",
+        "reason_code": "clean",
+        "row_id": 53168
+      },
+      {
+        "decision": "keep",
+        "rationale": "Clearly asks which button to tap in Postal Vote BD to send OTP; clean fit.",
+        "reason_code": "clean",
+        "row_id": 53177
+      },
+      {
+        "decision": "keep",
+        "rationale": "Colloquial wording, but it asks which button to touch/use to send OTP in the app; fits the tag.",
+        "reason_code": "clean",
+        "row_id": 53172
+      },
+      {
+        "decision": "keep",
+        "rationale": "Uses verification code as an OTP synonym and asks which button to press to send it; clean match.",
+        "reason_code": "clean",
+        "row_id": 53188
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks which colored button should be pressed to send OTP; still identifies the OTP send button.",
+        "reason_code": "clean",
+        "row_id": 53148
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks which button to select in Postal Vote app to send a verification code; matches OTP send button intent.",
+        "reason_code": "clean",
+        "row_id": 53143
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks what to tap in Postal Vote BD app to send OTP; self-contained and on intent.",
+        "reason_code": "clean",
+        "row_id": 53187
+      },
+      {
+        "decision": "flag",
+        "rationale": "Asks about forwarding an OTP rather than sending/generating an OTP via the app's send button; intent differs from the tag.",
+        "reason_code": "wrong_intent",
+        "row_id": 53162
+      },
+      {
+        "decision": "flag",
+        "rationale": "Focuses on an OTP forwarding button, not the app button used to send/request an OTP; not a clean fit for this tag.",
+        "reason_code": "wrong_intent",
+        "row_id": 53120
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks which colored button to tap to send OTP in Postal Vote BD; acceptable variant of identifying the send button.",
+        "reason_code": "clean",
+        "row_id": 53123
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks which command/control is for sending OTP in the Postal Vote app; close and self-contained fit to send-button intent.",
+        "reason_code": "clean",
+        "row_id": 53109
+      },
+      {
+        "decision": "keep",
+        "rationale": "Directly asks which is the OTP send button in the Postal Vote BD app; clean fit.",
+        "reason_code": "clean",
+        "row_id": 53145
+      },
+      {
+        "decision": "keep",
+        "rationale": "Although it says tab, the question asks what UI control to tap to send OTP in Postal Vote BD; fits the practical send-button intent.",
+        "reason_code": "clean",
+        "row_id": 53114
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks which command to choose in Postal Vote BD to send OTP; self-contained and aligned with identifying the send control.",
+        "reason_code": "clean",
+        "row_id": 53147
+      },
+      {
+        "decision": "keep",
+        "rationale": "Directly asks which option exists as the OTP send button in Postal Vote BD; clean match.",
+        "reason_code": "clean",
+        "row_id": 53181
+      },
+      {
+        "decision": "keep",
+        "rationale": "Uses security code as an OTP synonym and asks what to tap to send it in the Postal Vote app; fits the tag.",
+        "reason_code": "clean",
+        "row_id": 53140
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks which item to select in the Postal Vote app to send OTP; clear UI-control question matching the tag.",
+        "reason_code": "clean",
+        "row_id": 53152
+      }
+    ],
+    "packet_id": "audit_packet:000008",
+    "packet_rationale": "Most rows are self-contained Bengali/Bangla-English questions asking which button or UI control in the Postal Vote/Postal Vote BD app should be tapped/clicked to send an OTP or verification/security code. The only rows flagged use “forward” OTP, which changes the intent from requesting/sending an OTP through the app to forwarding an OTP onward."
+  },
+  "row_ids": [
+    47498,
+    53192,
+    53118,
+    53134,
+    53117,
+    53133,
+    53101,
+    53168,
+    53177,
+    53172,
+    53188,
+    53148,
+    53143,
+    53187,
+    53162,
+    53120,
+    53123,
+    53109,
+    53145,
+    53114,
+    53147,
+    53181,
+    53140,
+    53152
+  ]
+}

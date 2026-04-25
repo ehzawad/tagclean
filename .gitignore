@@ -1,3 +1,4 @@
+# Python
 __pycache__/
 *.pyc
 .venv/
@@ -6,19 +7,26 @@ venv/
 *.egg-info/
 build/
 dist/
-.DS_Store
-# Output roots
-artifacts/
-**/artifacts/
-runs/
-**/runs/
-.tagclean/
 
-# Heavy binary outputs anywhere — ban globally so a stray --artifact-root
-# under the repo can't smuggle them into a commit.
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Heavy binary outputs banned globally — committed run artifacts should be the
+# human-readable CSV / JSON / JSONL trail, not embedding caches or model files.
 *.parquet
 *.npy
 *.faiss
 *.idx
+*.bin
+*.safetensors
+*.pt
+*.h5
 
+# Misc transient
 *.checksum
+.tagclean/
+*.log
+.claude/

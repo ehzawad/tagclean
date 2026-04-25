@@ -1,0 +1,180 @@
+{
+  "packet_id": "audit_packet:000005",
+  "pass_idx": 0,
+  "result": {
+    "decisions": [
+      {
+        "decision": "keep",
+        "rationale": "Mentions once locked and trying again with information; fits post-lock retrial/opening question.",
+        "reason_code": "clean",
+        "row_id": 218
+      },
+      {
+        "decision": "keep",
+        "rationale": "Directly asks whether correct information still cannot give immediate access after lock.",
+        "reason_code": "clean",
+        "row_id": 343
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks about needing to wait a set number of hours after a lock, matching retry timing.",
+        "reason_code": "clean",
+        "row_id": 300
+      },
+      {
+        "decision": "keep",
+        "rationale": "Focuses on locked state and whether to try again after a few hours.",
+        "reason_code": "clean",
+        "row_id": 327
+      },
+      {
+        "decision": "keep",
+        "rationale": "Correct information is supplied but the locked account still is not opening; asks what to do.",
+        "reason_code": "clean",
+        "row_id": 355
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks if a locked account will not open immediately and how long it takes.",
+        "reason_code": "clean",
+        "row_id": 304
+      },
+      {
+        "decision": "keep",
+        "rationale": "After lock from wrong attempts, asks how long to wait before retrying.",
+        "reason_code": "clean",
+        "row_id": 271
+      },
+      {
+        "decision": "keep",
+        "rationale": "Explicitly says after account lock, correct details still do not allow entry.",
+        "reason_code": "clean",
+        "row_id": 223
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks whether waiting is enough after a lock or password reset is needed; core issue is post-lock wait.",
+        "reason_code": "clean",
+        "row_id": 302
+      },
+      {
+        "decision": "keep",
+        "rationale": "Matches central intent: after one lock, correct details still do not open it immediately.",
+        "reason_code": "clean",
+        "row_id": 214
+      },
+      {
+        "decision": "keep",
+        "rationale": "Explicit post-lock retry with correct information still showing locked; fits tag.",
+        "reason_code": "clean",
+        "row_id": 209
+      },
+      {
+        "decision": "keep",
+        "rationale": "Correct information still leaves the account locked and asks how long it will take.",
+        "reason_code": "clean",
+        "row_id": 354
+      },
+      {
+        "decision": "keep",
+        "rationale": "Correct information still produces a locked message and asks if it is time-limited.",
+        "reason_code": "clean",
+        "row_id": 261
+      },
+      {
+        "decision": "keep",
+        "rationale": "Locked login remains inaccessible despite correct information, asking for resolution.",
+        "reason_code": "clean",
+        "row_id": 204
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks whether immediate retry should be avoided while account is locked.",
+        "reason_code": "clean",
+        "row_id": 195
+      },
+      {
+        "decision": "flag",
+        "rationale": "Focuses on the quoted 'Account is locked' message and generic করণীয়, without clear wait/retry framing.",
+        "reason_code": "sibling_collision",
+        "row_id": 254
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks whether a locked account unlocks by itself after a certain time.",
+        "reason_code": "clean",
+        "row_id": 196
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks whether it is better to try later after the lock; this is retry timing.",
+        "reason_code": "clean",
+        "row_id": 309
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks how many hours the lock lasts while correct data still cannot log in.",
+        "reason_code": "clean",
+        "row_id": 273
+      },
+      {
+        "decision": "flag",
+        "rationale": "Near-duplicate of row 195; same question about not retrying immediately after lock.",
+        "reason_code": "duplicate",
+        "row_id": 307
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks whether lock auto-unlocks and when to log in again, matching wait/retry intent.",
+        "reason_code": "clean",
+        "row_id": 298
+      },
+      {
+        "decision": "keep",
+        "rationale": "Correct login information still cannot enter while locked; asks how to solve.",
+        "reason_code": "clean",
+        "row_id": 194
+      },
+      {
+        "decision": "keep",
+        "rationale": "Tried correct information on a locked account but still cannot enter; fits post-lock retrial.",
+        "reason_code": "clean",
+        "row_id": 316
+      },
+      {
+        "decision": "flag",
+        "rationale": "Primarily asks what to do when the login shows 'অ্যাকাউন্ট লকড', colliding with locked-message support.",
+        "reason_code": "sibling_collision",
+        "row_id": 346
+      }
+    ],
+    "packet_id": "audit_packet:000005",
+    "packet_rationale": "Rows were kept when they clearly involved post-lock retry timing, waiting, or correct information still failing to allow login. Rows were flagged when they were primarily generic locked-message support without clear retrial/wait framing, or a near-duplicate within the packet."
+  },
+  "row_ids": [
+    218,
+    343,
+    300,
+    327,
+    355,
+    304,
+    271,
+    223,
+    302,
+    214,
+    209,
+    354,
+    261,
+    204,
+    195,
+    254,
+    196,
+    309,
+    273,
+    307,
+    298,
+    194,
+    316,
+    346
+  ]
+}

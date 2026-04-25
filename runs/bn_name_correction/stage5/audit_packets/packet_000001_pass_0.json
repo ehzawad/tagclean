@@ -1,0 +1,180 @@
+{
+  "packet_id": "audit_packet:000001",
+  "pass_idx": 0,
+  "result": {
+    "decisions": [
+      {
+        "decision": "keep",
+        "rationale": "জাতীয় পরিচয়পত্রে নিজের নাম ঠিক করার জন্য প্রয়োজনীয় কাগজপত্র জানতে চাওয়া হয়েছে; ট্যাগের intent-এর সঙ্গে সরাসরি মেলে।",
+        "reason_code": "clean",
+        "row_id": 13066
+      },
+      {
+        "decision": "keep",
+        "rationale": "নামের বানান ঠিক করার জন্য প্রয়োজনীয় নথির তালিকা জানতে চাওয়া হয়েছে; নামের বানান সংশোধন intent পরিষ্কার।",
+        "reason_code": "clean",
+        "row_id": 13104
+      },
+      {
+        "decision": "keep",
+        "rationale": "নিজের নামের বানান শোধরাতে কী প্রমাণ লাগবে জানতে চাওয়া হয়েছে; ট্যাগের কেন্দ্রীয় উদাহরণের সঙ্গে মেলে।",
+        "reason_code": "clean",
+        "row_id": 13013
+      },
+      {
+        "decision": "keep",
+        "rationale": "নামের বানান সংশোধনের জন্য সহায়ক কাগজপত্র জানতে চাওয়া হয়েছে; intent স্পষ্ট ও প্রাসঙ্গিক।",
+        "reason_code": "clean",
+        "row_id": 13117
+      },
+      {
+        "decision": "keep",
+        "rationale": "জাতীয় পরিচয়পত্রে নাম সংশোধনের জন্য ডকুমেন্ট জানতে চাওয়া হয়েছে; NID name correction-এর পরিষ্কার উদাহরণ।",
+        "reason_code": "clean",
+        "row_id": 13090
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডিতে নামের বানান ঠিক করতে প্রমাণ হিসেবে কোন নথি লাগে তা জানতে চাওয়া হয়েছে; ট্যাগের সঙ্গে সরাসরি মেলে।",
+        "reason_code": "clean",
+        "row_id": 13050
+      },
+      {
+        "decision": "keep",
+        "rationale": "নামের বানান ভুল থাকলে সংশোধনের জন্য নথি জানতে চাওয়া হয়েছে; name spelling correction intent পরিষ্কার।",
+        "reason_code": "clean",
+        "row_id": 13107
+      },
+      {
+        "decision": "keep",
+        "rationale": "ইসি অফিসে নামের বানান সংশোধনের সময় প্রয়োজনীয় কাগজ জানতে চাওয়া হয়েছে; NID/ভোটার সংশোধন প্রসঙ্গ স্পষ্ট।",
+        "reason_code": "clean",
+        "row_id": 13022
+      },
+      {
+        "decision": "keep",
+        "rationale": "নিজের বাংলা ও ইংরেজি নামের বানান ঠিক করতে প্রমাণপত্র জানতে চাওয়া হয়েছে; নিজের নামের বানান সংশোধন intent স্পষ্ট।",
+        "reason_code": "clean",
+        "row_id": 13126
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডিতে নাম সংশোধনের জন্য প্রমাণপত্র জানতে চাওয়া হয়েছে; ট্যাগের intent-এর পরিষ্কার উদাহরণ।",
+        "reason_code": "clean",
+        "row_id": 13047
+      },
+      {
+        "decision": "flag",
+        "rationale": "প্রশ্নটি ভোটার লিস্টে নামের বানান সংশোধন নিয়ে; NID/জাতীয় পরিচয়পত্র বা কার্ড নয়, তাই সম্ভাব্য আলাদা voter-list correction intent-এ পড়ে।",
+        "reason_code": "sibling_collision",
+        "row_id": 13155
+      },
+      {
+        "decision": "keep",
+        "rationale": "ভোটার কার্ডে নাম ঠিক করার জন্য কাগজপত্র জানতে চাওয়া হয়েছে; ভোটার আইডি/NID নাম সংশোধন intent মেলে।",
+        "reason_code": "clean",
+        "row_id": 13144
+      },
+      {
+        "decision": "keep",
+        "rationale": "নামের বানান শুদ্ধ করতে কী ধরনের ডকুমেন্টারি প্রমাণ লাগবে জানতে চাওয়া হয়েছে; spelling correction documents intent স্পষ্ট।",
+        "reason_code": "clean",
+        "row_id": 13109
+      },
+      {
+        "decision": "keep",
+        "rationale": "নামের বানান সঠিক করতে প্রয়োজনীয় ডকুমেন্টারি সাপোর্ট জানতে চাওয়া হয়েছে; ট্যাগের সঙ্গে সামঞ্জস্যপূর্ণ।",
+        "reason_code": "clean",
+        "row_id": 13118
+      },
+      {
+        "decision": "keep",
+        "rationale": "স্মার্ট কার্ডে নামের বানান ঠিক করতে কোন প্রমাণপত্র দরকার তা জানতে চাওয়া হয়েছে; ট্যাগের must-have ধারণার সঙ্গে মেলে।",
+        "reason_code": "clean",
+        "row_id": 13166
+      },
+      {
+        "decision": "keep",
+        "rationale": "জাতীয় পরিচয়পত্রে নাম শোধরাতে কোন ডকুমেন্ট জমা দিতে হবে জানতে চাওয়া হয়েছে; NID name correction intent পরিষ্কার।",
+        "reason_code": "clean",
+        "row_id": 13072
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডি তথ্যভান্ডারে নাম সংশোধনের জন্য প্রয়োজনীয় প্রমাণ জানতে চাওয়া হয়েছে; NID নাম সংশোধনের প্রাসঙ্গিক প্রশ্ন।",
+        "reason_code": "clean",
+        "row_id": 13029
+      },
+      {
+        "decision": "keep",
+        "rationale": "স্মার্ট কার্ডে নামের বানান এডিট করতে কোন কাগজ লাগবে জানতে চাওয়া হয়েছে; ট্যাগের intent স্পষ্ট।",
+        "reason_code": "clean",
+        "row_id": 13165
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডি কার্ডে নামের ভুল ঠিক করতে প্রমাণ হিসেবে কী লাগে জানতে চাওয়া হয়েছে; সরাসরি NID name correction।",
+        "reason_code": "clean",
+        "row_id": 13024
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডি নাম শুদ্ধিকরণে supporting document জমা দেওয়ার বিষয়ে জানতে চাওয়া হয়েছে; প্রাসঙ্গিক ও self-contained।",
+        "reason_code": "clean",
+        "row_id": 13037
+      },
+      {
+        "decision": "flag",
+        "rationale": "শুধু 'আমার নাম ঠিক করতে' বলা হয়েছে; NID/জাতীয় পরিচয়পত্র বা নামের বানান প্রসঙ্গ নেই, তাই বহু ধরনের name correction-এ মিলে যেতে পারে।",
+        "reason_code": "too_generic",
+        "row_id": 13007
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডি রেকর্ডে নাম শুদ্ধ করার জন্য নথি জমা দেওয়ার কথা জানতে চাওয়া হয়েছে; ট্যাগের intent স্পষ্ট।",
+        "reason_code": "clean",
+        "row_id": 13043
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডি নাম শুদ্ধিকরণে প্রমাণপত্র হিসেবে কী লাগে জানতে চাওয়া হয়েছে; NID name correction documents intent মেলে।",
+        "reason_code": "clean",
+        "row_id": 13038
+      },
+      {
+        "decision": "keep",
+        "rationale": "নিজের নামের বানান ঠিক করার সময় কোন নথিপত্র দেখাতে হবে জানতে চাওয়া হয়েছে; ট্যাগের কেন্দ্রীয় clean উদাহরণ।",
+        "reason_code": "clean",
+        "row_id": 13011
+      }
+    ],
+    "packet_id": "audit_packet:000001",
+    "packet_rationale": "প্রায় সব প্রশ্ন NID/জাতীয় পরিচয়পত্র/স্মার্ট বা ভোটার কার্ডে নিজের নাম বা নামের বানান সংশোধনের জন্য প্রয়োজনীয় নথি/প্রমাণপত্র জানতে চেয়েছে। ভোটার লিস্ট-কেন্দ্রিক একটি প্রশ্ন sibling intent হিসেবে flag করা হয়েছে, এবং একটি প্রশ্ন NID বা বানান প্রসঙ্গ ছাড়া অতিরিক্ত generic হওয়ায় flag করা হয়েছে।"
+  },
+  "row_ids": [
+    13066,
+    13104,
+    13013,
+    13117,
+    13090,
+    13050,
+    13107,
+    13022,
+    13126,
+    13047,
+    13155,
+    13144,
+    13109,
+    13118,
+    13166,
+    13072,
+    13029,
+    13165,
+    13024,
+    13037,
+    13007,
+    13043,
+    13038,
+    13011
+  ]
+}

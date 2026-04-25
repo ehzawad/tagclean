@@ -1,0 +1,4 @@
+question,tag,top1_neighbor_tag,top1_neighbor_question,top1_correct,own_share_top_k,neighbor_tag_dist,audit_top_k
+Postal Vote BD অ্যাপ থেকে OTP কি সাথে সাথে না এসে একটু সময় নেয়?,otp_delivery_time,otp_not_received,Postal Vote BD অ্যাপে OTP না এলে কতো সময় অপেক্ষা করে আবার নেব?,False,0.6,"{""otp_not_received"": 4, ""otp_delivery_time"": 6}",10
+পোস্টাল ভোট অ্যাপে কোড না এলে কতক্ষণ অপেক্ষা করতে হয়?,otp_not_received,otp_delivery_time,পোস্টাল ভোটিং অ্যাপে সিকিউরিটি কোড পেতে কতক্ষণ ধৈর্য ধরতে হবে?,False,0.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোট BD তে OTP না এলে রিসেন্ডের সময় ব্যবধান কত?,otp_not_received,otp_delivery_time,পোস্টাল ভোট BD অ্যাপে রিসেন্ড দিলে ওটিপি আসতে কতক্ষণ লাগে?,False,0.5,"{""otp_delivery_time"": 5, ""otp_not_received"": 5}",10

@@ -1,0 +1,59 @@
+{
+  "audit_top_k": 10,
+  "drop_on_top1_mismatch": true,
+  "input_csv": "/Users/ehz/tagclean/runs/bn_otp/stage6/question_tag.cleaned.csv",
+  "median_own_share_top_k": 1.0,
+  "per_tag": [
+    {
+      "dropped": 1,
+      "input_rows": 80,
+      "median_own_share": 1.0,
+      "tag": "otp_delivery_time",
+      "top1_accuracy": 0.9875
+    },
+    {
+      "dropped": 2,
+      "input_rows": 59,
+      "median_own_share": 1.0,
+      "tag": "otp_not_received",
+      "top1_accuracy": 0.9661016949152542
+    },
+    {
+      "dropped": 0,
+      "input_rows": 73,
+      "median_own_share": 1.0,
+      "tag": "otp_send_button",
+      "top1_accuracy": 1.0
+    }
+  ],
+  "rows_dropped": 3,
+  "rows_in": 212,
+  "rows_kept": 209,
+  "top1_accuracy_in": 0.9858490566037735,
+  "top_drop_examples": [
+    {
+      "neighbor_tag_dist": "{\"otp_not_received\": 4, \"otp_delivery_time\": 6}",
+      "own_share_top_k": 0.6,
+      "question": "Postal Vote BD অ্যাপ থেকে OTP কি সাথে সাথে না এসে একটু সময় নেয়?",
+      "tag": "otp_delivery_time",
+      "top1_neighbor_question": "Postal Vote BD অ্যাপে OTP না এলে কতো সময় অপেক্ষা করে আবার নেব?",
+      "top1_neighbor_tag": "otp_not_received"
+    },
+    {
+      "neighbor_tag_dist": "{\"otp_delivery_time\": 10}",
+      "own_share_top_k": 0.0,
+      "question": "পোস্টাল ভোট অ্যাপে কোড না এলে কতক্ষণ অপেক্ষা করতে হয়?",
+      "tag": "otp_not_received",
+      "top1_neighbor_question": "পোস্টাল ভোটিং অ্যাপে সিকিউরিটি কোড পেতে কতক্ষণ ধৈর্য ধরতে হবে?",
+      "top1_neighbor_tag": "otp_delivery_time"
+    },
+    {
+      "neighbor_tag_dist": "{\"otp_delivery_time\": 5, \"otp_not_received\": 5}",
+      "own_share_top_k": 0.5,
+      "question": "পোস্টাল ভোট BD তে OTP না এলে রিসেন্ডের সময় ব্যবধান কত?",
+      "tag": "otp_not_received",
+      "top1_neighbor_question": "পোস্টাল ভোট BD অ্যাপে রিসেন্ড দিলে ওটিপি আসতে কতক্ষণ লাগে?",
+      "top1_neighbor_tag": "otp_delivery_time"
+    }
+  ]
+}

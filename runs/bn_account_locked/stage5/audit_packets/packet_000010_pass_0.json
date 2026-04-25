@@ -1,0 +1,180 @@
+{
+  "packet_id": "audit_packet:000010",
+  "pass_idx": 0,
+  "result": {
+    "decisions": [
+      {
+        "decision": "keep",
+        "rationale": "NID login is locked and the user asks if it can be opened this moment; fits an immediate unlock service request.",
+        "reason_code": "clean",
+        "row_id": 481
+      },
+      {
+        "decision": "flag",
+        "rationale": "Asks whether an immediate unlock arrangement exists, more like service-option availability than asking the agent to unlock it now.",
+        "reason_code": "sibling_collision",
+        "row_id": 524
+      },
+      {
+        "decision": "flag",
+        "rationale": "States download is blocked by account lock but asks 'কি করবেন'; it does not clearly request unlock or download on the user's behalf.",
+        "reason_code": "context_dependent",
+        "row_id": 421
+      },
+      {
+        "decision": "flag",
+        "rationale": "The phrase 'আইডি লক ঢাকা থেকে' is unnatural/context-inserted; despite download assistance wording it reads synthetic.",
+        "reason_code": "synthetic_artifact",
+        "row_id": 368
+      },
+      {
+        "decision": "keep",
+        "rationale": "Account shows locked and the user asks if immediate unlock is possible; aligned with the tag intent.",
+        "reason_code": "clean",
+        "row_id": 438
+      },
+      {
+        "decision": "flag",
+        "rationale": "Asks what to do for urgent download after profile block, which is a next-step/how-to intent, not a direct service request.",
+        "reason_code": "sibling_collision",
+        "row_id": 445
+      },
+      {
+        "decision": "flag",
+        "rationale": "Asks whether a quick unblock option exists, not asking support to perform the unlock now.",
+        "reason_code": "sibling_collision",
+        "row_id": 519
+      },
+      {
+        "decision": "keep",
+        "rationale": "NID site account is blocked and the user asks 'আনলক করে দেবেন'; direct unlock request.",
+        "reason_code": "clean",
+        "row_id": 477
+      },
+      {
+        "decision": "keep",
+        "rationale": "Directly asks if the user's ID can be unlocked now, with urgency.",
+        "reason_code": "clean",
+        "row_id": 441
+      },
+      {
+        "decision": "keep",
+        "rationale": "NID access is closed and the user asks if it can be opened now; direct immediate access/unlock request.",
+        "reason_code": "clean",
+        "row_id": 447
+      },
+      {
+        "decision": "flag",
+        "rationale": "Generic/hypothetical question about whether immediate opening opportunity exists, not a direct request for support to unlock this account now.",
+        "reason_code": "sibling_collision",
+        "row_id": 443
+      },
+      {
+        "decision": "keep",
+        "rationale": "User says their account is closed and politely asks if it can be opened now; fits direct unlock/open request.",
+        "reason_code": "clean",
+        "row_id": 370
+      },
+      {
+        "decision": "keep",
+        "rationale": "User says their ID is locked and asks if immediate rapid unlocking can be done.",
+        "reason_code": "clean",
+        "row_id": 374
+      },
+      {
+        "decision": "keep",
+        "rationale": "Locked account plus immediate reactivation request functions as an unlock-now service request.",
+        "reason_code": "clean",
+        "row_id": 435
+      },
+      {
+        "decision": "flag",
+        "rationale": "Asks for the way to unlock a restricted account, which is procedural/how-to rather than asking support to do it.",
+        "reason_code": "sibling_collision",
+        "row_id": 411
+      },
+      {
+        "decision": "keep",
+        "rationale": "Profile locked and user asks for manual download assistance, matching the on-behalf/download service branch of the tag.",
+        "reason_code": "clean",
+        "row_id": 504
+      },
+      {
+        "decision": "flag",
+        "rationale": "Asks for the way to download urgently when blocked, not for support to download on the user's behalf.",
+        "reason_code": "sibling_collision",
+        "row_id": 478
+      },
+      {
+        "decision": "flag",
+        "rationale": "Asks whether there is any way to open immediately; framed as method/option, not a direct unlock request.",
+        "reason_code": "sibling_collision",
+        "row_id": 460
+      },
+      {
+        "decision": "flag",
+        "rationale": "Asks about an express unlock option in general, not asking the agent to unlock the user's account now.",
+        "reason_code": "sibling_collision",
+        "row_id": 357
+      },
+      {
+        "decision": "flag",
+        "rationale": "Asks if calling can open it immediately, which is channel/procedure intent rather than direct service request.",
+        "reason_code": "sibling_collision",
+        "row_id": 415
+      },
+      {
+        "decision": "keep",
+        "rationale": "User's NID account is closed and asks if it can be opened this moment; direct immediate unlock/open request.",
+        "reason_code": "clean",
+        "row_id": 383
+      },
+      {
+        "decision": "flag",
+        "rationale": "Asks for the rule/procedure for instant unlock, not for support to perform the unlock.",
+        "reason_code": "sibling_collision",
+        "row_id": 395
+      },
+      {
+        "decision": "keep",
+        "rationale": "NID portal is blocked and user asks if access can be given now; direct access restoration request.",
+        "reason_code": "clean",
+        "row_id": 457
+      },
+      {
+        "decision": "keep",
+        "rationale": "Explicitly asks whether 'আপনাদের পক্ষে' the blocked NID login can be fixed immediately; direct support request.",
+        "reason_code": "clean",
+        "row_id": 469
+      }
+    ],
+    "packet_id": "audit_packet:000010",
+    "packet_rationale": "Kept rows that directly ask support, passively or explicitly, to unlock/open access now or provide manual/download assistance for a locked profile. Flagged rows framed as procedure, option, channel, or next-step questions such as 'উপায়', 'অপশন', 'নিয়ম', 'কী করবো/কি করবেন', plus one synthetic-sounding wording."
+  },
+  "row_ids": [
+    481,
+    524,
+    421,
+    368,
+    438,
+    445,
+    519,
+    477,
+    441,
+    447,
+    443,
+    370,
+    374,
+    435,
+    411,
+    504,
+    478,
+    460,
+    357,
+    415,
+    383,
+    395,
+    457,
+    469
+  ]
+}

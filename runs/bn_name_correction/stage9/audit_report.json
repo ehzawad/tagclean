@@ -1,0 +1,99 @@
+{
+  "audit_top_k": 10,
+  "drop_on_top1_mismatch": true,
+  "input_csv": "/Users/ehz/tagclean/runs/bn_name_correction/stage6/question_tag.cleaned.csv",
+  "median_own_share_top_k": 1.0,
+  "per_tag": [
+    {
+      "dropped": 2,
+      "input_rows": 60,
+      "median_own_share": 0.9,
+      "tag": "name_correction_in_nid_card",
+      "top1_accuracy": 0.9666666666666667
+    },
+    {
+      "dropped": 5,
+      "input_rows": 37,
+      "median_own_share": 0.7,
+      "tag": "parents_name_correction_new",
+      "top1_accuracy": 0.8648648648648649
+    },
+    {
+      "dropped": 1,
+      "input_rows": 68,
+      "median_own_share": 1.0,
+      "tag": "spouse_name_correction_new",
+      "top1_accuracy": 0.9852941176470589
+    }
+  ],
+  "rows_dropped": 8,
+  "rows_in": 165,
+  "rows_kept": 157,
+  "top1_accuracy_in": 0.9515151515151515,
+  "top_drop_examples": [
+    {
+      "neighbor_tag_dist": "{\"parents_name_correction_new\": 1, \"name_correction_in_nid_card\": 9}",
+      "own_share_top_k": 0.9,
+      "question": "নামের বানান ঠিক করতে চাই, আবেদন করার জন্য কি কি দলিল লাগবে?",
+      "tag": "name_correction_in_nid_card",
+      "top1_neighbor_question": "পিতার নামের বানান ঠিক করতে চাই, আবেদন করার জন্য কি কি দলিল লাগবে?",
+      "top1_neighbor_tag": "parents_name_correction_new"
+    },
+    {
+      "neighbor_tag_dist": "{\"spouse_name_correction_new\": 4, \"name_correction_in_nid_card\": 5, \"parents_name_correction_new\": 1}",
+      "own_share_top_k": 0.5,
+      "question": "জাতীয় পরিচয় পত্রে নিজের নাম সংশোধনের জন্য কি কি কাগজপত্র জমা দিতে হয়?",
+      "tag": "name_correction_in_nid_card",
+      "top1_neighbor_question": "স্বামী নাম সংশোধন করার জন্য জাতীয় পরিচয়পত্রে কি কি ডকুমেন্টস দিতে হবে?",
+      "top1_neighbor_tag": "spouse_name_correction_new"
+    },
+    {
+      "neighbor_tag_dist": "{\"name_correction_in_nid_card\": 6, \"parents_name_correction_new\": 4}",
+      "own_share_top_k": 0.4,
+      "question": "বাবামার নামের ভুল সংশোধনের প্রয়োজনীয় কাগজপত্র কী কী?",
+      "tag": "parents_name_correction_new",
+      "top1_neighbor_question": "নাম বানান সংশোধনের জন্য প্রয়োজনীয় কাগজগুলোর তালিকা কী?",
+      "top1_neighbor_tag": "name_correction_in_nid_card"
+    },
+    {
+      "neighbor_tag_dist": "{\"spouse_name_correction_new\": 6, \"parents_name_correction_new\": 3, \"name_correction_in_nid_card\": 1}",
+      "own_share_top_k": 0.3,
+      "question": "নতুন এনআইডি কার্ডে পিতার নামে ভুল সংশোধন করতে কি ডকুমেন্টস লাগবে?",
+      "tag": "parents_name_correction_new",
+      "top1_neighbor_question": "এনআইডি কার্ডে স্বামীর নাম সংশোধনের জন্য কি ডকুমেন্টস লাগবে?",
+      "top1_neighbor_tag": "spouse_name_correction_new"
+    },
+    {
+      "neighbor_tag_dist": "{\"name_correction_in_nid_card\": 5, \"parents_name_correction_new\": 3, \"spouse_name_correction_new\": 2}",
+      "own_share_top_k": 0.3,
+      "question": "জাতীয় পরিচয়পত্রে মা'র নামের বানান সংশোধন করতে কোন কাগজপত্র প্রয়োজন?",
+      "tag": "parents_name_correction_new",
+      "top1_neighbor_question": "জাতীয় পরিচয়পত্রে নামের ভুল বানান শোধরাতে কোন কাগজ লাগবে?",
+      "top1_neighbor_tag": "name_correction_in_nid_card"
+    },
+    {
+      "neighbor_tag_dist": "{\"name_correction_in_nid_card\": 8, \"parents_name_correction_new\": 2}",
+      "own_share_top_k": 0.2,
+      "question": "পিতার নামের বানান ঠিক করতে চাই, আবেদন করার জন্য কি কি দলিল লাগবে?",
+      "tag": "parents_name_correction_new",
+      "top1_neighbor_question": "নামের বানান ঠিক করতে চাই, আবেদন করার জন্য কি কি দলিল লাগবে?",
+      "top1_neighbor_tag": "name_correction_in_nid_card"
+    },
+    {
+      "neighbor_tag_dist": "{\"spouse_name_correction_new\": 5, \"parents_name_correction_new\": 4, \"name_correction_in_nid_card\": 1}",
+      "own_share_top_k": 0.4,
+      "question": "বাংলাদেশের জাতীয় পরিচয়পত্রে পিতার নাম সংশোধনের জন্য কি কি কাগজপত্র প্রয়োজন?",
+      "tag": "parents_name_correction_new",
+      "top1_neighbor_question": "জাতীয় পরিচয়পত্রে স্বামী নাম সংশোধনের জন্য কি কি কাগজপত্র প্রয়োজন?",
+      "top1_neighbor_tag": "spouse_name_correction_new"
+    },
+    {
+      "neighbor_tag_dist": "{\"name_correction_in_nid_card\": 1, \"spouse_name_correction_new\": 9}",
+      "own_share_top_k": 0.9,
+      "question": "ভোটার কার্ডে বিয়ের পর স্বামীর নাম বসাতে কোন কাগজপত্র প্রয়োজন?",
+      "tag": "spouse_name_correction_new",
+      "top1_neighbor_question": "ভোটার কার্ডে নাম ঠিক করার সময় কোন কাগজপত্র প্রয়োজন হয়?",
+      "top1_neighbor_tag": "name_correction_in_nid_card"
+    }
+  ]
+}

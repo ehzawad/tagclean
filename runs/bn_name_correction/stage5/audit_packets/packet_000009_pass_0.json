@@ -1,0 +1,180 @@
+{
+  "packet_id": "audit_packet:000009",
+  "pass_idx": 0,
+  "result": {
+    "decisions": [
+      {
+        "decision": "keep",
+        "rationale": "স্ত্রীর নাম এনআইডি কার্ডে সংযোজনের জন্য ডকুমেন্টস জানতে চেয়েছে; spouse name addition intent পরিষ্কার।",
+        "reason_code": "clean",
+        "row_id": 34930
+      },
+      {
+        "decision": "keep",
+        "rationale": "জাতীয় আইডিতে spouse name হালনাগাদের প্রামাণ্যপত্র জানতে চেয়েছে; ট্যাগের spouse নাম সংশোধন/আপডেট ডকুমেন্টস intent মেলে।",
+        "reason_code": "clean",
+        "row_id": 29371
+      },
+      {
+        "decision": "flag",
+        "rationale": "স্বামীর নাম যোগ করার কাগজপত্র জানতে চাওয়া row 29318/29316-এর খুব কাছাকাছি paraphrase; আলাদা বৈচিত্র্য কম।",
+        "reason_code": "duplicate",
+        "row_id": 29317
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডিতে স্ত্রীর নাম আপডেটের প্রয়োজনীয় ডকুমেন্টস জানতে চেয়েছে; spouse name update intent স্পষ্ট।",
+        "reason_code": "clean",
+        "row_id": 29355
+      },
+      {
+        "decision": "flag",
+        "rationale": "এখানে 'স্বামীর এনআইডি কার্ডের' বলা হয়েছে, কিন্তু স্বামীর নাম ফিল্ড সংশোধন নাকি অন্য নাম সংশোধনে স্বামীর এনআইডি লাগবে তা স্পষ্ট নয়।",
+        "reason_code": "context_dependent",
+        "row_id": 29431
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডিতে spouse নামের এন্ট্রি সংশোধনের জন্য কী সনদ লাগে জানতে চেয়েছে; স্পষ্ট spouse-name correction documents query।",
+        "reason_code": "clean",
+        "row_id": 29330
+      },
+      {
+        "decision": "keep",
+        "rationale": "জাতীয় পরিচয়পত্রে স্বামী নাম সংশোধনের কাগজপত্র জানতে চেয়েছে; ট্যাগের কেন্দ্রীয় intent-এর সঙ্গে মেলে।",
+        "reason_code": "clean",
+        "row_id": 29487
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডি কার্ডে স্বামীর নাম যোগ করার জন্য ডকুমেন্টস জানতে চেয়েছে; spouse name addition intent পরিষ্কার।",
+        "reason_code": "clean",
+        "row_id": 29318
+      },
+      {
+        "decision": "flag",
+        "rationale": "স্বামী নাম সংশোধনে জাতীয় পরিচয়পত্রে কাগজপত্র জমা দেওয়ার প্রশ্নটি row 29487-এর প্রায় একই intent ও wording-এর paraphrase।",
+        "reason_code": "duplicate",
+        "row_id": 29489
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডি কার্ডে স্ত্রীর নাম সংশোধনের ডকুমেন্টস জানতে চেয়েছে; spouse name correction intent পরিষ্কার।",
+        "reason_code": "clean",
+        "row_id": 29308
+      },
+      {
+        "decision": "flag",
+        "rationale": "row 29308-এর প্রায় একই প্রশ্ন; শুধু 'কি/কি কি' ধরনের সামান্য শব্দভেদ আছে, তাই duplicate।",
+        "reason_code": "duplicate",
+        "row_id": 29309
+      },
+      {
+        "decision": "flag",
+        "rationale": "স্বামীর এনআইডি কার্ডের কাগজপত্র বলা হলেও spouse-name field সংশোধনের কথা স্পষ্ট নয়; কোন নাম সংশোধন হচ্ছে তা জানতে প্রসঙ্গ দরকার।",
+        "reason_code": "context_dependent",
+        "row_id": 29432
+      },
+      {
+        "decision": "keep",
+        "rationale": "বিয়ের পরে জাতীয় পরিচয়পত্রে স্ত্রীর নাম সংযোজনের কাগজপত্র জানতে চেয়েছে; spouse name addition intent স্পষ্ট।",
+        "reason_code": "clean",
+        "row_id": 29411
+      },
+      {
+        "decision": "keep",
+        "rationale": "স্মার্ট এনআইডিতে spouse নামের ত্রুটি সংশোধনের কাগজ জানতে চেয়েছে; ট্যাগের spouse-name correction scope-এ পড়ে।",
+        "reason_code": "clean",
+        "row_id": 29499
+      },
+      {
+        "decision": "flag",
+        "rationale": "'কাগজপত্র কতকগুলো' অস্বাভাবিক ও malformed phrasing; কী ডকুমেন্টস লাগবে তা স্বাভাবিকভাবে জিজ্ঞেস করা হয়নি।",
+        "reason_code": "synthetic_artifact",
+        "row_id": 29312
+      },
+      {
+        "decision": "keep",
+        "rationale": "জাতীয় পরিচয়পত্রে spouse নামের বানান ঠিক করার প্রমাণপত্র জানতে চেয়েছে; spouse-name spelling correction clearly fits।",
+        "reason_code": "clean",
+        "row_id": 29404
+      },
+      {
+        "decision": "keep",
+        "rationale": "জাতীয় আইডিতে স্বামী নাম সংশোধনের জন্য কী কী প্রয়োজন জানতে চেয়েছে; যদিও সংক্ষিপ্ত, spouse-name correction requirement intent স্পষ্ট।",
+        "reason_code": "clean",
+        "row_id": 29393
+      },
+      {
+        "decision": "keep",
+        "rationale": "জাতীয় পরিচয়পত্রে spouse name পরিবর্তনের জন্য দলিলপত্র জানতে চেয়েছে; spouse name correction/update documents intent মেলে।",
+        "reason_code": "clean",
+        "row_id": 29400
+      },
+      {
+        "decision": "keep",
+        "rationale": "বিয়ের পর স্ত্রীর নাম কার্ডে যোগ করার কাগজপত্র জানতে চেয়েছে; spouse name addition documents query হিসেবে পরিষ্কার।",
+        "reason_code": "clean",
+        "row_id": 29444
+      },
+      {
+        "decision": "flag",
+        "rationale": "এনআইডিতে স্বামীর নাম যোগ করতে কাগজপত্র লাগবে—এটি row 29318-এর খুব কাছাকাছি paraphrase; duplicate হিসেবে বাদযোগ্য।",
+        "reason_code": "duplicate",
+        "row_id": 29316
+      },
+      {
+        "decision": "keep",
+        "rationale": "নিজের এনআইডি কার্ডে স্বামীর নাম সংশোধনের কাগজপত্র জানতে চেয়েছে; ট্যাগের কেন্দ্রীয় spouse-name correction intent।",
+        "reason_code": "clean",
+        "row_id": 29297
+      },
+      {
+        "decision": "keep",
+        "rationale": "জাতীয় পরিচয়পত্রে স্ত্রীর নাম ঠিক করতে কী ডকুমেন্টস দরকার জানতে চেয়েছে; spouse name correction intent পরিষ্কার।",
+        "reason_code": "clean",
+        "row_id": 29423
+      },
+      {
+        "decision": "keep",
+        "rationale": "জাতীয় আইডিতে স্ত্রীর নাম সংশোধনের সনদ জানতে চেয়েছে; spouse-name correction documents query।",
+        "reason_code": "clean",
+        "row_id": 29391
+      },
+      {
+        "decision": "keep",
+        "rationale": "বিয়ের পর জাতীয় আইডিতে স্বামীর নাম যোগের কাগজ জানতে চেয়েছে; spouse name addition after marriage intent স্পষ্ট।",
+        "reason_code": "clean",
+        "row_id": 29382
+      }
+    ],
+    "packet_id": "audit_packet:000009",
+    "packet_rationale": "ট্যাগটি এনআইডি/জাতীয় পরিচয়পত্রে স্বামী, স্ত্রী বা spouse-এর নাম যোগ, আপডেট বা সংশোধনের প্রয়োজনীয় কাগজপত্র নিয়ে। পরিষ্কার spouse-name document queries রাখা হয়েছে। যেগুলো অত্যন্ত কাছাকাছি paraphrase, malformed wording, অথবা spouse-name field নয় বরং অস্পষ্টভাবে স্বামীর এনআইডি/generic name correction বোঝায়, সেগুলো flag করা হয়েছে।"
+  },
+  "row_ids": [
+    34930,
+    29371,
+    29317,
+    29355,
+    29431,
+    29330,
+    29487,
+    29318,
+    29489,
+    29308,
+    29309,
+    29432,
+    29411,
+    29499,
+    29312,
+    29404,
+    29393,
+    29400,
+    29444,
+    29316,
+    29297,
+    29423,
+    29391,
+    29382
+  ]
+}

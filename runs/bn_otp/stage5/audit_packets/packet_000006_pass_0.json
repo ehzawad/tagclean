@@ -1,0 +1,180 @@
+{
+  "packet_id": "audit_packet:000006",
+  "pass_idx": 0,
+  "result": {
+    "decisions": [
+      {
+        "decision": "flag",
+        "rationale": "Uses “OTP না গেলে” rather than “না এলে/না পেলে”; it reads like an OTP sending/submission failure, not clearly a not-received case.",
+        "reason_code": "wrong_intent",
+        "row_id": 53059
+      },
+      {
+        "decision": "keep",
+        "rationale": "Self-contained question about the Postal Vote BD app code not arriving and how to resend it, which matches OTP not received.",
+        "reason_code": "clean",
+        "row_id": 53037
+      },
+      {
+        "decision": "keep",
+        "rationale": "Clearly asks what to do if the OTP is not received in Postal Vote BD.",
+        "reason_code": "clean",
+        "row_id": 53021
+      },
+      {
+        "decision": "keep",
+        "rationale": "Confirmation code not arriving in the app is a clear OTP/code not received issue.",
+        "reason_code": "clean",
+        "row_id": 53094
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks what to do after not getting the OTP in the Postal Vote BD app; fits the tag intent.",
+        "reason_code": "clean",
+        "row_id": 53011
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks how long to wait when the code does not arrive in the postal vote app, directly about not receiving the OTP/code.",
+        "reason_code": "clean",
+        "row_id": 53084
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks about resend timing when OTP does not arrive, which is within the not-received OTP flow.",
+        "reason_code": "clean",
+        "row_id": 53092
+      },
+      {
+        "decision": "keep",
+        "rationale": "Missing the OTP and asking how to get it again is a clear OTP not received/resend scenario.",
+        "reason_code": "clean",
+        "row_id": 53079
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks what action to take when the postal vote app code is not received; fits the tag.",
+        "reason_code": "clean",
+        "row_id": 53019
+      },
+      {
+        "decision": "flag",
+        "rationale": "The phrase “রিকোয়েস্ট রিনিউ করব” is awkward and unnatural for OTP resend/re-request, making the row look generated.",
+        "reason_code": "synthetic_artifact",
+        "row_id": 53055
+      },
+      {
+        "decision": "keep",
+        "rationale": "Directly asks what step to take if OTP does not arrive in the postal voting app.",
+        "reason_code": "clean",
+        "row_id": 53012
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks whether the OTP can be resent immediately if it does not arrive; cleanly matches the tag.",
+        "reason_code": "clean",
+        "row_id": 53089
+      },
+      {
+        "decision": "keep",
+        "rationale": "One-time code not being received in the postal vote service app is clearly an OTP not received issue.",
+        "reason_code": "clean",
+        "row_id": 53008
+      },
+      {
+        "decision": "flag",
+        "rationale": "Near-paraphrase of row 53004: both ask what to do if the verification/verify code does not arrive in Postal Vote BD.",
+        "reason_code": "duplicate",
+        "row_id": 53078
+      },
+      {
+        "decision": "keep",
+        "rationale": "Clear self-contained question about the verification code not arriving in Postal Vote BD.",
+        "reason_code": "clean",
+        "row_id": 53004
+      },
+      {
+        "decision": "keep",
+        "rationale": "Confirmation SMS not being received is a clear variant of OTP/code not received.",
+        "reason_code": "clean",
+        "row_id": 53068
+      },
+      {
+        "decision": "flag",
+        "rationale": "“ওটিপি কনফার্ম কোড” is redundant and awkward hybrid phrasing, making the row look synthetic despite the intended topic.",
+        "reason_code": "synthetic_artifact",
+        "row_id": 53042
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks when to try again if OTP delivery fails; clearly within OTP not received/resend handling.",
+        "reason_code": "clean",
+        "row_id": 53082
+      },
+      {
+        "decision": "keep",
+        "rationale": "States OTP is not being received in the postal vote app and asks what to do; clean fit.",
+        "reason_code": "clean",
+        "row_id": 53033
+      },
+      {
+        "decision": "keep",
+        "rationale": "SMS code not reaching the user is a clear not-received OTP/code question.",
+        "reason_code": "clean",
+        "row_id": 53038
+      },
+      {
+        "decision": "keep",
+        "rationale": "Confirmation code not arriving in the postal vote app and asking what to do matches the tag.",
+        "reason_code": "clean",
+        "row_id": 53060
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks what to do if the OTP is missed; in this context it fits the not-received/resend OTP issue.",
+        "reason_code": "clean",
+        "row_id": 53024
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks how to resolve the issue when the app code does not arrive; clean OTP/code not received intent.",
+        "reason_code": "clean",
+        "row_id": 53007
+      },
+      {
+        "decision": "keep",
+        "rationale": "Verification code not received and asking how to request again is directly aligned with OTP not received.",
+        "reason_code": "clean",
+        "row_id": 53091
+      }
+    ],
+    "packet_id": "audit_packet:000006",
+    "packet_rationale": "Most rows are self-contained Postal Vote app OTP, verification-code, confirmation-code, or SMS-code not-received questions, including resend or retry timing. I flagged only rows with unclear intent away from receipt failure, a near-duplicate, or unnatural synthetic phrasing."
+  },
+  "row_ids": [
+    53059,
+    53037,
+    53021,
+    53094,
+    53011,
+    53084,
+    53092,
+    53079,
+    53019,
+    53055,
+    53012,
+    53089,
+    53008,
+    53078,
+    53004,
+    53068,
+    53042,
+    53082,
+    53033,
+    53038,
+    53060,
+    53024,
+    53007,
+    53091
+  ]
+}

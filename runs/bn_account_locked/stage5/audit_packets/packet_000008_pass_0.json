@@ -1,0 +1,180 @@
+{
+  "packet_id": "audit_packet:000008",
+  "pass_idx": 0,
+  "result": {
+    "decisions": [
+      {
+        "decision": "keep",
+        "rationale": "Matches core intent: account locked and asks support to download NID on the user’s behalf.",
+        "reason_code": "clean",
+        "row_id": 414
+      },
+      {
+        "decision": "keep",
+        "rationale": "Account locked, addresses “আপনারা,” and asks for immediate download service; direct agent action.",
+        "reason_code": "clean",
+        "row_id": 431
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks to unlock the locked account immediately; direct service request.",
+        "reason_code": "clean",
+        "row_id": 34887
+      },
+      {
+        "decision": "keep",
+        "rationale": "Profile is locked and asks support to unlock urgently now; direct support action.",
+        "reason_code": "clean",
+        "row_id": 511
+      },
+      {
+        "decision": "keep",
+        "rationale": "Locked ID portal and asks “আপনি” to download for the user; direct on-behalf service request.",
+        "reason_code": "clean",
+        "row_id": 358
+      },
+      {
+        "decision": "keep",
+        "rationale": "Locked account and asks for immediate unlock; matches the central intent.",
+        "reason_code": "clean",
+        "row_id": 426
+      },
+      {
+        "decision": "keep",
+        "rationale": "Locked account and asks to get the download done immediately; direct service action.",
+        "reason_code": "clean",
+        "row_id": 434
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks the agent to download NID for the user after opening/unlocking; direct assistance request.",
+        "reason_code": "clean",
+        "row_id": 465
+      },
+      {
+        "decision": "keep",
+        "rationale": "Blocked profile and asks support to unblock instantly; direct service request.",
+        "reason_code": "clean",
+        "row_id": 520
+      },
+      {
+        "decision": "keep",
+        "rationale": "Locked own account and asks immediate unlock; matches a central example.",
+        "reason_code": "clean",
+        "row_id": 378
+      },
+      {
+        "decision": "keep",
+        "rationale": "Despite terse wording, it asks the agent to unlock the locked account now; direct request.",
+        "reason_code": "clean",
+        "row_id": 412
+      },
+      {
+        "decision": "flag",
+        "rationale": "Asks whether the user can submit a request, not asking support to unlock or download now.",
+        "reason_code": "wrong_intent",
+        "row_id": 497
+      },
+      {
+        "decision": "flag",
+        "rationale": "Mixed question about what will happen, self-opening, and someone downloading; not a clear direct support request.",
+        "reason_code": "context_dependent",
+        "row_id": 482
+      },
+      {
+        "decision": "flag",
+        "rationale": "Asks for a quick way or method, which is guidance/self-help rather than an unlock service request.",
+        "reason_code": "wrong_intent",
+        "row_id": 366
+      },
+      {
+        "decision": "keep",
+        "rationale": "Account blocked and asks support to unblock very fast; direct service request.",
+        "reason_code": "clean",
+        "row_id": 409
+      },
+      {
+        "decision": "keep",
+        "rationale": "Matches core example: locked NID online account and asks support to unlock now.",
+        "reason_code": "clean",
+        "row_id": 380
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks for an immediate opportunity to have the blocked ID unlocked; service-oriented, not a how-to.",
+        "reason_code": "clean",
+        "row_id": 373
+      },
+      {
+        "decision": "keep",
+        "rationale": "Profile locked and asks support to directly download for the user; clean on-behalf request.",
+        "reason_code": "clean",
+        "row_id": 502
+      },
+      {
+        "decision": "flag",
+        "rationale": "Asks for the urgent unlock procedure; this is how-to guidance, not a direct service request.",
+        "reason_code": "wrong_intent",
+        "row_id": 463
+      },
+      {
+        "decision": "flag",
+        "rationale": "Asks whether there is an unlock method or procedure, not support doing it now.",
+        "reason_code": "wrong_intent",
+        "row_id": 498
+      },
+      {
+        "decision": "flag",
+        "rationale": "Asks what steps the user can take quickly, a self-action/how-to intent.",
+        "reason_code": "wrong_intent",
+        "row_id": 419
+      },
+      {
+        "decision": "flag",
+        "rationale": "Asks broadly if anyone can download the NID, without a direct request to support or an agent.",
+        "reason_code": "too_generic",
+        "row_id": 413
+      },
+      {
+        "decision": "keep",
+        "rationale": "Blocked NID service account and asks if it can be unlocked this moment; direct immediate unlock intent.",
+        "reason_code": "clean",
+        "row_id": 479
+      },
+      {
+        "decision": "keep",
+        "rationale": "Login is closed and asks if someone can now download NID on the user’s behalf; direct on-behalf service request.",
+        "reason_code": "clean",
+        "row_id": 528
+      }
+    ],
+    "packet_id": "audit_packet:000008",
+    "packet_rationale": "Kept rows that directly ask support/agent to unlock or unblock a locked account/profile now/urgently, or download NID for/on behalf of the user. Flagged rows that instead ask for methods, self-action, submitting a request, or broad feasibility without a clear direct agent action."
+  },
+  "row_ids": [
+    414,
+    431,
+    34887,
+    511,
+    358,
+    426,
+    434,
+    465,
+    520,
+    378,
+    412,
+    497,
+    482,
+    366,
+    409,
+    380,
+    373,
+    502,
+    463,
+    498,
+    419,
+    413,
+    479,
+    528
+  ]
+}

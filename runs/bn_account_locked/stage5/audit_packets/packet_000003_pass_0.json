@@ -1,0 +1,68 @@
+{
+  "packet_id": "audit_packet:000003",
+  "pass_idx": 0,
+  "result": {
+    "decisions": [
+      {
+        "decision": "keep",
+        "rationale": "লকড/লক অবস্থার কথা বলে আনলকের ধাপ জানতে চেয়েছে; সাধারণ self-help intent, নিষিদ্ধ wait/agent-request নেই।",
+        "reason_code": "clean",
+        "row_id": 64
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডি অ্যাকাউন্ট লকড এবং আনলক প্রক্রিয়া/রিকোয়েস্ট দরকার কি জানতে চাওয়া হয়েছে; এজেন্টকে আনলক করে দিতে বলা হয়নি।",
+        "reason_code": "clean",
+        "row_id": 77
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডি লগইনে ব্লক হয়ে কীভাবে ঠিক করবে—এটি সরাসরি locked/blocked account self-help প্রশ্ন।",
+        "reason_code": "clean",
+        "row_id": 132
+      },
+      {
+        "decision": "flag",
+        "rationale": "লকড অ্যাকাউন্ট হলেও মূল প্রশ্ন কতক্ষণ পর আবার চেষ্টা করা যাবে; tag boundary-তে wait/retry timing স্পষ্টভাবে avoid করা হয়েছে।",
+        "reason_code": "sibling_collision",
+        "row_id": 76
+      },
+      {
+        "decision": "keep",
+        "rationale": "পোর্টালে ব্লকড অ্যাকাউন্ট রি-অ্যাকটিভেট/ঠিক করার উপায় জানতে চেয়েছে; সাধারণ unlock/fix intent-এর মধ্যে পড়ে।",
+        "reason_code": "clean",
+        "row_id": 110
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডি লগইন লক সমস্যার সমাধান জানতে চাওয়া হয়েছে; locked login self-help intent স্পষ্ট।",
+        "reason_code": "clean",
+        "row_id": 125
+      },
+      {
+        "decision": "keep",
+        "rationale": "ভুল পাসওয়ার্ডের কারণে লক হয়েছে এবং এখন কী করবে জানতে চায়; account locked করণীয়র সাধারণ প্রশ্ন, wait/agent boundary নেই।",
+        "reason_code": "clean",
+        "row_id": 178
+      },
+      {
+        "decision": "keep",
+        "rationale": "জাতীয় পরিচয় সাইটে লকড অ্যাকাউন্ট সমস্যা হলে কী করণীয়—এটি tag-এর কেন্দ্রীয় intent-এর সঙ্গে মেলে।",
+        "reason_code": "clean",
+        "row_id": 164
+      }
+    ],
+    "packet_id": "audit_packet:000003",
+    "packet_rationale": "প্রায় সব সারি locked/blocked এনআইডি অনলাইন/লগইন অ্যাকাউন্ট ঠিক করা বা আনলক করার সাধারণ self-help প্রশ্ন। শুধু row 76-এ মূল focus হলো কতক্ষণ পরে retry করা যাবে, যা এই tag-এর must-avoid wait/retry timing boundary-র সঙ্গে সংঘর্ষ করে।"
+  },
+  "row_ids": [
+    64,
+    77,
+    132,
+    76,
+    110,
+    125,
+    178,
+    164
+  ]
+}

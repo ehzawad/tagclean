@@ -1,0 +1,180 @@
+{
+  "packet_id": "audit_packet:000008",
+  "pass_idx": 0,
+  "result": {
+    "decisions": [
+      {
+        "decision": "keep",
+        "rationale": "বিয়ের পর এনআইডিতে স্বামী নাম যোগ করার ডকুমেন্টস জানতে চেয়েছে; tag intent-এর সঙ্গে সরাসরি মেলে।",
+        "reason_code": "clean",
+        "row_id": 29441
+      },
+      {
+        "decision": "keep",
+        "rationale": "বিয়ের পরে এনআইডিতে স্বামী নাম যোগের কাগজপত্র সম্পর্কে প্রশ্ন; spouse name addition intent পরিষ্কার।",
+        "reason_code": "clean",
+        "row_id": 29446
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডি কার্ডে স্বামী নাম সংশোধনের জন্য প্রয়োজনীয় কাগজপত্র জানতে চেয়েছে; কেন্দ্রীয় intent-এর সঙ্গে মেলে।",
+        "reason_code": "clean",
+        "row_id": 29311
+      },
+      {
+        "decision": "keep",
+        "rationale": "জাতীয় আইডি কার্ডে স্বামী নাম সংশোধনের কাগজপত্র জানতে চাওয়া হয়েছে; spouse name correction tag-এর জন্য পরিষ্কার।",
+        "reason_code": "clean",
+        "row_id": 29367
+      },
+      {
+        "decision": "keep",
+        "rationale": "স্বামী নাম সংশোধনে এনআইডি কার্ডে কী ডকুমেন্টস লাগবে তা জানতে চেয়েছে; tag intent সরাসরি পূরণ করে।",
+        "reason_code": "clean",
+        "row_id": 29486
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডি কার্ডে স্বামীর নাম সংশোধনের ডকুমেন্টস সম্পর্কে স্বয়ংসম্পূর্ণ প্রশ্ন; clean example।",
+        "reason_code": "clean",
+        "row_id": 29319
+      },
+      {
+        "decision": "keep",
+        "rationale": "স্বামী নাম সংশোধনে এনআইডির ডকুমেন্টস প্রয়োজনীয়তা জানতে চেয়েছে; intent স্পষ্ট ও প্রাসঙ্গিক।",
+        "reason_code": "clean",
+        "row_id": 29485
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডি কার্ডে স্বামী নাম সংশোধনের জন্য কী কাগজপত্র লাগবে জানতে চেয়েছে; tag-এর সঙ্গে মেলে।",
+        "reason_code": "clean",
+        "row_id": 29366
+      },
+      {
+        "decision": "keep",
+        "rationale": "জাতীয় আইডি কার্ডে স্বামী নাম সংশোধনের জন্য ডকুমেন্টস জমা দেওয়ার প্রশ্ন; সঠিক spouse correction intent।",
+        "reason_code": "clean",
+        "row_id": 29368
+      },
+      {
+        "decision": "keep",
+        "rationale": "বিবাহ-পরবর্তী স্বামীর নাম সংশোধনের কাগজপত্র জানতে চেয়েছে; tag-এর must-have concept স্পষ্ট।",
+        "reason_code": "clean",
+        "row_id": 29342
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডি কার্ডে স্বামী নাম সংশোধনের জন্য কোন কাগজপত্র জমা দিতে হবে জানতে চেয়েছে; clean fit।",
+        "reason_code": "clean",
+        "row_id": 29313
+      },
+      {
+        "decision": "keep",
+        "rationale": "জাতীয় আইডিতে স্বামী নাম যোগের জন্য কাগজপত্র জানতে চাওয়া হয়েছে; spouse name addition intent।",
+        "reason_code": "clean",
+        "row_id": 29392
+      },
+      {
+        "decision": "keep",
+        "rationale": "জাতীয় আইডি কার্ডে স্বামীর নাম সংশোধনের কাগজপত্র জানতে চেয়েছে; tag intent পরিষ্কার।",
+        "reason_code": "clean",
+        "row_id": 29369
+      },
+      {
+        "decision": "keep",
+        "rationale": "বিয়ের পর এনআইডি কার্ডে স্বামীর নাম যোগ করার ডকুমেন্টস সম্পর্কে প্রশ্ন; প্রাসঙ্গিক ও self-contained।",
+        "reason_code": "clean",
+        "row_id": 29305
+      },
+      {
+        "decision": "keep",
+        "rationale": "স্বামী নাম সংশোধনের জন্য এনআইডি কার্ডে কী কাগজপত্র দিতে হবে জানতে চেয়েছে; clean example।",
+        "reason_code": "clean",
+        "row_id": 29488
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডি কার্ডে স্বামী নাম যোগের কাগজপত্র সম্পর্কে সরাসরি প্রশ্ন; tag-এর যোগ intent-এর সঙ্গে মেলে।",
+        "reason_code": "clean",
+        "row_id": 29310
+      },
+      {
+        "decision": "keep",
+        "rationale": "জাতীয় পরিচয়পত্রে স্বামীর নাম সংশোধনের ডকুমেন্টস জানতে চেয়েছে; spouse correction intent স্পষ্ট।",
+        "reason_code": "clean",
+        "row_id": 29429
+      },
+      {
+        "decision": "keep",
+        "rationale": "বিয়ের পর জাতীয় পরিচয়পত্রে স্বামী নাম অ্যাড করার ডকুমেন্ট জানতে চেয়েছে; tag intent-এর পরিষ্কার উদাহরণ।",
+        "reason_code": "clean",
+        "row_id": 29410
+      },
+      {
+        "decision": "keep",
+        "rationale": "জাতীয় পরিচয়পত্রে স্বামী নাম সংশোধনের জন্য ডকুমেন্টস দিতে হবে কি না জানতে চেয়েছে; প্রাসঙ্গিক।",
+        "reason_code": "clean",
+        "row_id": 29484
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডিতে spouse নামের ত্রুটি ঠিক করার কাগজপত্র জানতে চেয়েছে; spouse name correction intent পরিষ্কার।",
+        "reason_code": "clean",
+        "row_id": 29331
+      },
+      {
+        "decision": "keep",
+        "rationale": "জাতীয় পরিচয়পত্রে স্বামী নাম সংশোধনের কাগজপত্র সম্পর্কে প্রশ্ন; tag-এর সঙ্গে সরাসরি মেলে।",
+        "reason_code": "clean",
+        "row_id": 29425
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডি কার্ডে স্বামীর নাম সংযোজনের ডকুমেন্টস জানতে চেয়েছে; spouse name addition intent।",
+        "reason_code": "clean",
+        "row_id": 34931
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডিতে স্বামী/স্ত্রী নাম সংশোধনের কাগজপত্র জানতে চেয়েছে; spouse name correction tag-এর মধ্যে পড়ে।",
+        "reason_code": "clean",
+        "row_id": 29360
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডি কার্ডে স্বামী নাম যোগ করতে কী ডকুমেন্টস জমা দিতে হবে জানতে চেয়েছে; clean spouse addition example।",
+        "reason_code": "clean",
+        "row_id": 29483
+      }
+    ],
+    "packet_id": "audit_packet:000008",
+    "packet_rationale": "সব target row-ই এনআইডি/জাতীয় পরিচয়পত্রে স্বামী/স্ত্রী/spouse নাম যোগ বা সংশোধনের জন্য প্রয়োজনীয় কাগজপত্র/ডকুমেন্টস জানতে চেয়েছে। নিজের, পিতা বা মাতার নাম সংশোধনের মতো avoid concept নেই; প্রশ্নগুলো self-contained এবং tag intent-এর সঙ্গে সরাসরি মেলে।"
+  },
+  "row_ids": [
+    29441,
+    29446,
+    29311,
+    29367,
+    29486,
+    29319,
+    29485,
+    29366,
+    29368,
+    29342,
+    29313,
+    29392,
+    29369,
+    29305,
+    29488,
+    29310,
+    29429,
+    29410,
+    29484,
+    29331,
+    29425,
+    34931,
+    29360,
+    29483
+  ]
+}

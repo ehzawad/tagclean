@@ -1,0 +1,180 @@
+{
+  "packet_id": "audit_packet:000001",
+  "pass_idx": 0,
+  "result": {
+    "decisions": [
+      {
+        "decision": "keep",
+        "rationale": "Asks how long to wait if the OTP has not arrived in Postal Vote BD, matching OTP delivery/wait time intent.",
+        "reason_code": "clean",
+        "row_id": 52724
+      },
+      {
+        "decision": "keep",
+        "rationale": "Directly asks whether the Postal Vote BD OTP arrives after about a minute, which is about OTP delivery time.",
+        "reason_code": "clean",
+        "row_id": 52748
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks how long it usually takes for the code to reach Postal Vote BD, fitting code delivery time.",
+        "reason_code": "clean",
+        "row_id": 52761
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks how many minutes it usually takes to receive a confirmation SMS from the Postal Vote BD app, aligned with confirmation code delivery timing.",
+        "reason_code": "clean",
+        "row_id": 52795
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks whether the OTP from the app comes immediately or takes some time, which is a delivery-time question.",
+        "reason_code": "clean",
+        "row_id": 52758
+      },
+      {
+        "decision": "keep",
+        "rationale": "Clearly asks the average time in minutes to receive an SMS OTP for Postal Vote BD.",
+        "reason_code": "clean",
+        "row_id": 52792
+      },
+      {
+        "decision": "keep",
+        "rationale": "One-time passcode is an OTP concept, and the row asks how many minutes it takes to arrive in the postal vote app.",
+        "reason_code": "clean",
+        "row_id": 52720
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks how long the SMS OTP takes to enter the inbox on average, a clean OTP delivery-time query.",
+        "reason_code": "clean",
+        "row_id": 52709
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks how long to wait for the verification code to arrive for Postal Vote BD, fitting the tag.",
+        "reason_code": "clean",
+        "row_id": 52774
+      },
+      {
+        "decision": "keep",
+        "rationale": "Directly asks after how many minutes the verification code usually arrives in the Postal Vote BD app.",
+        "reason_code": "clean",
+        "row_id": 52703
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks how many minutes to wait to get the code in the Postal Vote BD app, matching delivery time.",
+        "reason_code": "clean",
+        "row_id": 52731
+      },
+      {
+        "decision": "keep",
+        "rationale": "Although it mentions resend, the core question is how long the OTP takes to arrive, so it fits delivery time.",
+        "reason_code": "clean",
+        "row_id": 52714
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks the average number of minutes for the OTP to reach the Postal Voting BD app.",
+        "reason_code": "clean",
+        "row_id": 52777
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks how many minutes it usually takes to receive the code in the Postal Voting BD app.",
+        "reason_code": "clean",
+        "row_id": 52711
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks whether one should wait a few minutes if the OTP has not arrived, which is tied to expected OTP delivery timing.",
+        "reason_code": "clean",
+        "row_id": 52765
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks what amount of time is needed to receive a verification SMS in Postal Vote BD.",
+        "reason_code": "clean",
+        "row_id": 52780
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks the time needed to receive the security code for the EC postal voting portal, matching the security-code delivery-time intent.",
+        "reason_code": "clean",
+        "row_id": 52745
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks how long a security code sent by Postal Vote BD takes to arrive.",
+        "reason_code": "clean",
+        "row_id": 52753
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks whether waiting is needed to get the verification code in the postal voting app, which concerns code delivery timing.",
+        "reason_code": "clean",
+        "row_id": 52750
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks whether the security code takes a few minutes to reach the inbox, a clean delivery-time question.",
+        "reason_code": "clean",
+        "row_id": 52767
+      },
+      {
+        "decision": "keep",
+        "rationale": "Directly asks how long the OTP takes to enter the inbox for Postal Vote BD.",
+        "reason_code": "clean",
+        "row_id": 52737
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks whether it is normal for the one-time passcode to take some time to be received, fitting OTP/passcode delivery timing.",
+        "reason_code": "clean",
+        "row_id": 52782
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks whether the Postal Vote service OTP takes a short time to arrive, which is about OTP delivery time.",
+        "reason_code": "clean",
+        "row_id": 52793
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks how many minutes of delay are usual for the app OTP to arrive, a clear OTP delivery-time query.",
+        "reason_code": "clean",
+        "row_id": 52752
+      }
+    ],
+    "packet_id": "audit_packet:000001",
+    "packet_rationale": "All rows are self-contained questions about the time, delay, or waiting period for receiving an OTP, one-time passcode, security code, verification code, or confirmation SMS in the Postal Vote BD/app context. No rows involve password reset/update concepts or require prior context."
+  },
+  "row_ids": [
+    52724,
+    52748,
+    52761,
+    52795,
+    52758,
+    52792,
+    52720,
+    52709,
+    52774,
+    52703,
+    52731,
+    52714,
+    52777,
+    52711,
+    52765,
+    52780,
+    52745,
+    52753,
+    52750,
+    52767,
+    52737,
+    52782,
+    52793,
+    52752
+  ]
+}

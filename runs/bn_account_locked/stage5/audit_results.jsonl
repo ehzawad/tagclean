@@ -1,0 +1,240 @@
+{"row_id": 3, "decision": "keep", "reason_code": "clean", "rationale": "Blocked NID online account and asks rules for unlocking; clean fit.", "audit_status": "audited"}
+{"row_id": 4, "decision": "keep", "reason_code": "clean", "rationale": "Asks unlock process for NID online locked account; on scope.", "audit_status": "audited"}
+{"row_id": 5, "decision": "keep", "reason_code": "clean", "rationale": "Mentions exact account locked message online and asks what to do; clean fit.", "audit_status": "audited"}
+{"row_id": 6, "decision": "keep", "reason_code": "clean", "rationale": "Asks for guideline to unlock a locked NID account, fitting general self-help.", "audit_status": "audited"}
+{"row_id": 11, "decision": "keep", "reason_code": "clean", "rationale": "Asks what to do to open a locked NID portal account; central intent.", "audit_status": "audited"}
+{"row_id": 12, "decision": "keep", "reason_code": "clean", "rationale": "NID portal shows \"Your account is locked\" and asks next step; clean fit.", "audit_status": "audited"}
+{"row_id": 16, "decision": "keep", "reason_code": "clean", "rationale": "Account locked login message and asks what to do; no wait-time or agent-action request.", "audit_status": "audited"}
+{"row_id": 17, "decision": "keep", "reason_code": "clean", "rationale": "General question about what to do after NID site account is locked; no excluded detail.", "audit_status": "audited"}
+{"row_id": 18, "decision": "keep", "reason_code": "clean", "rationale": "NID site login is locked and asks for solution; on-topic.", "audit_status": "audited"}
+{"row_id": 22, "decision": "keep", "reason_code": "clean", "rationale": "National ID online service account is locked and asks how to get a solution; fits tag.", "audit_status": "audited"}
+{"row_id": 25, "decision": "keep", "reason_code": "clean", "rationale": "Cannot access NID online because account is locked and asks what to do; fits intent.", "audit_status": "audited"}
+{"row_id": 27, "decision": "keep", "reason_code": "clean", "rationale": "Locked account prevents entry to NID portal and asks how to solve; matches tag.", "audit_status": "audited"}
+{"row_id": 28, "decision": "keep", "reason_code": "clean", "rationale": "Account locked is preventing NID verification and asks what to do; fits general self-help unlock/fix intent.", "audit_status": "audited"}
+{"row_id": 29, "decision": "keep", "reason_code": "clean", "rationale": "Mentions NID account lock and asks how to regain access, matching the tag intent.", "audit_status": "audited"}
+{"row_id": 40, "decision": "flag", "reason_code": "sibling_collision", "rationale": "Asks for help to open the locked account, resembling an agent-assisted unlock request rather than a self-help question.", "audit_status": "audited"}
+{"row_id": 41, "decision": "keep", "reason_code": "clean", "rationale": "Directly asks how to open/unlock a locked NID account; matches tag.", "audit_status": "audited"}
+{"row_id": 42, "decision": "keep", "reason_code": "clean", "rationale": "Explicit locked NID account and asks how to unlock; central example fit.", "audit_status": "audited"}
+{"row_id": 43, "decision": "keep", "reason_code": "clean", "rationale": "Cannot log in because account is locked; expresses locked-account problem.", "audit_status": "audited"}
+{"row_id": 50, "decision": "keep", "reason_code": "clean", "rationale": "Blocked NID online account and asks how to open it again.", "audit_status": "audited"}
+{"row_id": 51, "decision": "keep", "reason_code": "clean", "rationale": "Asks how to fix an NID online account block, matching the tag.", "audit_status": "audited"}
+{"row_id": 53, "decision": "keep", "reason_code": "clean", "rationale": "Asks what steps to take when an NID online account is locked; clean self-help intent.", "audit_status": "audited"}
+{"row_id": 54, "decision": "keep", "reason_code": "clean", "rationale": "Asks official instructions for an NID online account lock; fits the intended scope.", "audit_status": "audited"}
+{"row_id": 55, "decision": "flag", "reason_code": "sibling_collision", "rationale": "Focuses on whether waiting will unlock the account, which collides with wait-time/automatic unlock boundary to avoid.", "audit_status": "audited"}
+{"row_id": 58, "decision": "keep", "reason_code": "clean", "rationale": "States NID online portal account is locked and asks what to do; matches intent.", "audit_status": "audited"}
+{"row_id": 59, "decision": "keep", "reason_code": "clean", "rationale": "Describes account locked message in NID portal and asks next action; fits tag.", "audit_status": "audited"}
+{"row_id": 60, "decision": "keep", "reason_code": "clean", "rationale": "Directly asks how to fix a locked NID online account; matches tag intent.", "audit_status": "audited"}
+{"row_id": 64, "decision": "keep", "reason_code": "clean", "rationale": "লকড/লক অবস্থার কথা বলে আনলকের ধাপ জানতে চেয়েছে; সাধারণ self-help intent, নিষিদ্ধ wait/agent-request নেই।", "audit_status": "audited"}
+{"row_id": 65, "decision": "keep", "reason_code": "clean", "rationale": "Blocked NID online account and asks how to restart/reactivate it.", "audit_status": "audited"}
+{"row_id": 68, "decision": "keep", "reason_code": "clean", "rationale": "NID online account is locked and asks how to open it; central tag intent.", "audit_status": "audited"}
+{"row_id": 70, "decision": "keep", "reason_code": "clean", "rationale": "States NID account issue is lock and asks how to open; sufficiently specific and on intent.", "audit_status": "audited"}
+{"row_id": 71, "decision": "keep", "reason_code": "clean", "rationale": "Asks the way to get free from/unlock NID account lock; fits self-help locked-account scope.", "audit_status": "audited"}
+{"row_id": 72, "decision": "keep", "reason_code": "clean", "rationale": "Asks ways to get out of an NID account lock problem; clean self-help fit.", "audit_status": "audited"}
+{"row_id": 73, "decision": "keep", "reason_code": "clean", "rationale": "Requests official guidance for solving an NID account lock, still general self-help.", "audit_status": "audited"}
+{"row_id": 74, "decision": "keep", "reason_code": "clean", "rationale": "Locked NID account and asks reset/fix method; within self-help account locked scope.", "audit_status": "audited"}
+{"row_id": 75, "decision": "keep", "reason_code": "clean", "rationale": "Asks what to do to unlock a locked NID account; self-help, not agent request.", "audit_status": "audited"}
+{"row_id": 76, "decision": "flag", "reason_code": "sibling_collision", "rationale": "লকড অ্যাকাউন্ট হলেও মূল প্রশ্ন কতক্ষণ পর আবার চেষ্টা করা যাবে; tag boundary-তে wait/retry timing স্পষ্টভাবে avoid করা হয়েছে।", "audit_status": "audited"}
+{"row_id": 77, "decision": "keep", "reason_code": "clean", "rationale": "এনআইডি অ্যাকাউন্ট লকড এবং আনলক প্রক্রিয়া/রিকোয়েস্ট দরকার কি জানতে চাওয়া হয়েছে; এজেন্টকে আনলক করে দিতে বলা হয়নি।", "audit_status": "audited"}
+{"row_id": 79, "decision": "keep", "reason_code": "clean", "rationale": "Asks what self-help steps can be tried before support for a locked NID account.", "audit_status": "audited"}
+{"row_id": 82, "decision": "keep", "reason_code": "clean", "rationale": "Locked notice on NID account and asks how to fix; matches tag.", "audit_status": "audited"}
+{"row_id": 86, "decision": "keep", "reason_code": "clean", "rationale": "Asks what to do when NID account shows locked; clean match.", "audit_status": "audited"}
+{"row_id": 87, "decision": "keep", "reason_code": "clean", "rationale": "States NID account is locked and asks for help, not agent action; fits general help intent.", "audit_status": "audited"}
+{"row_id": 88, "decision": "keep", "reason_code": "clean", "rationale": "Refers to a lock problem on the NID web portal and asks the needed action; acceptable account-lock fit.", "audit_status": "audited"}
+{"row_id": 89, "decision": "keep", "reason_code": "clean", "rationale": "Wording is informal but asks how to solve NID portal login lock/block problem; fits tag.", "audit_status": "audited"}
+{"row_id": 91, "decision": "keep", "reason_code": "clean", "rationale": "States NID website account has become locked and asks how to unlock; clean fit.", "audit_status": "audited"}
+{"row_id": 92, "decision": "keep", "reason_code": "clean", "rationale": "Account lock is shown and asks requirements to unlock; relevant self-help unlock question.", "audit_status": "audited"}
+{"row_id": 100, "decision": "keep", "reason_code": "clean", "rationale": "Blocked NID portal account and asks how to reactivate, within locked/blocked account recovery.", "audit_status": "audited"}
+{"row_id": 101, "decision": "keep", "reason_code": "clean", "rationale": "Asks where to start after NID portal account is locked; general self-help fit.", "audit_status": "audited"}
+{"row_id": 103, "decision": "keep", "reason_code": "clean", "rationale": "Asks about requirements for unlocking an NID account lock; still a general self-help unlock query.", "audit_status": "audited"}
+{"row_id": 106, "decision": "keep", "reason_code": "clean", "rationale": "Account lock is showing on NID portal and asks current action; matches intent.", "audit_status": "audited"}
+{"row_id": 107, "decision": "keep", "reason_code": "clean", "rationale": "Asks the way to fix a locked account on the NID portal; clean fit.", "audit_status": "audited"}
+{"row_id": 110, "decision": "keep", "reason_code": "clean", "rationale": "পোর্টালে ব্লকড অ্যাকাউন্ট রি-অ্যাকটিভেট/ঠিক করার উপায় জানতে চেয়েছে; সাধারণ unlock/fix intent-এর মধ্যে পড়ে।", "audit_status": "audited"}
+{"row_id": 111, "decision": "keep", "reason_code": "clean", "rationale": "Asks the way to remove an NID portal lock, matching unlock self-help.", "audit_status": "audited"}
+{"row_id": 112, "decision": "flag", "reason_code": "sibling_collision", "rationale": "Focuses on whether something can be done immediately after a lock, overlapping with wait/timing-after-lock handling rather than general unlock steps.", "audit_status": "audited"}
+{"row_id": 113, "decision": "keep", "reason_code": "clean", "rationale": "Locked shown on NID portal and asks how to proceed/retry; no wait-time or correct-info-after-lock detail.", "audit_status": "audited"}
+{"row_id": 114, "decision": "keep", "reason_code": "clean", "rationale": "NID portal shows account locked and asks what to do; clean fit.", "audit_status": "audited"}
+{"row_id": 115, "decision": "keep", "reason_code": "clean", "rationale": "Login locked message in NID portal and asks what to do, matching the tag.", "audit_status": "audited"}
+{"row_id": 116, "decision": "keep", "reason_code": "clean", "rationale": "Locked user in NID portal and asks for unlock instructions.", "audit_status": "audited"}
+{"row_id": 119, "decision": "keep", "reason_code": "clean", "rationale": "Asks for guidance on NID login account lock problem; fits general solution intent.", "audit_status": "audited"}
+{"row_id": 123, "decision": "keep", "reason_code": "clean", "rationale": "Mentions NID login message \"account locked\" and asks for solution; clean fit.", "audit_status": "audited"}
+{"row_id": 125, "decision": "keep", "reason_code": "clean", "rationale": "এনআইডি লগইন লক সমস্যার সমাধান জানতে চাওয়া হয়েছে; locked login self-help intent স্পষ্ট।", "audit_status": "audited"}
+{"row_id": 126, "decision": "keep", "reason_code": "clean", "rationale": "Asks steps to solve NID login lock problem; clean match.", "audit_status": "audited"}
+{"row_id": 128, "decision": "keep", "reason_code": "clean", "rationale": "NID login is locked and asks how to restore; appropriate locked-account self-help.", "audit_status": "audited"}
+{"row_id": 131, "decision": "keep", "reason_code": "clean", "rationale": "Asks what steps to take when NID login account is blocked; matches locked/blocked intent.", "audit_status": "audited"}
+{"row_id": 132, "decision": "keep", "reason_code": "clean", "rationale": "এনআইডি লগইনে ব্লক হয়ে কীভাবে ঠিক করবে—এটি সরাসরি locked/blocked account self-help প্রশ্ন।", "audit_status": "audited"}
+{"row_id": 133, "decision": "keep", "reason_code": "clean", "rationale": "NID login shows account locked message and asks for solution; matches tag.", "audit_status": "audited"}
+{"row_id": 134, "decision": "keep", "reason_code": "clean", "rationale": "Locked user error during NID login and asks how to fix it.", "audit_status": "audited"}
+{"row_id": 135, "decision": "keep", "reason_code": "clean", "rationale": "Mentions account lock after wrong info and asks how to fix; still a general locked-account resolution question.", "audit_status": "audited"}
+{"row_id": 136, "decision": "keep", "reason_code": "clean", "rationale": "Mentions an Account locked alert on the NID site and asks next steps.", "audit_status": "audited"}
+{"row_id": 137, "decision": "keep", "reason_code": "clean", "rationale": "Directly asks how to open/fix an NID service portal account marked locked.", "audit_status": "audited"}
+{"row_id": 138, "decision": "keep", "reason_code": "clean", "rationale": "Asks the rule/process to open a locked NID service account; clean fit.", "audit_status": "audited"}
+{"row_id": 139, "decision": "keep", "reason_code": "clean", "rationale": "User/account locked in NID service and asks how to recover.", "audit_status": "audited"}
+{"row_id": 140, "decision": "keep", "reason_code": "clean", "rationale": "Asks what to do when NID service login is locked; sufficiently matches account/login lock intent.", "audit_status": "audited"}
+{"row_id": 145, "decision": "keep", "reason_code": "clean", "rationale": "Mentions English locked-account message for NID and asks what to do; fits intent.", "audit_status": "audited"}
+{"row_id": 146, "decision": "keep", "reason_code": "clean", "rationale": "Asks for unlock steps for a locked NID account.", "audit_status": "audited"}
+{"row_id": 153, "decision": "keep", "reason_code": "clean", "rationale": "National ID online service account lock and asks how it can be fixed.", "audit_status": "audited"}
+{"row_id": 164, "decision": "keep", "reason_code": "clean", "rationale": "জাতীয় পরিচয় সাইটে লকড অ্যাকাউন্ট সমস্যা হলে কী করণীয়—এটি tag-এর কেন্দ্রীয় intent-এর সঙ্গে মেলে।", "audit_status": "audited"}
+{"row_id": 173, "decision": "keep", "reason_code": "clean", "rationale": "NID login lock under Election Commission context and asks for the solution.", "audit_status": "audited"}
+{"row_id": 175, "decision": "keep", "reason_code": "clean", "rationale": "Election Commission site NID account is locked and asks for solution; clean match.", "audit_status": "audited"}
+{"row_id": 178, "decision": "keep", "reason_code": "clean", "rationale": "ভুল পাসওয়ার্ডের কারণে লক হয়েছে এবং এখন কী করবে জানতে চায়; account locked করণীয়র সাধারণ প্রশ্ন, wait/agent boundary নেই।", "audit_status": "audited"}
+{"row_id": 182, "decision": "keep", "reason_code": "clean", "rationale": "Reports account lock error in NID and asks what to do; clean fit.", "audit_status": "audited"}
+{"row_id": 191, "decision": "keep", "reason_code": "clean", "rationale": "অ্যাকাউন্ট লক থাকায় লগইন ব্যর্থ এবং আনলকের জন্য কতক্ষণ অপেক্ষা করতে হবে—সরাসরি tag intent।", "audit_status": "audited"}
+{"row_id": 194, "decision": "keep", "reason_code": "clean", "rationale": "Correct login information still cannot enter while locked; asks how to solve.", "audit_status": "audited"}
+{"row_id": 195, "decision": "keep", "reason_code": "clean", "rationale": "Asks whether immediate retry should be avoided while account is locked.", "audit_status": "audited"}
+{"row_id": 196, "decision": "keep", "reason_code": "clean", "rationale": "Asks whether a locked account unlocks by itself after a certain time.", "audit_status": "audited"}
+{"row_id": 199, "decision": "keep", "reason_code": "clean", "rationale": "লক হওয়ার পর সঠিক তথ্য দেওয়ার পরেও লক দেখাচ্ছে—ট্যাগের মূল intent, অর্থাৎ ঠিক তথ্যেও এখনো খুলছে না।", "audit_status": "audited"}
+{"row_id": 201, "decision": "keep", "reason_code": "clean", "rationale": "সাময়িক লক নিজে থেকে কতক্ষণ পরে খুলবে জানতে চেয়েছে; অপেক্ষার সময়/auto-unlock প্রসঙ্গ আছে।", "audit_status": "audited"}
+{"row_id": 204, "decision": "keep", "reason_code": "clean", "rationale": "Locked login remains inaccessible despite correct information, asking for resolution.", "audit_status": "audited"}
+{"row_id": 206, "decision": "keep", "reason_code": "clean", "rationale": "অ্যাকাউন্ট লক অবস্থায় ঠিক তথ্য দিয়ে লগইন না হলে অপেক্ষা করতে হবে কি না—tag intent পরিষ্কার।", "audit_status": "audited"}
+{"row_id": 207, "decision": "keep", "reason_code": "clean", "rationale": "একবার একাউন্ট লক হওয়ার পর ঠিক তথ্য দিলেও খুলছে না—ট্যাগের কেন্দ্রীয় উদাহরণের সরাসরি মিল।", "audit_status": "audited"}
+{"row_id": 208, "decision": "keep", "reason_code": "clean", "rationale": "একবার লক হওয়ার পর সঠিক তথ্য দিলেও লক দেখাচ্ছে—কেন্দ্রীয় retrial-after-lock intent-এর পরিষ্কার উদাহরণ।", "audit_status": "audited"}
+{"row_id": 209, "decision": "keep", "reason_code": "clean", "rationale": "Explicit post-lock retry with correct information still showing locked; fits tag.", "audit_status": "audited"}
+{"row_id": 212, "decision": "keep", "reason_code": "clean", "rationale": "একবার লক হওয়ার পরে ঠিক তথ্য দিয়েও ঢুকতে না পারা ও কখন ঠিক হবে—ট্যাগের কেন্দ্রীয় intent।", "audit_status": "audited"}
+{"row_id": 213, "decision": "keep", "reason_code": "clean", "rationale": "একবার লক হওয়া আইডি ঠিক তথ্য দিলেও খুলছে না—কেন্দ্রীয় retrial-after-lock উদাহরণের সাথে মেলে।", "audit_status": "audited"}
+{"row_id": 214, "decision": "keep", "reason_code": "clean", "rationale": "Matches central intent: after one lock, correct details still do not open it immediately.", "audit_status": "audited"}
+{"row_id": 215, "decision": "keep", "reason_code": "clean", "rationale": "লক হওয়ার পরে সঠিক তথ্য দিলে সঙ্গে সঙ্গে খুলবে কি না—retrial/waiting প্রসঙ্গ স্পষ্ট।", "audit_status": "audited"}
+{"row_id": 217, "decision": "keep", "reason_code": "clean", "rationale": "লক হওয়ার পর ঠিক তথ্য দিলেও সঙ্গে সঙ্গে লগইন সম্ভব কি না—নির্দিষ্ট retrial প্রশ্ন।", "audit_status": "audited"}
+{"row_id": 218, "decision": "keep", "reason_code": "clean", "rationale": "Mentions once locked and trying again with information; fits post-lock retrial/opening question.", "audit_status": "audited"}
+{"row_id": 220, "decision": "keep", "reason_code": "clean", "rationale": "একবার লক হলে পরদিন সকালে চেষ্টা করা ভালো কি না—লক-পরবর্তী retry timing প্রশ্ন।", "audit_status": "audited"}
+{"row_id": 223, "decision": "keep", "reason_code": "clean", "rationale": "Explicitly says after account lock, correct details still do not allow entry.", "audit_status": "audited"}
+{"row_id": 224, "decision": "keep", "reason_code": "clean", "rationale": "একাউন্ট লক হওয়ার পর সঠিক তথ্য দেওয়ার পরও লক দেখাচ্ছে—কেন্দ্রীয় intent-এর সঙ্গে মেলে।", "audit_status": "audited"}
+{"row_id": 225, "decision": "keep", "reason_code": "clean", "rationale": "একাউন্ট লকের মেয়াদ ও ঠিক তথ্য দিলেও কাজ না করা—লক-পরবর্তী অপেক্ষা/retry intent স্পষ্ট।", "audit_status": "audited"}
+{"row_id": 227, "decision": "flag", "reason_code": "too_generic", "rationale": "ভুল চেষ্টা বেশি হয়ে অ্যাকাউন্ট লক; শুধু এখন কী করবে জানতে চেয়েছে, wait/retry বা correct-info retrial নেই।", "audit_status": "audited"}
+{"row_id": 251, "decision": "keep", "reason_code": "clean", "rationale": "লক খোলার অপেক্ষা-সময় এবং সঠিক তথ্য দিলেও ঢুকতে না পারার retrial পরিস্থিতি সরাসরি আছে।", "audit_status": "audited"}
+{"row_id": 252, "decision": "keep", "reason_code": "clean", "rationale": "ঠিক তথ্য দিলেও একাউন্টের লক খুলছে না এবং করণীয় জানতে চেয়েছে; retrial context যথেষ্ট।", "audit_status": "audited"}
+{"row_id": 254, "decision": "flag", "reason_code": "sibling_collision", "rationale": "Focuses on the quoted 'Account is locked' message and generic করণীয়, without clear wait/retry framing.", "audit_status": "audited"}
+{"row_id": 255, "decision": "keep", "reason_code": "clean", "rationale": "ঠিক তথ্য ইনপুটের পরেও লক থাকা এবং কী করা উচিত—সঠিক তথ্যেও লক না খোলার retrial প্রসঙ্গ।", "audit_status": "audited"}
+{"row_id": 257, "decision": "keep", "reason_code": "clean", "rationale": "ঠিক তথ্য দিলেও লক রয়ে গেছে এবং system auto-clear করবে কি না—correct-info-after-lock intent পরিষ্কার।", "audit_status": "audited"}
+{"row_id": 258, "decision": "keep", "reason_code": "clean", "rationale": "ঠিক তথ্য দিলেও লক অবস্থায় পুনরায় লগইন ট্রাই করা উচিত কি না—সঠিক তথ্য ও আবার চেষ্টা, দুই ধারণাই আছে।", "audit_status": "audited"}
+{"row_id": 259, "decision": "keep", "reason_code": "clean", "rationale": "সঠিক তথ্য দেওয়ার পরও Locked থাকা এবং কতক্ষণ স্থায়ী হবে—এটি lock retrial/wait-time intent-এর সাথে মেলে।", "audit_status": "audited"}
+{"row_id": 261, "decision": "keep", "reason_code": "clean", "rationale": "Correct information still produces a locked message and asks if it is time-limited.", "audit_status": "audited"}
+{"row_id": 264, "decision": "keep", "reason_code": "clean", "rationale": "ভুলের পর লক হয়েছে, এখন ঠিক তথ্যেও খুলছে না এবং কখন ট্রাই করবে—খুব স্পষ্ট retrial case।", "audit_status": "audited"}
+{"row_id": 265, "decision": "keep", "reason_code": "clean", "rationale": "সঠিক ক্রেডেনশিয়াল থাকা সত্ত্বেও বারবার লক দেখাচ্ছে—লক-পরবর্তী ঠিক তথ্য দিয়েও সমস্যা থাকার intent মেলে।", "audit_status": "audited"}
+{"row_id": 267, "decision": "keep", "reason_code": "clean", "rationale": "সঠিক তথ্য বারবার দিলেও লক রয়ে গেছে এবং কবে স্বয়ংক্রিয়ভাবে খুলবে জানতে চেয়েছে।", "audit_status": "audited"}
+{"row_id": 269, "decision": "keep", "reason_code": "clean", "rationale": "ভুল ইনপুটের কারণে লক কখন clear হবে জানতে চেয়েছে; lock wait/auto-clear timing intent আছে।", "audit_status": "audited"}
+{"row_id": 271, "decision": "keep", "reason_code": "clean", "rationale": "After lock from wrong attempts, asks how long to wait before retrying.", "audit_status": "audited"}
+{"row_id": 272, "decision": "keep", "reason_code": "clean", "rationale": "লক কত সময় থাকে এবং সঠিক তথ্যেও কেন ঢোকা যাচ্ছে না—উভয় কেন্দ্রীয় ধারণা আছে।", "audit_status": "audited"}
+{"row_id": 273, "decision": "keep", "reason_code": "clean", "rationale": "Asks how many hours the lock lasts while correct data still cannot log in.", "audit_status": "audited"}
+{"row_id": 275, "decision": "keep", "reason_code": "clean", "rationale": "লক অবস্থায় ঠিক তথ্য দিয়েও ব্যর্থ হচ্ছে এবং সাময়িক কি না জানতে চেয়েছে; tag-এর কেন্দ্রীয় ধারণা আছে।", "audit_status": "audited"}
+{"row_id": 276, "decision": "flag", "reason_code": "too_generic", "rationale": "লক অবস্থায় সাপোর্টে কল বনাম অপেক্ষার কথা আছে, কিন্তু সঠিক তথ্য দিয়েও লগইন না হওয়া বা পুনরায় চেষ্টা প্রসঙ্গ স্পষ্ট নয়।", "audit_status": "audited"}
+{"row_id": 278, "decision": "keep", "reason_code": "clean", "rationale": "লক অবস্থায় বারবার login চেষ্টা করা উচিত কি না—retry behavior/timing প্রসঙ্গ আছে।", "audit_status": "audited"}
+{"row_id": 279, "decision": "keep", "reason_code": "clean", "rationale": "লক অবস্থায় সঠিক credentials দিলেও login fail হচ্ছে কেন—correct-info-after-lock retrial issue।", "audit_status": "audited"}
+{"row_id": 280, "decision": "keep", "reason_code": "clean", "rationale": "লক অবস্থায় পুনরায় চেষ্টা করার জন্য সুপারিশকৃত অপেক্ষার সময় জানতে চেয়েছে; tag-এর সাথে মেলে।", "audit_status": "audited"}
+{"row_id": 282, "decision": "keep", "reason_code": "clean", "rationale": "লক আইডিতে তথ্য ঠিক দেওয়ার পরও লক দেখাচ্ছে; সঠিক তথ্যেও লক না খোলা প্রসঙ্গ।", "audit_status": "audited"}
+{"row_id": 283, "decision": "keep", "reason_code": "clean", "rationale": "লক থাকলে পরে আবার লগইন করা যাবে কি না জানতে চেয়েছে; retrial timing intent আছে।", "audit_status": "audited"}
+{"row_id": 284, "decision": "keep", "reason_code": "clean", "rationale": "লক দেখানোর পর অপেক্ষা করবে নাকি অন্য পদক্ষেপ নেবে—লক-পরবর্তী wait/action guidance intent আছে।", "audit_status": "audited"}
+{"row_id": 294, "decision": "keep", "reason_code": "clean", "rationale": "লক হওয়ার পর কত সময় অপেক্ষা করে আবার লগইন করা উচিত—retry timing-এর সরাসরি প্রশ্ন।", "audit_status": "audited"}
+{"row_id": 295, "decision": "keep", "reason_code": "clean", "rationale": "লক হওয়ার পর সঠিক তথ্যেও লগইন হচ্ছে না—লক-পরবর্তী correct-info failure স্পষ্ট।", "audit_status": "audited"}
+{"row_id": 298, "decision": "keep", "reason_code": "clean", "rationale": "Asks whether lock auto-unlocks and when to log in again, matching wait/retry intent.", "audit_status": "audited"}
+{"row_id": 299, "decision": "keep", "reason_code": "clean", "rationale": "লক হলে অপেক্ষা করলেই সমাধান হয় কি না—লক-পরবর্তী waiting/auto-resolution intent আছে।", "audit_status": "audited"}
+{"row_id": 300, "decision": "keep", "reason_code": "clean", "rationale": "Asks about needing to wait a set number of hours after a lock, matching retry timing.", "audit_status": "audited"}
+{"row_id": 301, "decision": "keep", "reason_code": "clean", "rationale": "লক হলে নির্দিষ্ট সময় অপেক্ষা করলেই সমাধান হয় কি না জানতে চেয়েছে; অপেক্ষার সময় সম্পর্কিত retrial intent আছে।", "audit_status": "audited"}
+{"row_id": 302, "decision": "keep", "reason_code": "clean", "rationale": "Asks whether waiting is enough after a lock or password reset is needed; core issue is post-lock wait.", "audit_status": "audited"}
+{"row_id": 304, "decision": "keep", "reason_code": "clean", "rationale": "Asks if a locked account will not open immediately and how long it takes.", "audit_status": "audited"}
+{"row_id": 306, "decision": "keep", "reason_code": "clean", "rationale": "লক হলে ৮ ঘণ্টা অপেক্ষা করতে হবে কি না—স্পষ্ট wait-time প্রশ্ন।", "audit_status": "audited"}
+{"row_id": 307, "decision": "flag", "reason_code": "duplicate", "rationale": "Near-duplicate of row 195; same question about not retrying immediately after lock.", "audit_status": "audited"}
+{"row_id": 308, "decision": "keep", "reason_code": "clean", "rationale": "লক থাকা অবস্থায় সঠিক তথ্য দিলেও ব্যর্থ হওয়ার কারণ জানতে চেয়েছে; locked retrial অবস্থার সঙ্গে মেলে।", "audit_status": "audited"}
+{"row_id": 309, "decision": "keep", "reason_code": "clean", "rationale": "Asks whether it is better to try later after the lock; this is retry timing.", "audit_status": "audited"}
+{"row_id": 312, "decision": "keep", "reason_code": "clean", "rationale": "লকড আইডি খুলতে নির্দিষ্ট সময় অপেক্ষা করতে হবে কি না—লক-পরবর্তী wait-time প্রশ্ন হিসেবে ট্যাগে মানানসই।", "audit_status": "audited"}
+{"row_id": 314, "decision": "flag", "reason_code": "too_generic", "rationale": "লকড আইডি ‘সমাধানে’ কত সময় লাগবে খুব সাধারণ; সঠিক তথ্য, retry বা স্পষ্ট wait-after-login প্রসঙ্গ নেই।", "audit_status": "audited"}
+{"row_id": 315, "decision": "keep", "reason_code": "clean", "rationale": "লকড অ্যাকাউন্ট আনলক হতে অপেক্ষাই কি উপায় জানতে চেয়েছে; wait-based retrial/unlock timing-এর সাথে মেলে।", "audit_status": "audited"}
+{"row_id": 316, "decision": "keep", "reason_code": "clean", "rationale": "Tried correct information on a locked account but still cannot enter; fits post-lock retrial.", "audit_status": "audited"}
+{"row_id": 321, "decision": "keep", "reason_code": "clean", "rationale": "লকড থাকার কারণ জানার পর আনলক হতে কত সময় লাগবে—wait-time প্রশ্ন, tag intent-এর মধ্যে পড়ে।", "audit_status": "audited"}
+{"row_id": 323, "decision": "keep", "reason_code": "clean", "rationale": "লকড হওয়ার পর কতক্ষণ পরে আবার চেষ্টা করা উচিত, অর্থাৎ next retry timing নিয়ে প্রশ্ন।", "audit_status": "audited"}
+{"row_id": 324, "decision": "keep", "reason_code": "clean", "rationale": "লকড দেখানোর পর কখন চেষ্টা করতে হবে তা জানতে চায়; retry timing প্রশ্ন।", "audit_status": "audited"}
+{"row_id": 326, "decision": "keep", "reason_code": "clean", "rationale": "লকড দেখালে পরে আবার চেষ্টা করতে হবে কি না—next retry/waiting ধারণা আছে।", "audit_status": "audited"}
+{"row_id": 327, "decision": "keep", "reason_code": "clean", "rationale": "Focuses on locked state and whether to try again after a few hours.", "audit_status": "audited"}
+{"row_id": 333, "decision": "keep", "reason_code": "clean", "rationale": "লকড প্রোফাইলে সঠিক তথ্যেও প্রবেশ ব্যর্থ এবং অপেক্ষা কতক্ষণ—সরাসরি ট্যাগ-মিল।", "audit_status": "audited"}
+{"row_id": 339, "decision": "keep", "reason_code": "clean", "rationale": "লকড স্ট্যাটাসে সঠিক ইনফো দিলেও সাইন-ইন হচ্ছে না—লক-পরবর্তী সঠিক তথ্য দিয়েও ঢুকতে না পারার প্রশ্ন।", "audit_status": "audited"}
+{"row_id": 340, "decision": "keep", "reason_code": "clean", "rationale": "লকড স্ট্যাটাসে সঠিক তথ্য দিয়েও এন্ট্রি মিলছে না—correct-info failure after lock; tag intent মেলে।", "audit_status": "audited"}
+{"row_id": 342, "decision": "keep", "reason_code": "clean", "rationale": "লকড হওয়ার পরে কবে আবার চেষ্টা করতে বলা হয়—next retry timing ট্যাগের মূল অংশ।", "audit_status": "audited"}
+{"row_id": 343, "decision": "keep", "reason_code": "clean", "rationale": "Directly asks whether correct information still cannot give immediate access after lock.", "audit_status": "audited"}
+{"row_id": 344, "decision": "keep", "reason_code": "clean", "rationale": "লকড অবস্থায় সন্ধ্যায় আবার login try করা উচিত কি না—next retry প্রশ্ন।", "audit_status": "audited"}
+{"row_id": 345, "decision": "flag", "reason_code": "sibling_collision", "rationale": "মূলত লগইনের সময় লক সতর্কতা/বার্তা কখন যাবে জানতে চেয়েছে; correct-info retrial বা wait-after-lock স্পষ্ট নয়।", "audit_status": "audited"}
+{"row_id": 346, "decision": "flag", "reason_code": "sibling_collision", "rationale": "Primarily asks what to do when the login shows 'অ্যাকাউন্ট লকড', colliding with locked-message support.", "audit_status": "audited"}
+{"row_id": 347, "decision": "keep", "reason_code": "clean", "rationale": "লগইন লক হওয়ার পর আবার চেষ্টা করার আগে নির্দিষ্ট সময় অপেক্ষা করতে হবে কি না জানতে চেয়েছে।", "audit_status": "audited"}
+{"row_id": 349, "decision": "keep", "reason_code": "clean", "rationale": "লগইন লকড হওয়ার পর কত ঘণ্টা পরে আবার চেষ্টা করা যাবে—এটি অপেক্ষার সময় ও রিট্রাই intent-এর সঙ্গে মেলে।", "audit_status": "audited"}
+{"row_id": 350, "decision": "keep", "reason_code": "clean", "rationale": "সঠিক তথ্য এন্ট্রি করেও লক কাটছে না এবং কবে কাটবে—ট্যাগের সঠিক retrial অর্থ বহন করে।", "audit_status": "audited"}
+{"row_id": 351, "decision": "keep", "reason_code": "clean", "rationale": "সঠিক তথ্য দিলেও লক থেকে যাচ্ছে এবং কত সময় পর খুলবে জানতে চাওয়া হয়েছে।", "audit_status": "audited"}
+{"row_id": 354, "decision": "keep", "reason_code": "clean", "rationale": "Correct information still leaves the account locked and asks how long it will take.", "audit_status": "audited"}
+{"row_id": 355, "decision": "keep", "reason_code": "clean", "rationale": "Correct information is supplied but the locked account still is not opening; asks what to do.", "audit_status": "audited"}
+{"row_id": 356, "decision": "flag", "reason_code": "sibling_collision", "rationale": "Asks how the user can get it unlocked quickly, which is a how-to/process intent rather than direct agent unlock request.", "audit_status": "audited"}
+{"row_id": 357, "decision": "flag", "reason_code": "sibling_collision", "rationale": "Asks about an express unlock option in general, not asking the agent to unlock the user's account now.", "audit_status": "audited"}
+{"row_id": 358, "decision": "keep", "reason_code": "clean", "rationale": "Locked ID portal and asks “আপনি” to download for the user; direct on-behalf service request.", "audit_status": "audited"}
+{"row_id": 359, "decision": "keep", "reason_code": "clean", "rationale": "Asks to open the closed/locked ID immediately, matching direct unlock service request.", "audit_status": "audited"}
+{"row_id": 360, "decision": "flag", "reason_code": "too_generic", "rationale": "Asks if you can urgently do 'something' for a blocked ID; too vague for this specific unlock/download request tag.", "audit_status": "audited"}
+{"row_id": 363, "decision": "flag", "reason_code": "wrong_intent", "rationale": "Asks whether it will be unlocked immediately, more of a status/timing question than a request for support to unlock it.", "audit_status": "audited"}
+{"row_id": 366, "decision": "flag", "reason_code": "wrong_intent", "rationale": "Asks for a quick way or method, which is guidance/self-help rather than an unlock service request.", "audit_status": "audited"}
+{"row_id": 368, "decision": "flag", "reason_code": "synthetic_artifact", "rationale": "The phrase 'আইডি লক ঢাকা থেকে' is unnatural/context-inserted; despite download assistance wording it reads synthetic.", "audit_status": "audited"}
+{"row_id": 370, "decision": "keep", "reason_code": "clean", "rationale": "User says their account is closed and politely asks if it can be opened now; fits direct unlock/open request.", "audit_status": "audited"}
+{"row_id": 373, "decision": "keep", "reason_code": "clean", "rationale": "Asks for an immediate opportunity to have the blocked ID unlocked; service-oriented, not a how-to.", "audit_status": "audited"}
+{"row_id": 374, "decision": "keep", "reason_code": "clean", "rationale": "User says their ID is locked and asks if immediate rapid unlocking can be done.", "audit_status": "audited"}
+{"row_id": 376, "decision": "keep", "reason_code": "clean", "rationale": "লক হওয়া আইডি ‘আজই’ আনলক করে দিতে পারবেন কি—এটি সরাসরি আনলক সার্ভিস অনুরোধ।", "audit_status": "audited"}
+{"row_id": 378, "decision": "keep", "reason_code": "clean", "rationale": "Locked own account and asks immediate unlock; matches a central example.", "audit_status": "audited"}
+{"row_id": 379, "decision": "flag", "reason_code": "context_dependent", "rationale": "Focuses on downloading from Gazipur/location while account is locked; not a direct support unlock or on-behalf download request.", "audit_status": "audited"}
+{"row_id": 380, "decision": "keep", "reason_code": "clean", "rationale": "Matches core example: locked NID online account and asks support to unlock now.", "audit_status": "audited"}
+{"row_id": 381, "decision": "flag", "reason_code": "sibling_collision", "rationale": "Asks how the user can download NID after lock; self/how-to download intent, not agent unlocking or downloading on behalf.", "audit_status": "audited"}
+{"row_id": 382, "decision": "flag", "reason_code": "context_dependent", "rationale": "Statement about urgent download need due to being in Rangpur; no direct request for support to unlock or download on behalf.", "audit_status": "audited"}
+{"row_id": 383, "decision": "keep", "reason_code": "clean", "rationale": "User's NID account is closed and asks if it can be opened this moment; direct immediate unlock/open request.", "audit_status": "audited"}
+{"row_id": 390, "decision": "flag", "reason_code": "wrong_intent", "rationale": "‘কিভাবে দ্রুত অ্যাক্সেস পাব’ একটি how-to/নিজে করণীয় ধরনের প্রশ্ন; support-কে এখনই আনলক করে দিতে বলা হয়নি।", "audit_status": "audited"}
+{"row_id": 393, "decision": "flag", "reason_code": "sibling_collision", "rationale": "Asks by what method the user will download after account lock; how-to download intent rather than direct service request.", "audit_status": "audited"}
+{"row_id": 395, "decision": "flag", "reason_code": "sibling_collision", "rationale": "Asks for the rule/procedure for instant unlock, not for support to perform the unlock.", "audit_status": "audited"}
+{"row_id": 401, "decision": "keep", "reason_code": "clean", "rationale": "Directly asks if the inactive account can be enabled now; close equivalent to immediate unlock request.", "audit_status": "audited"}
+{"row_id": 405, "decision": "keep", "reason_code": "clean", "rationale": "‘আপনি কি আমার হয়ে কপি ডাউনলোড করবেন’ সরাসরি support/agent-কে locked account অবস্থায় ডাউনলোড করে দিতে বলছে।", "audit_status": "audited"}
+{"row_id": 407, "decision": "keep", "reason_code": "clean", "rationale": "লক/ব্লকড একাউন্ট অবস্থায় ‘এই মুহূর্তে’ ডাউনলোড করে দেওয়ার অনুরোধ আছে; এজেন্টের পক্ষ থেকে কাজ করে দেওয়ার intent মেলে।", "audit_status": "audited"}
+{"row_id": 409, "decision": "keep", "reason_code": "clean", "rationale": "Account blocked and asks support to unblock very fast; direct service request.", "audit_status": "audited"}
+{"row_id": 411, "decision": "flag", "reason_code": "sibling_collision", "rationale": "Asks for the way to unlock a restricted account, which is procedural/how-to rather than asking support to do it.", "audit_status": "audited"}
+{"row_id": 412, "decision": "keep", "reason_code": "clean", "rationale": "Despite terse wording, it asks the agent to unlock the locked account now; direct request.", "audit_status": "audited"}
+{"row_id": 413, "decision": "flag", "reason_code": "too_generic", "rationale": "Asks broadly if anyone can download the NID, without a direct request to support or an agent.", "audit_status": "audited"}
+{"row_id": 414, "decision": "keep", "reason_code": "clean", "rationale": "Matches core intent: account locked and asks support to download NID on the user’s behalf.", "audit_status": "audited"}
+{"row_id": 415, "decision": "flag", "reason_code": "sibling_collision", "rationale": "Asks if calling can open it immediately, which is channel/procedure intent rather than direct service request.", "audit_status": "audited"}
+{"row_id": 419, "decision": "flag", "reason_code": "wrong_intent", "rationale": "Asks what steps the user can take quickly, a self-action/how-to intent.", "audit_status": "audited"}
+{"row_id": 421, "decision": "flag", "reason_code": "context_dependent", "rationale": "States download is blocked by account lock but asks 'কি করবেন'; it does not clearly request unlock or download on the user's behalf.", "audit_status": "audited"}
+{"row_id": 423, "decision": "keep", "reason_code": "clean", "rationale": "Explicitly asks 'you' to open/unlock the locked account immediately.", "audit_status": "audited"}
+{"row_id": 426, "decision": "keep", "reason_code": "clean", "rationale": "Locked account and asks for immediate unlock; matches the central intent.", "audit_status": "audited"}
+{"row_id": 431, "decision": "keep", "reason_code": "clean", "rationale": "Account locked, addresses “আপনারা,” and asks for immediate download service; direct agent action.", "audit_status": "audited"}
+{"row_id": 432, "decision": "keep", "reason_code": "clean", "rationale": "Locked account asks if it can be unlocked now; passive but clearly an immediate unlock service request.", "audit_status": "audited"}
+{"row_id": 433, "decision": "flag", "reason_code": "synthetic_artifact", "rationale": "The 'instant unlock token' concept is artificial and asks about a token, not support unlocking the account.", "audit_status": "audited"}
+{"row_id": 434, "decision": "keep", "reason_code": "clean", "rationale": "Locked account and asks to get the download done immediately; direct service action.", "audit_status": "audited"}
+{"row_id": 435, "decision": "keep", "reason_code": "clean", "rationale": "Locked account plus immediate reactivation request functions as an unlock-now service request.", "audit_status": "audited"}
+{"row_id": 436, "decision": "keep", "reason_code": "clean", "rationale": "‘আপনারা কি ফোনে সাথে সাথে খুলে দিতে পারবেন’ locked account unlock করার সরাসরি service request।", "audit_status": "audited"}
+{"row_id": 438, "decision": "keep", "reason_code": "clean", "rationale": "Account shows locked and the user asks if immediate unlock is possible; aligned with the tag intent.", "audit_status": "audited"}
+{"row_id": 439, "decision": "flag", "reason_code": "too_generic", "rationale": "Only asks whether urgent unlock is possible; lacks direct support/agent service request or 'করেদিতে' framing.", "audit_status": "audited"}
+{"row_id": 441, "decision": "keep", "reason_code": "clean", "rationale": "Directly asks if the user's ID can be unlocked now, with urgency.", "audit_status": "audited"}
+{"row_id": 442, "decision": "flag", "reason_code": "sibling_collision", "rationale": "Uses account recovery framing rather than unlock/open-for-me request, colliding with recovery intent.", "audit_status": "audited"}
+{"row_id": 443, "decision": "flag", "reason_code": "sibling_collision", "rationale": "Generic/hypothetical question about whether immediate opening opportunity exists, not a direct request for support to unlock this account now.", "audit_status": "audited"}
+{"row_id": 445, "decision": "flag", "reason_code": "sibling_collision", "rationale": "Asks what to do for urgent download after profile block, which is a next-step/how-to intent, not a direct service request.", "audit_status": "audited"}
+{"row_id": 447, "decision": "keep", "reason_code": "clean", "rationale": "NID access is closed and the user asks if it can be opened now; direct immediate access/unlock request.", "audit_status": "audited"}
+{"row_id": 448, "decision": "keep", "reason_code": "clean", "rationale": "Blocked NID access with request for on-the-spot unlock; fits immediate service unlock intent.", "audit_status": "audited"}
+{"row_id": 450, "decision": "keep", "reason_code": "clean", "rationale": "Blocked NID account with immediate request for manual opening; fits direct unlock service intent.", "audit_status": "audited"}
+{"row_id": 454, "decision": "keep", "reason_code": "clean", "rationale": "এনআইডি পোর্টাল লকড এবং ‘আজই খুলে দেওয়া’ সম্ভব কি—এজেন্টের মাধ্যমে দ্রুত unlock করে দেওয়ার request।", "audit_status": "audited"}
+{"row_id": 457, "decision": "keep", "reason_code": "clean", "rationale": "NID portal is blocked and user asks if access can be given now; direct access restoration request.", "audit_status": "audited"}
+{"row_id": 460, "decision": "flag", "reason_code": "sibling_collision", "rationale": "Asks whether there is any way to open immediately; framed as method/option, not a direct unlock request.", "audit_status": "audited"}
+{"row_id": 462, "decision": "flag", "reason_code": "sibling_collision", "rationale": "Asks for the way to get a copy after profile block; this is a how-to/download-copy intent, not agent action on behalf.", "audit_status": "audited"}
+{"row_id": 463, "decision": "flag", "reason_code": "wrong_intent", "rationale": "Asks for the urgent unlock procedure; this is how-to guidance, not a direct service request.", "audit_status": "audited"}
+{"row_id": 464, "decision": "keep", "reason_code": "clean", "rationale": "Profile block plus asks whether you can immediately unblock it; direct service intent.", "audit_status": "audited"}
+{"row_id": 465, "decision": "keep", "reason_code": "clean", "rationale": "Asks the agent to download NID for the user after opening/unlocking; direct assistance request.", "audit_status": "audited"}
+{"row_id": 468, "decision": "keep", "reason_code": "clean", "rationale": "Explicitly asks 'you' to open the blocked NID login immediately.", "audit_status": "audited"}
+{"row_id": 469, "decision": "keep", "reason_code": "clean", "rationale": "Explicitly asks whether 'আপনাদের পক্ষে' the blocked NID login can be fixed immediately; direct support request.", "audit_status": "audited"}
+{"row_id": 472, "decision": "flag", "reason_code": "too_generic", "rationale": "‘কপি পাওয়ার কোনো উপায়’ জিজ্ঞেস করছে; agent-কে আনলক/ডাউনলোড করে দিতে সরাসরি অনুরোধ নয়।", "audit_status": "audited"}
+{"row_id": 474, "decision": "keep", "reason_code": "clean", "rationale": "Polite direct request to open the locked NID login immediately.", "audit_status": "audited"}
+{"row_id": 477, "decision": "keep", "reason_code": "clean", "rationale": "NID site account is blocked and the user asks 'আনলক করে দেবেন'; direct unlock request.", "audit_status": "audited"}
+{"row_id": 478, "decision": "flag", "reason_code": "sibling_collision", "rationale": "Asks for the way to download urgently when blocked, not for support to download on the user's behalf.", "audit_status": "audited"}
+{"row_id": 479, "decision": "keep", "reason_code": "clean", "rationale": "Blocked NID service account and asks if it can be unlocked this moment; direct immediate unlock intent.", "audit_status": "audited"}
+{"row_id": 480, "decision": "keep", "reason_code": "clean", "rationale": "Locked NID portal with immediate request for someone to unlock it; matches service unlock intent.", "audit_status": "audited"}
+{"row_id": 481, "decision": "keep", "reason_code": "clean", "rationale": "NID login is locked and the user asks if it can be opened this moment; fits an immediate unlock service request.", "audit_status": "audited"}
+{"row_id": 482, "decision": "flag", "reason_code": "context_dependent", "rationale": "Mixed question about what will happen, self-opening, and someone downloading; not a clear direct support request.", "audit_status": "audited"}
+{"row_id": 488, "decision": "flag", "reason_code": "too_generic", "rationale": "‘ব্লক থাকলে কি দ্রুত আনলক করানো যায়’ সাধারণ সম্ভাবনা/প্রক্রিয়া জানতে চাওয়া; নির্দিষ্ট agent-কে এখনই করে দিতে বলা নয়।", "audit_status": "audited"}
+{"row_id": 497, "decision": "flag", "reason_code": "wrong_intent", "rationale": "Asks whether the user can submit a request, not asking support to unlock or download now.", "audit_status": "audited"}
+{"row_id": 498, "decision": "flag", "reason_code": "wrong_intent", "rationale": "Asks whether there is an unlock method or procedure, not support doing it now.", "audit_status": "audited"}
+{"row_id": 499, "decision": "flag", "reason_code": "sibling_collision", "rationale": "Asks for the way to get an NID copy after profile block, a how-to/copy retrieval intent rather than direct service.", "audit_status": "audited"}
+{"row_id": 502, "decision": "keep", "reason_code": "clean", "rationale": "Profile locked and asks support to directly download for the user; clean on-behalf request.", "audit_status": "audited"}
+{"row_id": 504, "decision": "keep", "reason_code": "clean", "rationale": "Profile locked and user asks for manual download assistance, matching the on-behalf/download service branch of the tag.", "audit_status": "audited"}
+{"row_id": 506, "decision": "keep", "reason_code": "clean", "rationale": "Asks whether download can be arranged/done while profile is locked, matching on-behalf download service intent.", "audit_status": "audited"}
+{"row_id": 508, "decision": "flag", "reason_code": "wrong_intent", "rationale": "Asks whether the user can open it themselves immediately; self-service, not support/agent unlock request.", "audit_status": "audited"}
+{"row_id": 511, "decision": "keep", "reason_code": "clean", "rationale": "Profile is locked and asks support to unlock urgently now; direct support action.", "audit_status": "audited"}
+{"row_id": 519, "decision": "flag", "reason_code": "sibling_collision", "rationale": "Asks whether a quick unblock option exists, not asking support to perform the unlock now.", "audit_status": "audited"}
+{"row_id": 520, "decision": "keep", "reason_code": "clean", "rationale": "Blocked profile and asks support to unblock instantly; direct service request.", "audit_status": "audited"}
+{"row_id": 524, "decision": "flag", "reason_code": "sibling_collision", "rationale": "Asks whether an immediate unlock arrangement exists, more like service-option availability than asking the agent to unlock it now.", "audit_status": "audited"}
+{"row_id": 528, "decision": "keep", "reason_code": "clean", "rationale": "Login is closed and asks if someone can now download NID on the user’s behalf; direct on-behalf service request.", "audit_status": "audited"}
+{"row_id": 34887, "decision": "keep", "reason_code": "clean", "rationale": "Asks to unlock the locked account immediately; direct service request.", "audit_status": "audited"}

@@ -1,0 +1,180 @@
+{
+  "packet_id": "audit_packet:000002",
+  "pass_idx": 0,
+  "result": {
+    "decisions": [
+      {
+        "decision": "keep",
+        "rationale": "Directly asks how to open/fix an NID service portal account marked locked.",
+        "reason_code": "clean",
+        "row_id": 137
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks about requirements for unlocking an NID account lock; still a general self-help unlock query.",
+        "reason_code": "clean",
+        "row_id": 103
+      },
+      {
+        "decision": "keep",
+        "rationale": "Mentions NID account lock and asks how to regain access, matching the tag intent.",
+        "reason_code": "clean",
+        "row_id": 29
+      },
+      {
+        "decision": "keep",
+        "rationale": "Account locked login message and asks what to do; no wait-time or agent-action request.",
+        "reason_code": "clean",
+        "row_id": 16
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks for guideline to unlock a locked NID account, fitting general self-help.",
+        "reason_code": "clean",
+        "row_id": 6
+      },
+      {
+        "decision": "keep",
+        "rationale": "Login locked message in NID portal and asks what to do, matching the tag.",
+        "reason_code": "clean",
+        "row_id": 115
+      },
+      {
+        "decision": "keep",
+        "rationale": "Blocked NID online account and asks rules for unlocking; clean fit.",
+        "reason_code": "clean",
+        "row_id": 3
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks for unlock steps for a locked NID account.",
+        "reason_code": "clean",
+        "row_id": 146
+      },
+      {
+        "decision": "keep",
+        "rationale": "Blocked NID portal account and asks how to reactivate, within locked/blocked account recovery.",
+        "reason_code": "clean",
+        "row_id": 100
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks what self-help steps can be tried before support for a locked NID account.",
+        "reason_code": "clean",
+        "row_id": 79
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks how to fix an NID online account block, matching the tag.",
+        "reason_code": "clean",
+        "row_id": 51
+      },
+      {
+        "decision": "keep",
+        "rationale": "National ID online service account lock and asks how it can be fixed.",
+        "reason_code": "clean",
+        "row_id": 153
+      },
+      {
+        "decision": "keep",
+        "rationale": "Requests official guidance for solving an NID account lock, still general self-help.",
+        "reason_code": "clean",
+        "row_id": 73
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks official instructions for an NID online account lock; fits the intended scope.",
+        "reason_code": "clean",
+        "row_id": 54
+      },
+      {
+        "decision": "keep",
+        "rationale": "User/account locked in NID service and asks how to recover.",
+        "reason_code": "clean",
+        "row_id": 139
+      },
+      {
+        "decision": "keep",
+        "rationale": "Blocked NID online account and asks how to restart/reactivate it.",
+        "reason_code": "clean",
+        "row_id": 65
+      },
+      {
+        "decision": "keep",
+        "rationale": "Mentions an Account locked alert on the NID site and asks next steps.",
+        "reason_code": "clean",
+        "row_id": 136
+      },
+      {
+        "decision": "flag",
+        "rationale": "Focuses on whether something can be done immediately after a lock, overlapping with wait/timing-after-lock handling rather than general unlock steps.",
+        "reason_code": "sibling_collision",
+        "row_id": 112
+      },
+      {
+        "decision": "keep",
+        "rationale": "Locked user in NID portal and asks for unlock instructions.",
+        "reason_code": "clean",
+        "row_id": 116
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks the way to remove an NID portal lock, matching unlock self-help.",
+        "reason_code": "clean",
+        "row_id": 111
+      },
+      {
+        "decision": "keep",
+        "rationale": "NID login lock under Election Commission context and asks for the solution.",
+        "reason_code": "clean",
+        "row_id": 173
+      },
+      {
+        "decision": "keep",
+        "rationale": "Blocked NID online account and asks how to open it again.",
+        "reason_code": "clean",
+        "row_id": 50
+      },
+      {
+        "decision": "keep",
+        "rationale": "Locked user error during NID login and asks how to fix it.",
+        "reason_code": "clean",
+        "row_id": 134
+      },
+      {
+        "decision": "flag",
+        "rationale": "Asks for help to open the locked account, resembling an agent-assisted unlock request rather than a self-help question.",
+        "reason_code": "sibling_collision",
+        "row_id": 40
+      }
+    ],
+    "packet_id": "audit_packet:000002",
+    "packet_rationale": "Kept rows that clearly describe an NID online/login account being locked or blocked and ask for general fix, unlock, recovery, or next-step guidance. Flagged only rows crossing stated boundaries: timing/immediate-action after lock, and agent-assisted opening/unlocking rather than self-help."
+  },
+  "row_ids": [
+    137,
+    103,
+    29,
+    16,
+    6,
+    115,
+    3,
+    146,
+    100,
+    79,
+    51,
+    153,
+    73,
+    54,
+    139,
+    65,
+    136,
+    112,
+    116,
+    111,
+    173,
+    50,
+    134,
+    40
+  ]
+}

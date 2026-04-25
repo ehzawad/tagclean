@@ -1,0 +1,68 @@
+{
+  "packet_id": "audit_packet:000003",
+  "pass_idx": 0,
+  "result": {
+    "decisions": [
+      {
+        "decision": "keep",
+        "rationale": "Self-contained question asking how long an OTP sent from the EC postal voting portal will take to be received; directly matches OTP delivery time intent.",
+        "reason_code": "clean",
+        "row_id": 52789
+      },
+      {
+        "decision": "keep",
+        "rationale": "Clearly asks whether the OTP message in Postal Vote BD takes some time to arrive, which is about OTP delivery timing.",
+        "reason_code": "clean",
+        "row_id": 52738
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks if the Postal Vote BD OTP arrives instantly or with delay; this cleanly fits the delivery-time/delay intent.",
+        "reason_code": "clean",
+        "row_id": 52707
+      },
+      {
+        "decision": "keep",
+        "rationale": "Directly asks how many minutes the postal vote app OTP takes to arrive; central fit for the tag.",
+        "reason_code": "clean",
+        "row_id": 52698
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks the OTP receive time for the EC postal vote app; self-contained and clearly about OTP delivery time.",
+        "reason_code": "clean",
+        "row_id": 52773
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks how quickly the OTP for the EC postal vote portal arrives; matches the intended delivery-time question.",
+        "reason_code": "clean",
+        "row_id": 52713
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks the approximate time limit to receive a verification code for EC postal vote service; verification/confirmation code timing is within the tag.",
+        "reason_code": "clean",
+        "row_id": 52768
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks the approximate number of minutes to get an OTP for the EC postal vote service; clearly fits OTP delivery time despite slightly compact phrasing.",
+        "reason_code": "clean",
+        "row_id": 52781
+      }
+    ],
+    "packet_id": "audit_packet:000003",
+    "packet_rationale": "All rows are self-contained and ask about how long an OTP, verification, or confirmation code takes to arrive or be received in the postal vote BD/EC app, portal, or service. No row is about password reset or another avoided intent, and none is too generic or context-dependent."
+  },
+  "row_ids": [
+    52789,
+    52738,
+    52707,
+    52698,
+    52773,
+    52713,
+    52768,
+    52781
+  ]
+}

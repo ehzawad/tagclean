@@ -1,0 +1,37 @@
+{
+  "cleaned": {
+    "confusions": [
+      {
+        "count": 2,
+        "predicted_tag": "otp_delivery_time",
+        "true_tag": "otp_not_received"
+      },
+      {
+        "count": 1,
+        "predicted_tag": "otp_not_received",
+        "true_tag": "otp_delivery_time"
+      }
+    ],
+    "rows": 212,
+    "top1_accuracy": 0.9858490566037735,
+    "top5_accuracy": 0.9952830188679245
+  },
+  "low_support_tags": [],
+  "top40": {
+    "confusions": [
+      {
+        "count": 2,
+        "predicted_tag": "otp_delivery_time",
+        "true_tag": "otp_not_received"
+      },
+      {
+        "count": 1,
+        "predicted_tag": "otp_not_received",
+        "true_tag": "otp_delivery_time"
+      }
+    ],
+    "rows": 120,
+    "top1_accuracy": 0.975,
+    "top5_accuracy": 0.9916666666666667
+  }
+}

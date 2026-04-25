@@ -1,0 +1,180 @@
+{
+  "packet_id": "audit_packet:000002",
+  "pass_idx": 0,
+  "result": {
+    "decisions": [
+      {
+        "decision": "keep",
+        "rationale": "Self-contained question asking when the Postal Vote BD app confirmation code arrives, matching OTP/code delivery timing.",
+        "reason_code": "clean",
+        "row_id": 52725
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks how long it takes for the code to arrive after resend; still clearly about code delivery time.",
+        "reason_code": "clean",
+        "row_id": 52778
+      },
+      {
+        "decision": "keep",
+        "rationale": "Directly asks how many minutes OTP delivery usually takes in the Election Commission postal vote app.",
+        "reason_code": "clean",
+        "row_id": 52749
+      },
+      {
+        "decision": "keep",
+        "rationale": "Clearly asks whether users must wait a few minutes to receive the Postal Vote BD OTP.",
+        "reason_code": "clean",
+        "row_id": 52740
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks whether the OTP reaching the inbox should be expected to take a few minutes; fits delivery-time intent.",
+        "reason_code": "clean",
+        "row_id": 52796
+      },
+      {
+        "decision": "keep",
+        "rationale": "Uses 'one-time password' as OTP and asks how long it takes to reach the phone; matches tag.",
+        "reason_code": "clean",
+        "row_id": 52764
+      },
+      {
+        "decision": "keep",
+        "rationale": "Directly asks how many minutes to wait to receive the Postal Vote BD OTP.",
+        "reason_code": "clean",
+        "row_id": 52784
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks whether the postal vote OTP arrival takes a long or short time, which is a delivery-time question.",
+        "reason_code": "clean",
+        "row_id": 52770
+      },
+      {
+        "decision": "keep",
+        "rationale": "Self-contained question about the arrival time of OTP on the postal vote platform.",
+        "reason_code": "clean",
+        "row_id": 52776
+      },
+      {
+        "decision": "keep",
+        "rationale": "Directly asks the timeframe for OTP arrival in the postal vote app.",
+        "reason_code": "clean",
+        "row_id": 52744
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks whether receiving the SMS OTP can be delayed by a few minutes; clearly about OTP delivery time.",
+        "reason_code": "clean",
+        "row_id": 52762
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks the OTP delivery window in minutes for the Election Commission postal vote app.",
+        "reason_code": "clean",
+        "row_id": 52760
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks whether OTP arrives immediately or with slight delay; clean delivery-time intent.",
+        "reason_code": "clean",
+        "row_id": 52779
+      },
+      {
+        "decision": "keep",
+        "rationale": "Uses 'one-time password' to mean OTP and asks how much time should be allowed to receive it.",
+        "reason_code": "clean",
+        "row_id": 52702
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks how much delay is usually seen in receiving the postal vote app OTP.",
+        "reason_code": "clean",
+        "row_id": 52772
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks approximately how many minutes it takes to get the verification code from the postal vote app.",
+        "reason_code": "clean",
+        "row_id": 52715
+      },
+      {
+        "decision": "keep",
+        "rationale": "Directly asks how long it may take to receive the postal vote app verification code.",
+        "reason_code": "clean",
+        "row_id": 52759
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks generally what the OTP delivery time is in the postal voting system.",
+        "reason_code": "clean",
+        "row_id": 52735
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks how long an SMS code arrival may be delayed in Postal Vote BD; fits code delivery timing.",
+        "reason_code": "clean",
+        "row_id": 52751
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks how many minutes to wait for the postal vote OTP message on the phone.",
+        "reason_code": "clean",
+        "row_id": 52708
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks how long to wait in the postal vote app before receiving OTP; matches tag intent.",
+        "reason_code": "clean",
+        "row_id": 52712
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks the timeframe for receiving OTP in the EC postal vote service.",
+        "reason_code": "clean",
+        "row_id": 52706
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks whether getting the code in the postal voting app can take a few minutes; clean delivery-time query.",
+        "reason_code": "clean",
+        "row_id": 52788
+      },
+      {
+        "decision": "keep",
+        "rationale": "Directly asks how many minutes it takes to receive OTP in the postal vote service.",
+        "reason_code": "clean",
+        "row_id": 52726
+      }
+    ],
+    "packet_id": "audit_packet:000002",
+    "packet_rationale": "All rows are self-contained questions about how long OTP, verification, confirmation, SMS, or one-time password codes take to arrive or be received in the Postal Vote BD/app/service context. None concern password reset or password update timing, and no row is too generic or context-dependent for this tag."
+  },
+  "row_ids": [
+    52725,
+    52778,
+    52749,
+    52740,
+    52796,
+    52764,
+    52784,
+    52770,
+    52776,
+    52744,
+    52762,
+    52760,
+    52779,
+    52702,
+    52772,
+    52715,
+    52759,
+    52735,
+    52751,
+    52708,
+    52712,
+    52706,
+    52788,
+    52726
+  ]
+}

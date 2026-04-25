@@ -12,7 +12,7 @@ if [[ "${ALLOW_ARTIFACT_COMMIT:-0}" == "1" ]]; then
     exit 0
 fi
 
-PATTERN='^(runs/|artifacts/|.*/artifacts/)|\.parquet$|\.npy$|\.faiss$|\.idx$'
+PATTERN='\.parquet$|\.npy$|\.faiss$|\.idx$|\.safetensors$|\.pt$|\.bin$|\.h5$'
 BAD="$(git diff --cached --name-only --diff-filter=AM | grep -E "$PATTERN" || true)"
 
 if [[ -n "$BAD" ]]; then

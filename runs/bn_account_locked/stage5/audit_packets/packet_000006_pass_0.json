@@ -1,0 +1,180 @@
+{
+  "packet_id": "audit_packet:000006",
+  "pass_idx": 0,
+  "result": {
+    "decisions": [
+      {
+        "decision": "keep",
+        "rationale": "সঠিক তথ্য দেওয়ার পরও Locked থাকা এবং কতক্ষণ স্থায়ী হবে—এটি lock retrial/wait-time intent-এর সাথে মেলে।",
+        "reason_code": "clean",
+        "row_id": 259
+      },
+      {
+        "decision": "keep",
+        "rationale": "সাময়িক লক নিজে থেকে কতক্ষণ পরে খুলবে জানতে চেয়েছে; অপেক্ষার সময়/auto-unlock প্রসঙ্গ আছে।",
+        "reason_code": "clean",
+        "row_id": 201
+      },
+      {
+        "decision": "keep",
+        "rationale": "লকড থাকার কারণ জানার পর আনলক হতে কত সময় লাগবে—wait-time প্রশ্ন, tag intent-এর মধ্যে পড়ে।",
+        "reason_code": "clean",
+        "row_id": 321
+      },
+      {
+        "decision": "keep",
+        "rationale": "একবার লক হওয়ার পর সঠিক তথ্য দিলেও লক দেখাচ্ছে—কেন্দ্রীয় retrial-after-lock intent-এর পরিষ্কার উদাহরণ।",
+        "reason_code": "clean",
+        "row_id": 208
+      },
+      {
+        "decision": "flag",
+        "rationale": "মূলত লগইনের সময় লক সতর্কতা/বার্তা কখন যাবে জানতে চেয়েছে; correct-info retrial বা wait-after-lock স্পষ্ট নয়।",
+        "reason_code": "sibling_collision",
+        "row_id": 345
+      },
+      {
+        "decision": "keep",
+        "rationale": "অ্যাকাউন্ট লক অবস্থায় ঠিক তথ্য দিয়ে লগইন না হলে অপেক্ষা করতে হবে কি না—tag intent পরিষ্কার।",
+        "reason_code": "clean",
+        "row_id": 206
+      },
+      {
+        "decision": "keep",
+        "rationale": "লক হওয়ার পর কত সময় অপেক্ষা করে আবার লগইন করা উচিত—retry timing-এর সরাসরি প্রশ্ন।",
+        "reason_code": "clean",
+        "row_id": 294
+      },
+      {
+        "decision": "keep",
+        "rationale": "লক থাকলে পরে আবার লগইন করা যাবে কি না জানতে চেয়েছে; retrial timing intent আছে।",
+        "reason_code": "clean",
+        "row_id": 283
+      },
+      {
+        "decision": "keep",
+        "rationale": "লকড অবস্থায় সন্ধ্যায় আবার login try করা উচিত কি না—next retry প্রশ্ন।",
+        "reason_code": "clean",
+        "row_id": 344
+      },
+      {
+        "decision": "keep",
+        "rationale": "লক অবস্থায় পুনরায় চেষ্টা করার জন্য সুপারিশকৃত অপেক্ষার সময় জানতে চেয়েছে; tag-এর সাথে মেলে।",
+        "reason_code": "clean",
+        "row_id": 280
+      },
+      {
+        "decision": "flag",
+        "rationale": "লকড আইডি ‘সমাধানে’ কত সময় লাগবে খুব সাধারণ; সঠিক তথ্য, retry বা স্পষ্ট wait-after-login প্রসঙ্গ নেই।",
+        "reason_code": "too_generic",
+        "row_id": 314
+      },
+      {
+        "decision": "keep",
+        "rationale": "লক দেখানোর পর অপেক্ষা করবে নাকি অন্য পদক্ষেপ নেবে—লক-পরবর্তী wait/action guidance intent আছে।",
+        "reason_code": "clean",
+        "row_id": 284
+      },
+      {
+        "decision": "keep",
+        "rationale": "লকড অ্যাকাউন্ট আনলক হতে অপেক্ষাই কি উপায় জানতে চেয়েছে; wait-based retrial/unlock timing-এর সাথে মেলে।",
+        "reason_code": "clean",
+        "row_id": 315
+      },
+      {
+        "decision": "keep",
+        "rationale": "ঠিক তথ্য দিলেও লক রয়ে গেছে এবং system auto-clear করবে কি না—correct-info-after-lock intent পরিষ্কার।",
+        "reason_code": "clean",
+        "row_id": 257
+      },
+      {
+        "decision": "flag",
+        "rationale": "ভুল চেষ্টা বেশি হয়ে অ্যাকাউন্ট লক; শুধু এখন কী করবে জানতে চেয়েছে, wait/retry বা correct-info retrial নেই।",
+        "reason_code": "too_generic",
+        "row_id": 227
+      },
+      {
+        "decision": "keep",
+        "rationale": "লকড স্ট্যাটাসে সঠিক তথ্য দিয়েও এন্ট্রি মিলছে না—correct-info failure after lock; tag intent মেলে।",
+        "reason_code": "clean",
+        "row_id": 340
+      },
+      {
+        "decision": "keep",
+        "rationale": "একবার লক হলে পরদিন সকালে চেষ্টা করা ভালো কি না—লক-পরবর্তী retry timing প্রশ্ন।",
+        "reason_code": "clean",
+        "row_id": 220
+      },
+      {
+        "decision": "keep",
+        "rationale": "লক অবস্থায় ঠিক তথ্য দিয়েও ব্যর্থ হচ্ছে এবং সাময়িক কি না জানতে চেয়েছে; tag-এর কেন্দ্রীয় ধারণা আছে।",
+        "reason_code": "clean",
+        "row_id": 275
+      },
+      {
+        "decision": "keep",
+        "rationale": "ভুল ইনপুটের কারণে লক কখন clear হবে জানতে চেয়েছে; lock wait/auto-clear timing intent আছে।",
+        "reason_code": "clean",
+        "row_id": 269
+      },
+      {
+        "decision": "keep",
+        "rationale": "লক হলে ৮ ঘণ্টা অপেক্ষা করতে হবে কি না—স্পষ্ট wait-time প্রশ্ন।",
+        "reason_code": "clean",
+        "row_id": 306
+      },
+      {
+        "decision": "keep",
+        "rationale": "লক অবস্থায় সঠিক credentials দিলেও login fail হচ্ছে কেন—correct-info-after-lock retrial issue।",
+        "reason_code": "clean",
+        "row_id": 279
+      },
+      {
+        "decision": "keep",
+        "rationale": "অ্যাকাউন্ট লক থাকায় লগইন ব্যর্থ এবং আনলকের জন্য কতক্ষণ অপেক্ষা করতে হবে—সরাসরি tag intent।",
+        "reason_code": "clean",
+        "row_id": 191
+      },
+      {
+        "decision": "keep",
+        "rationale": "একবার লক হওয়া আইডি ঠিক তথ্য দিলেও খুলছে না—কেন্দ্রীয় retrial-after-lock উদাহরণের সাথে মেলে।",
+        "reason_code": "clean",
+        "row_id": 213
+      },
+      {
+        "decision": "keep",
+        "rationale": "লক অবস্থায় বারবার login চেষ্টা করা উচিত কি না—retry behavior/timing প্রসঙ্গ আছে।",
+        "reason_code": "clean",
+        "row_id": 278
+      }
+    ],
+    "packet_id": "audit_packet:000006",
+    "packet_rationale": "Rows were kept when they clearly involve post-lock waiting, auto-clear, correct-information failure after lock, or when to retry logging in. Rows were flagged only where the question was merely a lock warning/message or a generic locked-ID remedy without the retrial/wait/correct-information boundary required for this tag."
+  },
+  "row_ids": [
+    259,
+    201,
+    321,
+    208,
+    345,
+    206,
+    294,
+    283,
+    344,
+    280,
+    314,
+    284,
+    315,
+    257,
+    227,
+    340,
+    220,
+    275,
+    269,
+    306,
+    279,
+    191,
+    213,
+    278
+  ]
+}

@@ -1,0 +1,180 @@
+{
+  "packet_id": "audit_packet:000004",
+  "pass_idx": 0,
+  "result": {
+    "decisions": [
+      {
+        "decision": "keep",
+        "rationale": "Self-contained NID mother's-name error correction question asking what certificates to submit; directly matches the tag.",
+        "reason_code": "clean",
+        "row_id": 21872
+      },
+      {
+        "decision": "flag",
+        "rationale": "Clean intent, but it is a near-paraphrase of row 21872 about correcting mother's name in NID and submitting proof documents.",
+        "reason_code": "duplicate",
+        "row_id": 21862
+      },
+      {
+        "decision": "keep",
+        "rationale": "Directly asks required documents for correcting parents' names; central fit for father-mother name correction.",
+        "reason_code": "clean",
+        "row_id": 21913
+      },
+      {
+        "decision": "flag",
+        "rationale": "On-topic, but it closely duplicates row 21859/21783 style father-name wrong in NID and papers needed.",
+        "reason_code": "duplicate",
+        "row_id": 21778
+      },
+      {
+        "decision": "keep",
+        "rationale": "Specific question about correcting father's name error and whether family/heir certificate is needed; fits the tag well.",
+        "reason_code": "clean",
+        "row_id": 21927
+      },
+      {
+        "decision": "flag",
+        "rationale": "On-topic, but it repeats the same mother's-name error correction documents intent as row 21872.",
+        "reason_code": "duplicate",
+        "row_id": 21967
+      },
+      {
+        "decision": "flag",
+        "rationale": "Fits the tag, but is a near-paraphrase of row 21913 about correcting both parents' names and required documents.",
+        "reason_code": "duplicate",
+        "row_id": 21804
+      },
+      {
+        "decision": "keep",
+        "rationale": "Specific NID mother's-name correction question asking whether a family certificate is required; clear tag match.",
+        "reason_code": "clean",
+        "row_id": 21935
+      },
+      {
+        "decision": "flag",
+        "rationale": "On-topic father-name spelling correction process question, but near-duplicates row 21775 about contacting the proper authority.",
+        "reason_code": "duplicate",
+        "row_id": 21759
+      },
+      {
+        "decision": "keep",
+        "rationale": "Clearly asks about a spelling error in father's name on an identity card and which authority to contact; fits the process side of the tag.",
+        "reason_code": "clean",
+        "row_id": 21775
+      },
+      {
+        "decision": "flag",
+        "rationale": "Clean intent, but it is a near-paraphrase of row 21859 about father's name wrong in NID and required papers.",
+        "reason_code": "duplicate",
+        "row_id": 21783
+      },
+      {
+        "decision": "flag",
+        "rationale": "On-topic father-name spelling correction, but it closely duplicates row 21812 asking what documents to submit for spelling correction.",
+        "reason_code": "duplicate",
+        "row_id": 21903
+      },
+      {
+        "decision": "keep",
+        "rationale": "Self-contained question about correcting father's name error on a new NID card and required documents; central tag example.",
+        "reason_code": "clean",
+        "row_id": 21859
+      },
+      {
+        "decision": "flag",
+        "rationale": "On-topic, but duplicates row 21913/21804 style question about father-mother name correction documents.",
+        "reason_code": "duplicate",
+        "row_id": 21782
+      },
+      {
+        "decision": "keep",
+        "rationale": "Clearly asks about correcting father's-name spelling error in NID and which documents to submit; strong tag fit.",
+        "reason_code": "clean",
+        "row_id": 21812
+      },
+      {
+        "decision": "flag",
+        "rationale": "On-topic, but near-duplicates row 21859/21784 asking documents for correcting father's name in national ID.",
+        "reason_code": "duplicate",
+        "row_id": 21831
+      },
+      {
+        "decision": "flag",
+        "rationale": "Clean intent, but near-paraphrases row 21872 about mother's-name error correction in NID and required papers.",
+        "reason_code": "duplicate",
+        "row_id": 21864
+      },
+      {
+        "decision": "keep",
+        "rationale": "Specific question about correcting mother's-name spelling in national identity card and required documents; directly matches the tag.",
+        "reason_code": "clean",
+        "row_id": 21853
+      },
+      {
+        "decision": "flag",
+        "rationale": "On-topic, but duplicates the mother's-name correction documents intent already represented by row 21872.",
+        "reason_code": "duplicate",
+        "row_id": 21852
+      },
+      {
+        "decision": "flag",
+        "rationale": "Near-paraphrase of row 21759 and row 21775 about father's-name spelling error and where to go for correction.",
+        "reason_code": "duplicate",
+        "row_id": 21758
+      },
+      {
+        "decision": "flag",
+        "rationale": "On-topic, but semantically repeats the generic father's-name correction documents question represented by row 21859.",
+        "reason_code": "duplicate",
+        "row_id": 21928
+      },
+      {
+        "decision": "keep",
+        "rationale": "Specific question about correcting mother's-name error and whether original education certificate is needed; clear parent-name correction intent.",
+        "reason_code": "clean",
+        "row_id": 21943
+      },
+      {
+        "decision": "flag",
+        "rationale": "On-topic, but closely duplicates row 21859/21783 about correcting father's-name error in NID and needed certificates or papers.",
+        "reason_code": "duplicate",
+        "row_id": 21785
+      },
+      {
+        "decision": "flag",
+        "rationale": "Clean intent, but near-duplicates row 21831 and row 21859 about father's-name correction documents in NID.",
+        "reason_code": "duplicate",
+        "row_id": 21784
+      }
+    ],
+    "packet_id": "audit_packet:000004",
+    "packet_rationale": "All rows are broadly about correcting father/mother names in NID or identity-card records. I kept representative, self-contained examples, including central cases and specific-document/process variants. I flagged repetitive near-paraphrases within the packet, especially repeated generic questions about father's-name documents, mother's-name documents, and both-parents correction documents."
+  },
+  "row_ids": [
+    21872,
+    21862,
+    21913,
+    21778,
+    21927,
+    21967,
+    21804,
+    21935,
+    21759,
+    21775,
+    21783,
+    21903,
+    21859,
+    21782,
+    21812,
+    21831,
+    21864,
+    21853,
+    21852,
+    21758,
+    21928,
+    21943,
+    21785,
+    21784
+  ]
+}

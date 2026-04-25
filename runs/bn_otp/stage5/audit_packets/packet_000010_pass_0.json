@@ -1,0 +1,180 @@
+{
+  "packet_id": "audit_packet:000010",
+  "pass_idx": 0,
+  "result": {
+    "decisions": [
+      {
+        "decision": "keep",
+        "rationale": "Self-contained question asking which button to tap in Postal Vote BD to send an OTP; directly matches the tag.",
+        "reason_code": "clean",
+        "row_id": 53096
+      },
+      {
+        "decision": "keep",
+        "rationale": "Clearly asks which button to touch in Postal Vote BD to send an OTP.",
+        "reason_code": "clean",
+        "row_id": 53153
+      },
+      {
+        "decision": "keep",
+        "rationale": "Uses 'one-time code' as an OTP synonym and asks which button to touch to send it in Postal Vote BD.",
+        "reason_code": "clean",
+        "row_id": 53119
+      },
+      {
+        "decision": "flag",
+        "rationale": "The phrase 'কার বাটনে প্রেস করব' is malformed/unnatural for 'which button'; not a clean natural example despite the likely intended meaning.",
+        "reason_code": "synthetic_artifact",
+        "row_id": 53115
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks which button to click to send a verification code in the Postal Vote BD app, matching OTP send-button intent.",
+        "reason_code": "clean",
+        "row_id": 53139
+      },
+      {
+        "decision": "keep",
+        "rationale": "Self-contained and asks which UI control to click in Postal Vote app to perform OTP sending.",
+        "reason_code": "clean",
+        "row_id": 53155
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks which button to click in Postal Vote BD to send a verify/verification code; fits OTP send-button intent.",
+        "reason_code": "clean",
+        "row_id": 53108
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks which colored button to press to send OTP in the Postal Vote app; still about identifying the OTP send button.",
+        "reason_code": "clean",
+        "row_id": 53179
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks which option to select to send OTP in Postal Vote app; the intended UI action matches the send-button tag.",
+        "reason_code": "clean",
+        "row_id": 53098
+      },
+      {
+        "decision": "keep",
+        "rationale": "Although wording is a bit awkward, it asks which code-sending button to press in Postal Vote BD, fitting the tag.",
+        "reason_code": "clean",
+        "row_id": 53150
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks which icon/control to tap for sending OTP in the Postal Vote app; aligned with the send-button intent.",
+        "reason_code": "clean",
+        "row_id": 53131
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks what to press in Postal Vote BD to send a one-time password, a clear OTP send-button question.",
+        "reason_code": "clean",
+        "row_id": 53136
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks which control should be treated as the code-sending button in Postal Vote BD; clear enough for this tag.",
+        "reason_code": "clean",
+        "row_id": 53137
+      },
+      {
+        "decision": "flag",
+        "rationale": "Asks about submitting OTP, not sending/requesting an OTP; this fits an OTP submit-button intent better.",
+        "reason_code": "sibling_collision",
+        "row_id": 53173
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks which button to touch to send a security code in Postal Vote BD; security code is an OTP-like synonym.",
+        "reason_code": "clean",
+        "row_id": 53190
+      },
+      {
+        "decision": "keep",
+        "rationale": "Clearly asks which button to click in Postal Vote app to send a verify code; matches OTP send-button intent.",
+        "reason_code": "clean",
+        "row_id": 53167
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks which button to press in Postal Vote BD to send a verification code; direct fit.",
+        "reason_code": "clean",
+        "row_id": 53132
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks which control to select in Postal Vote app to send OTP; self-contained and on-tag.",
+        "reason_code": "clean",
+        "row_id": 53170
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks which button/option is used to send a security code in Postal Vote BD; fits OTP send-button intent.",
+        "reason_code": "clean",
+        "row_id": 53165
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks which button is needed to send a verification code in Postal Vote BD; clean match.",
+        "reason_code": "clean",
+        "row_id": 53180
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks which button to choose to send a security code in Postal Vote BD; clear OTP send-button question.",
+        "reason_code": "clean",
+        "row_id": 53116
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks exactly what to press in Postal Vote app to send OTP; directly matches the tag.",
+        "reason_code": "clean",
+        "row_id": 53125
+      },
+      {
+        "decision": "flag",
+        "rationale": "Asks which button to touch to submit OTP, which is different from sending/requesting an OTP.",
+        "reason_code": "sibling_collision",
+        "row_id": 53138
+      },
+      {
+        "decision": "keep",
+        "rationale": "Self-contained question asking what to press in Postal Vote app to send OTP; cleanly fits the tag.",
+        "reason_code": "clean",
+        "row_id": 53191
+      }
+    ],
+    "packet_id": "audit_packet:000010",
+    "packet_rationale": "Rows were kept when they clearly asked which button/control/option in Postal Vote BD sends or requests an OTP/verification/security code. Rows about OTP submission were flagged as sibling collisions, and the visibly malformed 'কার বাটনে' row was flagged as a synthetic/malformed artifact."
+  },
+  "row_ids": [
+    53096,
+    53153,
+    53119,
+    53115,
+    53139,
+    53155,
+    53108,
+    53179,
+    53098,
+    53150,
+    53131,
+    53136,
+    53137,
+    53173,
+    53190,
+    53167,
+    53132,
+    53170,
+    53165,
+    53180,
+    53116,
+    53125,
+    53138,
+    53191
+  ]
+}

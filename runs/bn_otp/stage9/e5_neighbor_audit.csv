@@ -1,0 +1,213 @@
+question,tag,top1_neighbor_tag,top1_neighbor_question,top1_correct,own_share_top_k,neighbor_tag_dist,audit_top_k
+পোস্টাল ভোট BD-তে SMS OTP ইনবক্সে আসতে আনুমানিক কতক্ষণ লাগে?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট BD-র যাচাইকরণ OTP ইনবক্সে আসতে সময় কত?,True,1.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোট অ্যাপে OTP পেতে কি কয়েক মিনিট লাগতে পারে?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট সার্ভিসের OTP আসতে কি অল্প সময় লাগে?,True,1.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোটিং সিস্টেমের OTP পেতে আনুমানিক কত মিনিট অপেক্ষা করব?,otp_delivery_time,otp_delivery_time,ফোনে পোস্টাল ভোটের ওটিপি মেসেজ পেতে কত মিনিট অপেক্ষা করব?,True,1.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোট বিডি অ্যাপে OTP আসতে কতক্ষণ সময় লাগে?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট BD অ্যাপে OTP পেতে সাধারণত কতক্ষণ অপেক্ষা করতে হয়?,True,1.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোট BD অ্যাপে OTP পেতে সাধারণত কতক্ষণ অপেক্ষা করতে হয়?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট বিডি অ্যাপে OTP আসতে কতক্ষণ সময় লাগে?,True,0.8,"{""otp_delivery_time"": 8, ""otp_not_received"": 2}",10
+নির্বাচন কমিশনের পোস্টাল ভোট অ্যাপের ওটিপি পেতে আনুমানিক সময় কত?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট অ্যাপের ওটিপি পেতে সাধারণত কতটা বিলম্ব দেখা যায়?,True,1.0,"{""otp_delivery_time"": 10}",10
+ইসি’র পোস্টাল ভোট সেবার OTP পাওয়ায় সাধারণত কেমন সময় লাগে?,otp_delivery_time,otp_delivery_time,ইসি পোস্টাল ভোট সার্ভিসে OTP পাওয়ার সময়সীমা কতটা?,True,1.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোট BD OTP পৌঁছাতে কত সময় ধরে অপেক্ষা করতে হয়?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট BD-তে OTP না এলে কতক্ষণ অপেক্ষা করা উচিত?,True,0.9,"{""otp_delivery_time"": 9, ""otp_not_received"": 1}",10
+নির্বাচন কমিশনের পোস্টাল ভোট অ্যাপের OTP ইনবক্সে আসার সময় সাধারণত কত?,otp_delivery_time,otp_delivery_time,নির্বাচন কমিশনের পোস্টাল ভোট প্ল্যাটফর্মে OTP আসার সময় কত?,True,1.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোট BD OTP আসতে কত মিনিট সময় নেয় সাধারণত?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোটিং BD অ্যাপে ওটিপি পৌঁছাতে গড় সময় কত মিনিট?,True,1.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোট BD-র যাচাইকরণ OTP ইনবক্সে আসতে সময় কত?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট BD-তে SMS OTP ইনবক্সে আসতে আনুমানিক কতক্ষণ লাগে?,True,1.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোট অ্যাপের সিকিউরিটি কোড আসতে প্রায় কতক্ষণ লাগে?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোটিং অ্যাপে সিকিউরিটি কোড পেতে কতক্ষণ ধৈর্য ধরতে হবে?,True,0.9,"{""otp_delivery_time"": 9, ""otp_not_received"": 1}",10
+পোস্টাল ভোট BD অ্যাপ থেকে OTP রিসিভ হতে সাধারণত কত মিনিট লাগে?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোটিং BD অ্যাপে ওটিপি পৌঁছাতে গড় সময় কত মিনিট?,True,1.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোটের জন্য পাঠানো ভেরিফিকেশন কোড আসতে গড়ে কত মিনিট লাগে?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোটিং অ্যাপের একবারের কোড পৌঁছাতে কত মিনিট সময় লাগে?,True,1.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোট BD অ্যাপে নিশ্চিতকরণ কোড ইনবক্সে আসতে কতক্ষণ ধরে সময় নেয়?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট BD-তে কোড পৌঁছাতে সাধারণত কতক্ষণ লাগে বলবেন?,True,1.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোট সিস্টেমে OTP আসার গড় সময় কত?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোটিং সিস্টেমে OTP ডেলিভারি সময় সাধারণত কেমন?,True,1.0,"{""otp_delivery_time"": 10}",10
+ইসি’র পোস্টাল ভোটিং অ্যাপ থেকে পাঠানো OTP কতক্ষণে মিলে?,otp_delivery_time,otp_delivery_time,ইসি’র পোস্টাল ভোট অ্যাপে OTP রিসিভ টাইম কতটা?,True,1.0,"{""otp_delivery_time"": 10}",10
+ইসি’র পোস্টাল ভোট বিডি অ্যাপ থেকে ভেরিফিকেশন কোড আসতে কতটা সময় লাগে?,otp_delivery_time,otp_delivery_time,ইসি পোস্টাল ভোট সার্ভিসে ভেরিফিকেশন কোড পেতে আনুমানিক সময়সীমা কত?,True,1.0,"{""otp_delivery_time"": 10}",10
+Postal Vote BD অ্যাপের সিকিউরিটি কোড আসতে কতটা সময় ধরে অপেক্ষা করতে হয়?,otp_delivery_time,otp_delivery_time,"Postal Vote BD থেকে পাঠানো সিকিউরিটি কোড কতক্ষণে আসে, কোনো ধারণা?",True,0.9,"{""otp_delivery_time"": 9, ""otp_not_received"": 1}",10
+পোস্টাল ভোট অ্যাপে কোড জেনারেট হওয়ার পর ফোনে পৌঁছাতে কতক্ষণ লাগে?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোটিং অ্যাপের একবারের কোড পৌঁছাতে কত মিনিট সময় লাগে?,True,0.9,"{""otp_delivery_time"": 9, ""otp_not_received"": 1}",10
+পোস্টাল ভোট BD অ্যাপে কোড পেতে কি ২–৩ মিনিটের মতো অপেক্ষা করতে হয়?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোটিং অ্যাপের কোড পেতে কি মিনিট কয়েক সময় লাগতে পারে?,True,0.9,"{""otp_delivery_time"": 9, ""otp_not_received"": 1}",10
+পোস্টাল ভোটিং অ্যাপে সিকিউরিটি কোড পেতে কতক্ষণ ধৈর্য ধরতে হবে?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট অ্যাপের সিকিউরিটি কোড আসতে প্রায় কতক্ষণ লাগে?,True,0.9,"{""otp_delivery_time"": 9, ""otp_not_received"": 1}",10
+পোস্টাল ভোটিং অ্যাপের একবারের কোড পৌঁছাতে কত মিনিট সময় লাগে?,otp_delivery_time,otp_delivery_time,যাচাইকরণ কোড পোস্টাল ভোট অ্যাপ থেকে পেতে আনুমানিক কত মিনিট লাগে?,True,0.9,"{""otp_delivery_time"": 9, ""otp_not_received"": 1}",10
+ইসি পোস্টাল ভোট অ্যাপে কোড ডেলিভারি হতে আনুমানিক কতক্ষণ সময় নেয়?,otp_delivery_time,otp_delivery_time,ইসি’র পোস্টাল ভোট বিডি অ্যাপ থেকে ভেরিফিকেশন কোড আসতে কতটা সময় লাগে?,True,0.9,"{""otp_delivery_time"": 9, ""otp_not_received"": 1}",10
+Postal Vote BD-এর OTP কি মিনিট খানেক পর আসে?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট BD OTP পেতে কি কয়েক মিনিট অপেক্ষা করতে হবে?,True,1.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোট BD-তে কোড পৌঁছাতে সাধারণত কতক্ষণ লাগে বলবেন?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোটিং BD অ্যাপে কোড রিসিভ হতে সাধারণত কত মিনিট সময় লাগে?,True,1.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোট BD-তে OTP না এলে কতক্ষণ অপেক্ষা করা উচিত?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট BD OTP পৌঁছাতে কত সময় ধরে অপেক্ষা করতে হয়?,True,0.6,"{""otp_delivery_time"": 6, ""otp_not_received"": 4}",10
+পোস্টাল ভোট BD অ্যাপ থেকে নিশ্চিতকরণ SMS পেতে সাধারণত কত মিনিট লাগে?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট BD-তে ভেরিফিকেশন SMS পেতে কী পরিমাণ সময় লাগে?,True,1.0,"{""otp_delivery_time"": 10}",10
+Postal Vote BD অ্যাপ থেকে OTP কি সাথে সাথে না এসে একটু সময় নেয়?,otp_delivery_time,otp_not_received,Postal Vote BD অ্যাপে OTP না এলে কতো সময় অপেক্ষা করে আবার নেব?,False,0.6,"{""otp_not_received"": 4, ""otp_delivery_time"": 6}",10
+Postal Vote BD-তে SMS OTP পাওয়ার গড় সময় কত মিনিট?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোটিং BD অ্যাপে ওটিপি পৌঁছাতে গড় সময় কত মিনিট?,True,1.0,"{""otp_delivery_time"": 10}",10
+ইসি পোস্টাল ভোট অ্যাপের এককালীন পাসকোড আসতে কত মিনিট সময় নেয়?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোটিং অ্যাপের একবারের কোড পৌঁছাতে কত মিনিট সময় লাগে?,True,1.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোট অ্যাপের এসএমএস ওটিপি ইনবক্সে ঢুকতে গড়ে কতক্ষণ লাগে?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট BD-তে SMS OTP ইনবক্সে আসতে আনুমানিক কতক্ষণ লাগে?,True,1.0,"{""otp_delivery_time"": 10}",10
+Postal Vote BD অ্যাপের যাচাইকরণ কোড সাধারণত কত মিনিট পরে আসে?,otp_delivery_time,otp_delivery_time,যাচাইকরণ কোড পোস্টাল ভোট অ্যাপ থেকে পেতে আনুমানিক কত মিনিট লাগে?,True,1.0,"{""otp_delivery_time"": 10}",10
+Postal Vote BD-র যাচাইকরণ কোড আসতে কত সময় ধরে ধৈর্য ধরতে হবে?,otp_delivery_time,otp_delivery_time,Postal Vote BD অ্যাপের সিকিউরিটি কোড আসতে কতটা সময় ধরে অপেক্ষা করতে হয়?,True,1.0,"{""otp_delivery_time"": 10}",10
+Postal Vote BD অ্যাপে কোড পেতে কত মিনিট ধরে ওয়েট করতে হবে?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোটিং BD অ্যাপে কোড রিসিভ হতে সাধারণত কত মিনিট সময় লাগে?,True,1.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোট BD অ্যাপে রিসেন্ড দিলে ওটিপি আসতে কতক্ষণ লাগে?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট বিডি অ্যাপে OTP আসতে কতক্ষণ সময় লাগে?,True,0.7,"{""otp_delivery_time"": 7, ""otp_not_received"": 3}",10
+পোস্টাল ভোটিং BD অ্যাপে ওটিপি পৌঁছাতে গড় সময় কত মিনিট?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট BD OTP আসতে কত মিনিট সময় নেয় সাধারণত?,True,1.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোটিং BD অ্যাপে কোড রিসিভ হতে সাধারণত কত মিনিট সময় লাগে?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট BD-তে কোড পৌঁছাতে সাধারণত কতক্ষণ লাগে বলবেন?,True,1.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোট অ্যাপে OTP না এলে কি কিছু মিনিট অপেক্ষা করা উচিত?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট অ্যাপে OTP পেতে কি কয়েক মিনিট লাগতে পারে?,True,0.8,"{""otp_delivery_time"": 8, ""otp_not_received"": 2}",10
+পোস্টাল ভোট BD-তে ভেরিফিকেশন SMS পেতে কী পরিমাণ সময় লাগে?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট BD অ্যাপ থেকে নিশ্চিতকরণ SMS পেতে সাধারণত কত মিনিট লাগে?,True,1.0,"{""otp_delivery_time"": 10}",10
+ইসি পোস্টাল ভোটিং পোর্টালের সিকিউরিটি কোড পেতে সময় কত ধরে?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোটিং অ্যাপে সিকিউরিটি কোড পেতে কতক্ষণ ধৈর্য ধরতে হবে?,True,1.0,"{""otp_delivery_time"": 10}",10
+"Postal Vote BD থেকে পাঠানো সিকিউরিটি কোড কতক্ষণে আসে, কোনো ধারণা?",otp_delivery_time,otp_delivery_time,Postal Vote BD অ্যাপের সিকিউরিটি কোড আসতে কতটা সময় ধরে অপেক্ষা করতে হয়?,True,1.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোটিং অ্যাপে যাচাইকরণ কোড পেতে কি একটু অপেক্ষা করতে হবে?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোটিং অ্যাপে সিকিউরিটি কোড পেতে কতক্ষণ ধৈর্য ধরতে হবে?,True,0.7,"{""otp_delivery_time"": 7, ""otp_not_received"": 2, ""otp_send_button"": 1}",10
+পোস্টাল ভোটিং অ্যাপের সিকিউরিটি কোড ইনবক্সে ঢুকতে কি কয়েক মিনিট লাগে?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট অ্যাপের সিকিউরিটি কোড আসতে প্রায় কতক্ষণ লাগে?,True,1.0,"{""otp_delivery_time"": 10}",10
+Postal Vote BD-এর ওটিপি ইনবক্সে ঢুকতে কতক্ষণ সময় নেয়?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট BD-তে SMS OTP ইনবক্সে আসতে আনুমানিক কতক্ষণ লাগে?,True,0.9,"{""otp_delivery_time"": 9, ""otp_not_received"": 1}",10
+পোস্টাল ভোট অ্যাপে এককালীন পাসকোড পেতে কি একটু সময় নেওয়া স্বাভাবিক?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোটিং অ্যাপের একবারের পাসওয়ার্ড পেতে কত সময় ধরা উচিত?,True,0.9,"{""otp_delivery_time"": 9, ""otp_not_received"": 1}",10
+পোস্টাল ভোট সার্ভিসের OTP আসতে কি অল্প সময় লাগে?,otp_delivery_time,otp_delivery_time,"পোস্টাল ভোটের OTP আসতে কি খুব বেশি সময় লাগে, নাকি অল্প?",True,1.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোট অ্যাপের OTP সাধারণত কত মিনিট বিলম্বে পৌঁছায়?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট অ্যাপের ওটিপি কত মিনিটে পৌঁছায়?,True,1.0,"{""otp_delivery_time"": 10}",10
+Postal Vote BD অ্যাপের নিশ্চিতকরণ কোড সাধারণত কখন আসে?,otp_delivery_time,otp_delivery_time,Postal Vote BD অ্যাপের যাচাইকরণ কোড সাধারণত কত মিনিট পরে আসে?,True,0.5,"{""otp_delivery_time"": 5, ""otp_not_received"": 2, ""otp_send_button"": 3}",10
+Postal Vote BD থেকে রিসেন্ড দেওয়ার পর কোড আসতে কতক্ষণ লাগে?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট BD-তে কোড পৌঁছাতে সাধারণত কতক্ষণ লাগে বলবেন?,True,1.0,"{""otp_delivery_time"": 10}",10
+নির্বাচন কমিশনের পোস্টাল ভোট অ্যাপের OTP ডেলিভারি সাধারণত কত মিনিটে হয়?,otp_delivery_time,otp_delivery_time,নির্বাচন কমিশনের পোস্টাল ভোট অ্যাপে OTP ডেলিভারি উইন্ডো কত মিনিটের?,True,1.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোট BD OTP পেতে কি কয়েক মিনিট অপেক্ষা করতে হবে?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট BD-র OTP পেতে ক’মিনিট অপেক্ষা করা ভালো?,True,1.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোটিং BD-র OTP ইনবক্সে পৌঁছাতে কি কয়েক মিনিট সময় ধরা উচিত?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট BD OTP পেতে কি কয়েক মিনিট অপেক্ষা করতে হবে?,True,1.0,"{""otp_delivery_time"": 10}",10
+Postal Vote BD অ্যাপের একবারের পাসওয়ার্ড ফোনে পৌঁছাতে কতটা সময়?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোটিং অ্যাপের একবারের পাসওয়ার্ড পেতে কত সময় ধরা উচিত?,True,0.7,"{""otp_delivery_time"": 7, ""otp_not_received"": 1, ""otp_send_button"": 2}",10
+পোস্টাল ভোট BD-র OTP পেতে ক’মিনিট অপেক্ষা করা ভালো?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট BD OTP পেতে কি কয়েক মিনিট অপেক্ষা করতে হবে?,True,1.0,"{""otp_delivery_time"": 10}",10
+"পোস্টাল ভোটের OTP আসতে কি খুব বেশি সময় লাগে, নাকি অল্প?",otp_delivery_time,otp_delivery_time,পোস্টাল ভোট সার্ভিসের OTP আসতে কি অল্প সময় লাগে?,True,1.0,"{""otp_delivery_time"": 10}",10
+নির্বাচন কমিশনের পোস্টাল ভোট প্ল্যাটফর্মে OTP আসার সময় কত?,otp_delivery_time,otp_delivery_time,নির্বাচন কমিশনের পোস্টাল ভোট অ্যাপের OTP ইনবক্সে আসার সময় সাধারণত কত?,True,1.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোট অ্যাপে OTP আসার টাইমফ্রেম কত?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট অ্যাপের ওটিপি কত মিনিটে পৌঁছায়?,True,1.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোট অ্যাপের SMS OTP পেতে কি মিনিট কয়েক দেরি হতে পারে?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট অ্যাপে OTP পেতে কি কয়েক মিনিট লাগতে পারে?,True,1.0,"{""otp_delivery_time"": 10}",10
+নির্বাচন কমিশনের পোস্টাল ভোট অ্যাপে OTP ডেলিভারি উইন্ডো কত মিনিটের?,otp_delivery_time,otp_delivery_time,নির্বাচন কমিশনের পোস্টাল ভোট অ্যাপের OTP ডেলিভারি সাধারণত কত মিনিটে হয়?,True,1.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোট অ্যাপের OTP কি অবিলম্বে আসে নাকি সামান্য দেরিতে?,otp_delivery_time,otp_delivery_time,"পোস্টাল ভোট BD-র OTP কি তৎক্ষণাৎ আসে, নাকি কিছুটা দেরি হয়?",True,1.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোটিং অ্যাপের একবারের পাসওয়ার্ড পেতে কত সময় ধরা উচিত?,otp_delivery_time,otp_delivery_time,Postal Vote BD অ্যাপের একবারের পাসওয়ার্ড ফোনে পৌঁছাতে কতটা সময়?,True,1.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোট অ্যাপের ওটিপি পেতে সাধারণত কতটা বিলম্ব দেখা যায়?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট অ্যাপের OTP সাধারণত কত মিনিট বিলম্বে পৌঁছায়?,True,1.0,"{""otp_delivery_time"": 10}",10
+যাচাইকরণ কোড পোস্টাল ভোট অ্যাপ থেকে পেতে আনুমানিক কত মিনিট লাগে?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোটিং অ্যাপের একবারের কোড পৌঁছাতে কত মিনিট সময় লাগে?,True,1.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোট অ্যাপের ভেরিফিকেশন কোড পেতে কতটা সময় লাগতে পারে?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোটের জন্য পাঠানো ভেরিফিকেশন কোড আসতে গড়ে কত মিনিট লাগে?,True,0.9,"{""otp_delivery_time"": 9, ""otp_not_received"": 1}",10
+পোস্টাল ভোটিং সিস্টেমে OTP ডেলিভারি সময় সাধারণত কেমন?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট সিস্টেমে OTP আসার গড় সময় কত?,True,1.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোট BD-তে SMS কোড আসতে কতটা সময় ধরে বিলম্ব হতে পারে?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট BD-তে কোড পৌঁছাতে সাধারণত কতক্ষণ লাগে বলবেন?,True,0.9,"{""otp_delivery_time"": 9, ""otp_not_received"": 1}",10
+ফোনে পোস্টাল ভোটের ওটিপি মেসেজ পেতে কত মিনিট অপেক্ষা করব?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোটিং সিস্টেমের OTP পেতে আনুমানিক কত মিনিট অপেক্ষা করব?,True,1.0,"{""otp_delivery_time"": 10}",10
+ওটিপি পাওয়ার আগে পোস্টাল ভোট অ্যাপে কতটা সময় ওয়েট করতে হবে?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট অ্যাপের ওটিপি কত মিনিটে পৌঁছায়?,True,1.0,"{""otp_delivery_time"": 10}",10
+ইসি পোস্টাল ভোট সার্ভিসে OTP পাওয়ার সময়সীমা কতটা?,otp_delivery_time,otp_delivery_time,ইসি পোস্টাল ভোট সার্ভিসে OTP পাওয়ার আনুমানিক মিনিট কত?,True,1.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোটিং অ্যাপের কোড পেতে কি মিনিট কয়েক সময় লাগতে পারে?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোটিং অ্যাপের একবারের কোড পৌঁছাতে কত মিনিট সময় লাগে?,True,0.9,"{""otp_delivery_time"": 9, ""otp_not_received"": 1}",10
+পোস্টাল ভোট সার্ভিসে ওটিপি পেতে ক’মিনিট লাগে?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট অ্যাপের ওটিপি কত মিনিটে পৌঁছায়?,True,1.0,"{""otp_delivery_time"": 10}",10
+ইসি পোস্টাল ভোটিং পোর্টাল থেকে পাঠানো OTP কতক্ষণে রিসিভ হবে?,otp_delivery_time,otp_delivery_time,ইসি’র পোস্টাল ভোটিং অ্যাপ থেকে পাঠানো OTP কতক্ষণে মিলে?,True,1.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোট BD-তে ওটিপি মেসেজ আসতে কি কিছুটা সময় লাগে?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট BD OTP পৌঁছাতে কত সময় ধরে অপেক্ষা করতে হয়?,True,1.0,"{""otp_delivery_time"": 10}",10
+"পোস্টাল ভোট BD-র OTP কি তৎক্ষণাৎ আসে, নাকি কিছুটা দেরি হয়?",otp_delivery_time,otp_delivery_time,পোস্টাল ভোট অ্যাপের OTP কি অবিলম্বে আসে নাকি সামান্য দেরিতে?,True,1.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোট অ্যাপের ওটিপি কত মিনিটে পৌঁছায়?,otp_delivery_time,otp_delivery_time,পোস্টাল ভোট অ্যাপের OTP সাধারণত কত মিনিট বিলম্বে পৌঁছায়?,True,1.0,"{""otp_delivery_time"": 10}",10
+ইসি’র পোস্টাল ভোট পোর্টালের OTP কত দ্রুত আসে?,otp_delivery_time,otp_delivery_time,ইসি পোস্টাল ভোটিং পোর্টাল থেকে পাঠানো OTP কতক্ষণে রিসিভ হবে?,True,1.0,"{""otp_delivery_time"": 10}",10
+ইসি’র পোস্টাল ভোট অ্যাপে OTP রিসিভ টাইম কতটা?,otp_delivery_time,otp_delivery_time,ইসি’র পোস্টাল ভোটিং অ্যাপ থেকে পাঠানো OTP কতক্ষণে মিলে?,True,1.0,"{""otp_delivery_time"": 10}",10
+ইসি পোস্টাল ভোট সার্ভিসে ভেরিফিকেশন কোড পেতে আনুমানিক সময়সীমা কত?,otp_delivery_time,otp_delivery_time,ইসি’র পোস্টাল ভোট বিডি অ্যাপ থেকে ভেরিফিকেশন কোড আসতে কতটা সময় লাগে?,True,1.0,"{""otp_delivery_time"": 10}",10
+ইসি পোস্টাল ভোট সার্ভিসে OTP পাওয়ার আনুমানিক মিনিট কত?,otp_delivery_time,otp_delivery_time,ইসি পোস্টাল ভোট সার্ভিসে OTP পাওয়ার সময়সীমা কতটা?,True,1.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোট বিডি অ্যাপে OTP না আসলে কি করব?,otp_not_received,otp_not_received,পোস্টাল ভোট বিডি অ্যাপে ওটিপি না এলে করণীয় কী?,True,1.0,"{""otp_not_received"": 10}",10
+পোস্টাল ভোট অ্যাপে OTP না পেলে অপেক্ষা করে আবার কিভাবে চাইব?,otp_not_received,otp_not_received,"পোস্টাল ভোট অ্যাপে OTP আসছে না, কী করতে হবে?",True,1.0,"{""otp_not_received"": 10}",10
+ইসির পোস্টাল ভোট বিডি অ্যাপে ওটিপি না গেলে কীভাবে আগাব?,otp_not_received,otp_not_received,পোস্টাল ভোট বিডি অ্যাপে ওটিপি না এলে করণীয় কী?,True,1.0,"{""otp_not_received"": 10}",10
+পোস্টাল ভোট BD অ্যাপে ৬ ডিজিটের OTP না এলে কীভাবে সমাধান করব?,otp_not_received,otp_not_received,পোস্টাল ভোট বিডি অ্যাপে OTP না আসলে কি করব?,True,1.0,"{""otp_not_received"": 10}",10
+পোস্টাল ভোট BD অ্যাপে যাচাইকরণ কোড না পৌঁছালে কী করণীয়?,otp_not_received,otp_not_received,পোস্টাল ভোট BD অ্যাপে কোড ডেলিভার না হলে কী করা উচিত?,True,1.0,"{""otp_not_received"": 10}",10
+পোস্টাল ভোট BD অ্যাপে OTP পেতে বারবার ব্যর্থ হলে কী করব?,otp_not_received,otp_not_received,পোস্টাল ভোট বিডি অ্যাপে OTP না আসলে কি করব?,True,1.0,"{""otp_not_received"": 10}",10
+Postal Vote BD অ্যাপে OTP না গেলে কি বিকল্প আছে?,otp_not_received,otp_not_received,পোস্টাল ভোট বিডি অ্যাপে OTP না আসলে কি করব?,True,1.0,"{""otp_not_received"": 10}",10
+Postal Vote BD অ্যাপে ভেরিফিকেশন কোড না পেলে কী করতে হবে?,otp_not_received,otp_not_received,Postal Vote BD অ্যাপে ভেরিফিকেশন কোড না আসলে আবার কিভাবে পাঠাব?,True,1.0,"{""otp_not_received"": 10}",10
+"পোস্টাল ভোট অ্যাপে OTP আসছে না, কী করতে হবে?",otp_not_received,otp_not_received,"পোস্টাল ভোট অ্যাপে OTP রিসিভ হচ্ছে না, কী করবেন?",True,1.0,"{""otp_not_received"": 10}",10
+পোস্টাল ভোট অ্যাপে ওটিপি কোড না আসলে কী করনীয় ধাপ?,otp_not_received,otp_not_received,পোস্টাল ভোটিং অ্যাপে ওটিপি না এলে কোন পদক্ষেপ নেব?,True,1.0,"{""otp_not_received"": 10}",10
+পোস্টাল ভোটিং BD অ্যাপে ওটিপি না পেলে কখন আবার চেষ্টা করা যাবে?,otp_not_received,otp_not_received,পোস্টাল ভোটিং BD অ্যাপে OTP ডেলিভারি না হলে কবে আবার চেষ্টা করব?,True,1.0,"{""otp_not_received"": 10}",10
+Postal Vote BD অ্যাপে OTP মেসেজ না এলে কি অপেক্ষা করতে হবে?,otp_not_received,otp_not_received,Postal Vote BD অ্যাপে OTP না এলে কতো সময় অপেক্ষা করে আবার নেব?,True,0.7,"{""otp_not_received"": 7, ""otp_delivery_time"": 3}",10
+পোস্টাল ভোট অ্যাপে ওয়ান-টাইম কোড না পেলে আবার কীভাবে চাওয়া যায়?,otp_not_received,otp_not_received,পোস্টাল ভোট সেবা অ্যাপে ওয়ান টাইম কোড না পেলে কী করবো?,True,1.0,"{""otp_not_received"": 10}",10
+পোস্টাল ভোট BD অ্যাপে OTP না এলে কতোক্ষণ পর আবার চাইব?,otp_not_received,otp_not_received,Postal Vote BD অ্যাপে OTP না এলে কতো সময় অপেক্ষা করে আবার নেব?,True,0.7,"{""otp_not_received"": 7, ""otp_delivery_time"": 3}",10
+"পোস্টাল ভোট BD অ্যাপে নিশ্চিতকরণ কোড আসছে না, সমাধান কী?",otp_not_received,otp_not_received,পোস্টাল ভোট BD অ্যাপে যাচাইকরণ কোড না পৌঁছালে কী করণীয়?,True,1.0,"{""otp_not_received"": 10}",10
+Postal Vote BD অ্যাপে ৬-সংখ্যার ভেরিফাই কোড না এলে কী করব?,otp_not_received,otp_not_received,Postal Vote BD অ্যাপে ভেরিফিকেশন কোড না পেলে কী করতে হবে?,True,1.0,"{""otp_not_received"": 10}",10
+Postal Vote BD অ্যাপে সিকিউরিটি কোড না এলে কী উপায়?,otp_not_received,otp_not_received,পোস্টাল ভোট BD-তে সিকিউরিটি কোড না এলে কীভাবে সমাধান করব?,True,0.9,"{""otp_not_received"": 9, ""otp_send_button"": 1}",10
+Postal Vote BD-তে সিকিউরিটি OTP না এলে করণীয় কী?,otp_not_received,otp_not_received,Postal Vote BD-তে নিশ্চিতকরণ OTP না পাওয়া গেলে কী করবেন?,True,1.0,"{""otp_not_received"": 10}",10
+Postal Vote BD অ্যাপে ভেরিফিকেশন PIN না পেলে কী করব?,otp_not_received,otp_not_received,Postal Vote BD অ্যাপে ভেরিফিকেশন কোড না পেলে কী করতে হবে?,True,1.0,"{""otp_not_received"": 10}",10
+Postal Vote BD অ্যাপে ওটিপি আসতে দেরি হলে কীভাবে সামলাব?,otp_not_received,otp_not_received,পোস্টাল ভোট BD অ্যাপে OTP এসে না পৌঁছালে কী ব্যবস্থা?,True,0.7,"{""otp_not_received"": 7, ""otp_delivery_time"": 3}",10
+পোস্টাল ভোট BD-তে সিকিউরিটি কোড না এলে কীভাবে সমাধান করব?,otp_not_received,otp_not_received,Postal Vote BD অ্যাপে সিকিউরিটি কোড না এলে কী উপায়?,True,1.0,"{""otp_not_received"": 10}",10
+Postal Vote BD অ্যাপে OTP না এলে কতো সময় অপেক্ষা করে আবার নেব?,otp_not_received,otp_not_received,পোস্টাল ভোট BD অ্যাপে OTP না এলে কতোক্ষণ পর আবার চাইব?,True,0.4,"{""otp_not_received"": 4, ""otp_delivery_time"": 6}",10
+পোস্টাল ভোট বিডি অ্যাপে ওটিপি না এলে করণীয় কী?,otp_not_received,otp_not_received,পোস্টাল ভোট বিডি অ্যাপে OTP না আসলে কি করব?,True,1.0,"{""otp_not_received"": 10}",10
+Postal Vote BD-তে নিশ্চিতকরণ SMS না পেলে রিসেন্ড কোথায় পাব?,otp_not_received,otp_not_received,পোস্টাল ভোটিং BD অ্যাপে নিশ্চিতকরণ SMS না পেলে কী করণীয়?,True,0.9,"{""otp_not_received"": 9, ""otp_delivery_time"": 1}",10
+Postal Vote BD-তে OTP না এলে কতক্ষণ পর পুনরায় চেষ্টা করব?,otp_not_received,otp_not_received,Postal Vote BD অ্যাপে OTP না এলে কতো সময় অপেক্ষা করে আবার নেব?,True,0.7,"{""otp_not_received"": 7, ""otp_delivery_time"": 3}",10
+পোস্টাল ভোট BD অ্যাপে OTP এসে না পৌঁছালে কী ব্যবস্থা?,otp_not_received,otp_not_received,পোস্টাল ভোট বিডি অ্যাপে ওটিপি না এলে করণীয় কী?,True,1.0,"{""otp_not_received"": 10}",10
+পোস্টাল ভোট BD অ্যাপে ভেরিফিকেশন OTP না এলে কীভাবে রিসেন্ড করব?,otp_not_received,otp_not_received,পোস্টাল ভোট BD অ্যাপে OTP না এলে কি রিসেন্ড করা যাবে?,True,1.0,"{""otp_not_received"": 10}",10
+পোস্টাল ভোটিং BD অ্যাপে OTP না এলে কীভাবে আবার পাঠানো যায়?,otp_not_received,otp_not_received,পোস্টাল ভোটিং BD অ্যাপে OTP ডেলিভারি না হলে কবে আবার চেষ্টা করব?,True,1.0,"{""otp_not_received"": 10}",10
+পোস্টাল ভোট BD অ্যাপে OTP না এলে কি রিসেন্ড করা যাবে?,otp_not_received,otp_not_received,পোস্টাল ভোট BD অ্যাপে ভেরিফিকেশন OTP না এলে কীভাবে রিসেন্ড করব?,True,1.0,"{""otp_not_received"": 10}",10
+Postal Vote BD-তে SMS OTP না পেলে কি করতে হবে?,otp_not_received,otp_not_received,Postal Vote BD-তে নিশ্চিতকরণ OTP না পাওয়া গেলে কী করবেন?,True,1.0,"{""otp_not_received"": 10}",10
+পোস্টাল ভোটিং BD অ্যাপে ওটিপি না পাওয়া গেলে কী পদক্ষেপ নেওয়া উচিৎ?,otp_not_received,otp_not_received,পোস্টাল ভোট বিডি অ্যাপে ওটিপি না এলে করণীয় কী?,True,1.0,"{""otp_not_received"": 10}",10
+পোস্টাল ভোট BD অ্যাপে কোড ডেলিভার না হলে কী করা উচিত?,otp_not_received,otp_not_received,পোস্টাল ভোট BD অ্যাপে যাচাইকরণ কোড না পৌঁছালে কী করণীয়?,True,1.0,"{""otp_not_received"": 10}",10
+পোস্টাল ভোট BD অ্যাপে কোড না এলে কিভাবে রিকোয়েস্ট করব?,otp_not_received,otp_not_received,পোস্টাল ভোট BD অ্যাপে কোড না আসলে আবার কবে রিকোয়েস্ট করতে পারি?,True,1.0,"{""otp_not_received"": 10}",10
+Postal Vote BD-তে নিশ্চিতকরণ OTP না পাওয়া গেলে কী করবেন?,otp_not_received,otp_not_received,Postal Vote BD-তে SMS OTP না পেলে কি করতে হবে?,True,1.0,"{""otp_not_received"": 10}",10
+পোস্টাল ভোট BD অ্যাপে কোড না এলেই কীভাবে রিসেন্ড করব?,otp_not_received,otp_not_received,পোস্টাল ভোট BD অ্যাপে কোড না এলে কিভাবে রিকোয়েস্ট করব?,True,1.0,"{""otp_not_received"": 10}",10
+পোস্টাল ভোট অ্যাপে কোড না এলে কতক্ষণ অপেক্ষা করতে হয়?,otp_not_received,otp_delivery_time,পোস্টাল ভোটিং অ্যাপে সিকিউরিটি কোড পেতে কতক্ষণ ধৈর্য ধরতে হবে?,False,0.0,"{""otp_delivery_time"": 10}",10
+পোস্টাল ভোট BD-তে ওটিপি রিসিভ না হলে কী করতে বলবেন?,otp_not_received,otp_not_received,পোস্টাল ভোট বিডি অ্যাপে ওটিপি না এলে করণীয় কী?,True,1.0,"{""otp_not_received"": 10}",10
+পোস্টাল ভোট BD তে OTP না এলে রিসেন্ডের সময় ব্যবধান কত?,otp_not_received,otp_delivery_time,পোস্টাল ভোট BD অ্যাপে রিসেন্ড দিলে ওটিপি আসতে কতক্ষণ লাগে?,False,0.5,"{""otp_delivery_time"": 5, ""otp_not_received"": 5}",10
+"Postal Vote BD অ্যাপে OTP মেলেনি, এরপর কী করব?",otp_not_received,otp_not_received,পোস্টাল ভোট বিডি অ্যাপে OTP না আসলে কি করব?,True,1.0,"{""otp_not_received"": 10}",10
+Postal Vote BD অ্যাপে নিশ্চিতকরণ কোড না এলে পরবর্তী পদক্ষেপ কী?,otp_not_received,otp_not_received,Postal Vote BD অ্যাপে ভেরিফিকেশন কোড না পেলে কী করতে হবে?,True,1.0,"{""otp_not_received"": 10}",10
+Postal Vote BD অ্যাপে OTP মিস করলে আবার কিভাবে নেব?,otp_not_received,otp_not_received,পোস্টাল ভোটিং BD অ্যাপে OTP না এলে কীভাবে আবার পাঠানো যায়?,True,1.0,"{""otp_not_received"": 10}",10
+পোস্টাল ভোট অ্যাপে কোড না পাওয়ার ক্ষেত্রে কী ব্যবস্থা নিতে হবে?,otp_not_received,otp_not_received,পোস্টাল ভোট অ্যাপে কনফার্মেশন কোড না এলে কী করতে বলবেন?,True,1.0,"{""otp_not_received"": 10}",10
+পোস্টাল ভোটিং অ্যাপে ওটিপি না এলে কোন পদক্ষেপ নেব?,otp_not_received,otp_not_received,পোস্টাল ভোটিং BD অ্যাপে ওটিপি না পাওয়া গেলে কী পদক্ষেপ নেওয়া উচিৎ?,True,1.0,"{""otp_not_received"": 10}",10
+পোস্টাল ভোট অ্যাপে OTP না এলে কি সাথে সাথে আবার পাঠানো যায়?,otp_not_received,otp_not_received,পোস্টাল ভোটিং BD অ্যাপে OTP না এলে কীভাবে আবার পাঠানো যায়?,True,0.9,"{""otp_not_received"": 9, ""otp_delivery_time"": 1}",10
+পোস্টাল ভোট সেবা অ্যাপে ওয়ান টাইম কোড না পেলে কী করবো?,otp_not_received,otp_not_received,পোস্টাল ভোট অ্যাপে ওয়ান-টাইম কোড না পেলে আবার কীভাবে চাওয়া যায়?,True,1.0,"{""otp_not_received"": 10}",10
+পোস্টাল ভোটিং BD অ্যাপে নিশ্চিতকরণ SMS না পেলে কী করণীয়?,otp_not_received,otp_not_received,পোস্টাল ভোট BD অ্যাপে যাচাইকরণ কোড না পৌঁছালে কী করণীয়?,True,1.0,"{""otp_not_received"": 10}",10
+পোস্টাল ভোট BD-তে ভেরিফাই করার কোড না এলে কী করব?,otp_not_received,otp_not_received,Postal Vote BD অ্যাপে ভেরিফিকেশন কোড না পেলে কী করতে হবে?,True,1.0,"{""otp_not_received"": 10}",10
+পোস্টাল ভোটিং BD অ্যাপে OTP ডেলিভারি না হলে কবে আবার চেষ্টা করব?,otp_not_received,otp_not_received,পোস্টাল ভোটিং BD অ্যাপে ওটিপি না পেলে কখন আবার চেষ্টা করা যাবে?,True,1.0,"{""otp_not_received"": 10}",10
+Postal Vote BD-তে SMS কোড না পৌঁছালে কী করব?,otp_not_received,otp_not_received,Postal Vote BD অ্যাপে নিশ্চিতকরণ কোড না এলে পরবর্তী পদক্ষেপ কী?,True,1.0,"{""otp_not_received"": 10}",10
+"পোস্টাল ভোট অ্যাপে OTP রিসিভ হচ্ছে না, কী করবেন?",otp_not_received,otp_not_received,"পোস্টাল ভোট অ্যাপে OTP আসছে না, কী করতে হবে?",True,1.0,"{""otp_not_received"": 10}",10
+পোস্টাল ভোট অ্যাপে কনফার্মেশন কোড না এলে কী করতে বলবেন?,otp_not_received,otp_not_received,পোস্টাল ভোট অ্যাপে কোড না পাওয়ার ক্ষেত্রে কী ব্যবস্থা নিতে হবে?,True,1.0,"{""otp_not_received"": 10}",10
+পোস্টাল ভোটিং অ্যাপে OTP মিস হলে কী করণীয়?,otp_not_received,otp_not_received,পোস্টাল ভোট বিডি অ্যাপে OTP না আসলে কি করব?,True,1.0,"{""otp_not_received"": 10}",10
+Postal Vote BD অ্যাপে কোড না এলেই কীভাবে সমস্যা মেটাব?,otp_not_received,otp_not_received,Postal Vote BD অ্যাপে সিকিউরিটি কোড না এলে কী উপায়?,True,1.0,"{""otp_not_received"": 10}",10
+Postal Vote BD অ্যাপে ভেরিফিকেশন কোড না পেলে কীভাবে পুনরায় রিকোয়েস্ট করব?,otp_not_received,otp_not_received,Postal Vote BD অ্যাপে ভেরিফাই কোড না এলে কিভাবে পুনরায় নেব?,True,1.0,"{""otp_not_received"": 10}",10
+Postal Vote BD অ্যাপে ভেরিফাই কোড না এলে কিভাবে পুনরায় নেব?,otp_not_received,otp_not_received,Postal Vote BD অ্যাপে ভেরিফিকেশন কোড না পেলে কীভাবে পুনরায় রিকোয়েস্ট করব?,True,1.0,"{""otp_not_received"": 10}",10
+Postal Vote BD অ্যাপে ভেরিফিকেশন কোড না আসলে আবার কিভাবে পাঠাব?,otp_not_received,otp_not_received,Postal Vote BD অ্যাপে ভেরিফিকেশন কোড না পেলে কী করতে হবে?,True,0.8,"{""otp_not_received"": 8, ""otp_send_button"": 2}",10
+পোস্টাল ভোট অ্যাপে ৬ ডিজিটের কোড না পেলে কোন পদক্ষেপ?,otp_not_received,otp_not_received,পোস্টাল ভোট অ্যাপে কোড না পাওয়ার ক্ষেত্রে কী ব্যবস্থা নিতে হবে?,True,1.0,"{""otp_not_received"": 10}",10
+পোস্টাল ভোট অ্যাপে ভেরিফাই কোড না এলেই কীভাবে এগোতে হবে?,otp_not_received,otp_not_received,পোস্টাল ভোট অ্যাপে কোড না পাওয়ার ক্ষেত্রে কী ব্যবস্থা নিতে হবে?,True,0.9,"{""otp_not_received"": 9, ""otp_send_button"": 1}",10
+পোস্টাল ভোট BD অ্যাপে কোড না আসলে আবার কবে রিকোয়েস্ট করতে পারি?,otp_not_received,otp_not_received,পোস্টাল ভোট BD অ্যাপে কোড না এলে কিভাবে রিকোয়েস্ট করব?,True,0.9,"{""otp_not_received"": 9, ""otp_send_button"": 1}",10
+পোস্টাল ভোট বিডি অ্যাপে OTP পাঠাতে কী বাটন ক্লিক করব?,otp_send_button,otp_send_button,পোস্টাল ভোটবিডি অ্যাপে ওটিপি পাঠাতে কোন লেখা থাকা বাটন চাপব?,True,1.0,"{""otp_send_button"": 10}",10
+Postal Vote BD অ্যাপে OTP প্রেরণের জন্য কোন বোতাম ট্যাপ করতে বলবেন?,otp_send_button,otp_send_button,OTP প্রেরণের জন্য পোস্টাল ভোট BD অ্যাপে কোন বাটামটা ট্যাপ করবো?,True,1.0,"{""otp_send_button"": 10}",10
+যাচাইকরণ OTP পাঠাতে পোস্টাল ভোট অ্যাপে কোন বোতাম টিপব?,otp_send_button,otp_send_button,যাচাইকরণ OTP পাঠাতে পোস্টাল ভোট BD তে কোন বোতাম ক্লিক করবো?,True,1.0,"{""otp_send_button"": 10}",10
+যাচাইকরণ OTP পাঠাতে পোস্টাল ভোট BD তে কোন বোতাম ক্লিক করবো?,otp_send_button,otp_send_button,যাচাইকরণ OTP পাঠাতে পোস্টাল ভোট অ্যাপে কোন বোতাম টিপব?,True,1.0,"{""otp_send_button"": 10}",10
+পোস্টাল ভোট বিডি অ্যাপের মধ্যে ওটিপি পাঠাতে কোনটা ক্লিক করা লাগবে?,otp_send_button,otp_send_button,ওটিপি পাঠানোর কাজটা করতে পোস্টাল ভোট অ্যাপে কোনটা ক্লিক করা উচিত?,True,1.0,"{""otp_send_button"": 10}",10
+পোস্টাল ভোটবিডি অ্যাপে OTP পাঠানোর সঠিক বাটন কোনটা?,otp_send_button,otp_send_button,পোস্টাল ভোট বিডি অ্যাপে OTP পাঠাতে কী বাটন ক্লিক করব?,True,1.0,"{""otp_send_button"": 10}",10
+পোস্টাল ভোট অ্যাপে OTP পাঠানোর জন্য ঠিক কোন বোতনটি টাচ করব?,otp_send_button,otp_send_button,ওটিপি প্রেরণ করতে পোস্টাল ভোট অ্যাপে কোন বাটনে টাচ দেব?,True,1.0,"{""otp_send_button"": 10}",10
+Postal Vote BD অ্যাপে OTP পাঠাতে কোন গ্রিন বাটনে চাপ দেব?,otp_send_button,otp_send_button,Postal Vote BD তে OTP পাঠাতে ঠিক কোন বাটনে ট্যাপ করব?,True,1.0,"{""otp_send_button"": 10}",10
+পোস্টাল ভোট অ্যাপে যাচাইকরণ কোড পাঠাতে কোন বাটন টিপে দেব?,otp_send_button,otp_send_button,যাচাই কোড পাঠানোর জন্য পোস্টাল ভোট অ্যাপে কোন বাটন সিলেক্ট করব?,True,1.0,"{""otp_send_button"": 10}",10
+Postal Vote BD তে OTP পাঠাতে ঠিক কোন বাটনে ট্যাপ করব?,otp_send_button,otp_send_button,Postal Vote BD অ্যাপে OTP প্রেরণের জন্য কোন বোতাম ট্যাপ করতে বলবেন?,True,1.0,"{""otp_send_button"": 10}",10
+পোস্টাল ভোট BD অ্যাপে OTP সেন্ড করতে কোন বাটনটা ধরব?,otp_send_button,otp_send_button,Postal Vote BD অ্যাপে ওটিপি সেন্ড করার জন্য কোন বাটন ট্যাপ করতে হবে?,True,1.0,"{""otp_send_button"": 10}",10
+পোস্টাল ভোট BD অ্যাপে OTP পাঠানোর জন্য কোন রঙের বাটন প্রেস করতে হয়?,otp_send_button,otp_send_button,ওটিপি পাঠাতে পোস্টাল ভোট অ্যাপের কোন রঙের বোতাম টিপব?,True,1.0,"{""otp_send_button"": 10}",10
+যাচাই কোড পাঠানোর জন্য পোস্টাল ভোট অ্যাপে কোন বাটন সিলেক্ট করব?,otp_send_button,otp_send_button,পোস্টাল ভোট অ্যাপে যাচাইকরণ কোড পাঠাতে কোন বাটন টিপে দেব?,True,1.0,"{""otp_send_button"": 10}",10
+পোস্টাল ভোটবিডি অ্যাপে OTP পাঠানোর জন্য কোনটা ট্যাপ করতেই হবে?,otp_send_button,otp_send_button,পোস্টাল ভোটবিডি অ্যাপে ওটিপি পাঠাতে কোন লেখা থাকা বাটন চাপব?,True,1.0,"{""otp_send_button"": 10}",10
+Postal Vote BD তে OTP পাঠাতে কোন রঙের বোতামে ট্যাপ করবো?,otp_send_button,otp_send_button,ওটিপি পাঠাতে পোস্টাল ভোট অ্যাপের কোন রঙের বোতাম টিপব?,True,1.0,"{""otp_send_button"": 10}",10
+পোস্টাল ভোট অ্যাপে OTP পাঠানোর কমান্ড কোনটা?,otp_send_button,otp_send_button,পোস্টাল ভোটবিডি অ্যাপে OTP পাঠানোর জন্য কোনটা ট্যাপ করতেই হবে?,True,1.0,"{""otp_send_button"": 10}",10
+OTP পাঠানোর জন্য পোস্টাল Vote BD তে কোন ট্যাব ট্যাপ করবো?,otp_send_button,otp_send_button,OTP প্রেরণের জন্য পোস্টাল ভোট BD অ্যাপে কোন বাটামটা ট্যাপ করবো?,True,1.0,"{""otp_send_button"": 10}",10
+পোস্টাল ভোটবিডি অ্যাপে OTP সেন্ড বাটন কোনটা?,otp_send_button,otp_send_button,পোস্টাল ভোটবিডি অ্যাপে OTP সেন্ড বাটন হিসেবে কোনটা আছে?,True,1.0,"{""otp_send_button"": 10}",10
+Postal Vote BD তে ওটিপি পাঠাতে কোন কমান্ড বেছে নেব?,otp_send_button,otp_send_button,Postal Vote BD তে ওটিপি পাঠাতে কোন বোতাম টাচ করতে বলবেন?,True,1.0,"{""otp_send_button"": 10}",10
+পোস্টাল ভোটবিডি অ্যাপে OTP সেন্ড বাটন হিসেবে কোনটা আছে?,otp_send_button,otp_send_button,পোস্টাল ভোটবিডি অ্যাপে OTP সেন্ড বাটন কোনটা?,True,1.0,"{""otp_send_button"": 10}",10
+পোস্টাল ভোট অ্যাপে নিরাপত্তা কোড পাঠাতে কোনটা ট্যাপ করি?,otp_send_button,otp_send_button,পোস্টাল ভোট BD অ্যাপে নিরাপত্তা কোড পাঠাতে কোন বোতামে টাচ করব?,True,1.0,"{""otp_send_button"": 10}",10
+পোস্টাল ভোট অ্যাপে OTP সেন্ড করার জন্য কোন আইটেম সিলেক্ট করব?,otp_send_button,otp_send_button,পোস্টাল ভোট অ্যাপে ওটিপি পাঠাতে কোনটা সিলেক্ট করলেই হবে?,True,1.0,"{""otp_send_button"": 10}",10
+পোস্টাল ভোট বিডি অ্যাপে OTP পাঠাতে কোন বোতামে চাপ দেব?,otp_send_button,otp_send_button,পোস্টাল ভোট বিডিতে ওটিপি পাঠাতে কী নামের বোতাম চাপতে হবে?,True,1.0,"{""otp_send_button"": 10}",10
+OTP প্রেরণের জন্য পোস্টাল ভোট BD অ্যাপে কোন বাটামটা ট্যাপ করবো?,otp_send_button,otp_send_button,Postal Vote BD অ্যাপে OTP প্রেরণের জন্য কোন বোতাম ট্যাপ করতে বলবেন?,True,1.0,"{""otp_send_button"": 10}",10
+"পোস্টাল ভোট BD অ্যাপে ""OTP"" পাঠানোর জন্য কোন বোতাম টিপতে হবে?",otp_send_button,otp_send_button,পোস্টাল ভোট বিডি অ্যাপে OTP পাঠাতে কোন বোতামে চাপ দেব?,True,1.0,"{""otp_send_button"": 10}",10
+পোস্টাল ভোট অ্যাপে OTP পাঠাতে যে বোতাম টিপতে হয় সেটি কোনটি?,otp_send_button,otp_send_button,ওটিপি পাঠাতে পোস্টাল ভোট অ্যাপে ঠিক কোন বোতাম ট্যাপ করা দরকার?,True,1.0,"{""otp_send_button"": 10}",10
+পোস্টাল ভোটবিডি অ্যাপে ওটিপি পাঠাতে কোন লেখা থাকা বাটন চাপব?,otp_send_button,otp_send_button,পোস্টাল ভোট বিডি অ্যাপে OTP পাঠাতে কী বাটন ক্লিক করব?,True,1.0,"{""otp_send_button"": 10}",10
+পোস্টাল ভোটবিডি অ্যাপে নিরাপত্তা OTP পাঠাতে কোন বোতাম প্রেস করব?,otp_send_button,otp_send_button,পোস্টাল ভোট বিডি অ্যাপে OTP পাঠাতে কোন বোতামে চাপ দেব?,True,1.0,"{""otp_send_button"": 10}",10
+ওটিপি পাঠাতে পোস্টাল ভোট অ্যাপে ঠিক কোন বোতাম ট্যাপ করা দরকার?,otp_send_button,otp_send_button,পোস্টাল ভোট অ্যাপে OTP পাঠাতে যে বোতাম টিপতে হয় সেটি কোনটি?,True,1.0,"{""otp_send_button"": 10}",10
+পোস্টাল ভোট BD অ্যাপে কোড পাঠাতে কোন বাটনে চাপ দেব?,otp_send_button,otp_send_button,পোস্টাল ভোট BD অ্যাপে কোড পাঠাতে কোন অপশনটা ট্যাপ করবো?,True,1.0,"{""otp_send_button"": 10}",10
+Postal Vote BD তে ওটিপি পাঠাতে কোন বাটনটা সিলেক্ট করা উচিত?,otp_send_button,otp_send_button,Postal Vote BD তে ওটিপি পাঠানোর জন্য কোন বোতাম ক্লিক করাই ঠিক?,True,1.0,"{""otp_send_button"": 10}",10
+ওটিপি প্রেরণ করতে পোস্টাল ভোট অ্যাপে কোন বাটনে টাচ দেব?,otp_send_button,otp_send_button,পোস্টাল ভোটবিডি অ্যাপে ওটিপি পাঠাতে কোন লেখা থাকা বাটন চাপব?,True,1.0,"{""otp_send_button"": 10}",10
+পোস্টাল ভোট BD অ্যাপে ওটিপি পাঠাতে কোন বোতনে প্রেস করবো?,otp_send_button,otp_send_button,পোস্টাল ভোট বিডি অ্যাপে OTP পাঠাতে কোন বোতামে চাপ দেব?,True,1.0,"{""otp_send_button"": 10}",10
+Postal Vote BD তে ওটিপি পাঠানোর জন্য কোন বোতাম ক্লিক করাই ঠিক?,otp_send_button,otp_send_button,Postal Vote BD তে ওটিপি পাঠাতে কোন বাটনটা সিলেক্ট করা উচিত?,True,1.0,"{""otp_send_button"": 10}",10
+ওটিপি পাঠাতে পোস্টাল ভোট অ্যাপে কোন লেবেল থাকা বাটন প্রেস করব?,otp_send_button,otp_send_button,পোস্টাল ভোটবিডি অ্যাপে ওটিপি পাঠাতে কোন লেখা থাকা বাটন চাপব?,True,1.0,"{""otp_send_button"": 10}",10
+পোস্টাল ভোট BD অ্যাপে কোড পাঠানোর জন্য বেছে নেব কোন বোতাম?,otp_send_button,otp_send_button,পোস্টাল ভোট BD অ্যাপে নিরাপত্তা কোড পাঠাতে কোন বোতামে টাচ করব?,True,1.0,"{""otp_send_button"": 10}",10
+পোস্টাল ভোট বিডিতে ওটিপি পাঠাতে কী নামের বোতাম চাপতে হবে?,otp_send_button,otp_send_button,পোস্টাল ভোট বিডি অ্যাপে OTP পাঠাতে কোন বোতামে চাপ দেব?,True,1.0,"{""otp_send_button"": 10}",10
+পোস্টাল ভোট BD অ্যাপ থেকে যাচাইকরণ কোড পাঠাতে কোন বোতাম চাপতে হয়?,otp_send_button,otp_send_button,পোস্টাল ভোট BD অ্যাপে যাচাইকরণ কোড প্রেরণের বাটন কোনটি?,True,1.0,"{""otp_send_button"": 10}",10
+পোস্টাল ভোটবিডি অ্যাপে কোড পাঠানোর জন্য কী নামের বাটনে টাচ করব?,otp_send_button,otp_send_button,পোস্টাল ভোট BD অ্যাপে কোড পাঠাতে কোন বাটনে চাপ দেব?,True,1.0,"{""otp_send_button"": 10}",10
+ওটিপি পাঠাতে পোস্টাল ভোট BD অ্যাপের কোন অপশনটি চাপি?,otp_send_button,otp_send_button,পোস্টাল ভোট BD অ্যাপে ওটিপি পাঠানোর সঠিক অপশন কোনটা?,True,1.0,"{""otp_send_button"": 10}",10
+Postal Vote BD অ্যাপে ওয়ান টাইম কোড পাঠাতে কোন বোতাম টিপব?,otp_send_button,otp_send_button,Postal Vote BD অ্যাপে One-Time কোড পাঠাতে কোন বোতাম চেপে ধরব?,True,1.0,"{""otp_send_button"": 10}",10
+পোস্টাল ভোট BD অ্যাপে ওটিপি পাঠানোর সঠিক অপশন কোনটা?,otp_send_button,otp_send_button,ওটিপি পাঠাতে পোস্টাল ভোট BD অ্যাপের কোন অপশনটি চাপি?,True,1.0,"{""otp_send_button"": 10}",10
+Postal Vote BD অ্যাপে One-Time কোড পাঠাতে কোন বোতাম চেপে ধরব?,otp_send_button,otp_send_button,Postal Vote BD অ্যাপে ওয়ান টাইম কোড পাঠাতে কোন বোতাম টিপব?,True,1.0,"{""otp_send_button"": 10}",10
+Postal Vote BD অ্যাপে যাচাই কোড পাঠাতে কোন বাটন ব্যবহার করব?,otp_send_button,otp_send_button,পোস্টাল ভোট BD অ্যাপে যাচাইকরণ কোড প্রেরণের বাটন কোনটি?,True,1.0,"{""otp_send_button"": 10}",10
+পোস্টাল ভোট BD অ্যাপে যাচাইকরণ কোড প্রেরণের বাটন কোনটি?,otp_send_button,otp_send_button,পোস্টাল ভোট BD অ্যাপ থেকে যাচাইকরণ কোড পাঠাতে কোন বোতাম চাপতে হয়?,True,1.0,"{""otp_send_button"": 10}",10
+পোস্টাল ভোট BD অ্যাপে কোড পাঠাতে কোন অপশনটা ট্যাপ করবো?,otp_send_button,otp_send_button,পোস্টাল ভোট BD অ্যাপে কোড পাঠাতে কোন বাটনে চাপ দেব?,True,1.0,"{""otp_send_button"": 10}",10
+Postal Vote BD অ্যাপে ওটিপি সেন্ড করার জন্য কোন বাটন ট্যাপ করতে হবে?,otp_send_button,otp_send_button,পোস্টাল ভোট BD অ্যাপে OTP সেন্ড করতে কোন বাটনটা ধরব?,True,1.0,"{""otp_send_button"": 10}",10
+Postal Vote BD তে ওটিপি পাঠাতে কোন বোতাম টাচ করতে বলবেন?,otp_send_button,otp_send_button,Postal Vote BD অ্যাপে OTP প্রেরণের জন্য কোন বোতাম ট্যাপ করতে বলবেন?,True,1.0,"{""otp_send_button"": 10}",10
+Postal Vote BD তে ওয়ান-টাইম কোড পাঠাতে কোন বাটন টাচ করতে হয়?,otp_send_button,otp_send_button,Postal Vote BD অ্যাপে ওয়ান টাইম কোড পাঠাতে কোন বোতাম টিপব?,True,1.0,"{""otp_send_button"": 10}",10
+পোস্টাল ভোটবিডি অ্যাপে ভেরিফিকেশন কোড পাঠানোর জন্য কোন বাটনে ক্লিক দেব?,otp_send_button,otp_send_button,ভেরিফাই কোড পাঠাতে পোস্টাল ভোটবিডি অ্যাপে কোন বাটন ক্লিক করা উচিত?,True,1.0,"{""otp_send_button"": 10}",10
+ওটিপি পাঠানোর কাজটা করতে পোস্টাল ভোট অ্যাপে কোনটা ক্লিক করা উচিত?,otp_send_button,otp_send_button,পোস্টাল ভোট বিডি অ্যাপের মধ্যে ওটিপি পাঠাতে কোনটা ক্লিক করা লাগবে?,True,1.0,"{""otp_send_button"": 10}",10
+ওটিপি পাঠাতে পোস্টাল ভোট অ্যাপের কোন রঙের বোতাম টিপব?,otp_send_button,otp_send_button,পোস্টাল ভোট BD অ্যাপে OTP পাঠানোর জন্য কোন রঙের বাটন প্রেস করতে হয়?,True,1.0,"{""otp_send_button"": 10}",10
+ভেরিফাই কোড পাঠাতে পোস্টাল ভোটবিডি অ্যাপে কোন বাটন ক্লিক করা উচিত?,otp_send_button,otp_send_button,পোস্টাল ভোটবিডি অ্যাপে ভেরিফিকেশন কোড পাঠানোর জন্য কোন বাটনে ক্লিক দেব?,True,1.0,"{""otp_send_button"": 10}",10
+ওটিপি পাঠাতে পোস্টাল ভোট অ্যাপে কোন অপশন সিলেক্ট করব?,otp_send_button,otp_send_button,পোস্টাল ভোট অ্যাপে ওটিপি পাঠাতে কোনটা সিলেক্ট করলেই হবে?,True,1.0,"{""otp_send_button"": 10}",10
+Postal Vote BD তে ওয়ান-টাইম পাসওয়ার্ড পাঠাতে কী চাপব?,otp_send_button,otp_send_button,পোস্টাল ভোট BD অ্যাপে ওয়ান টাইম পাসওয়ার্ড পাঠাতে কোন বোতামে ট্যাপ করব?,True,0.9,"{""otp_send_button"": 9, ""otp_delivery_time"": 1}",10
+Postal Vote BD অ্যাপে কোড পাঠানোর বাটামটা কোথায় কোনটা চাপতে হবে?,otp_send_button,otp_send_button,Postal Vote BD অ্যাপে ভেরিফিকেশন কোড পাঠাতে কোন বাটাম চাপবো?,True,1.0,"{""otp_send_button"": 10}",10
+ওটিপি পাঠাতে পোস্টাল ভোট অ্যাপে কোন আইকন ট্যাপ করব?,otp_send_button,otp_send_button,ওটিপি প্রেরণ করতে পোস্টাল ভোট অ্যাপে কোন বাটনে টাচ দেব?,True,1.0,"{""otp_send_button"": 10}",10
+পোস্টাল ভোট বিডিতে কোড পাঠানোর বাটন হিসেবে কোনটা ধরব?,otp_send_button,otp_send_button,পোস্টাল ভোট BD অ্যাপে কোড পাঠাতে কোন বাটনে চাপ দেব?,True,1.0,"{""otp_send_button"": 10}",10
+পোস্টাল ভোট BD অ্যাপে নিরাপত্তা কোড পাঠাতে কোন বোতামে টাচ করব?,otp_send_button,otp_send_button,Postal Vote BD অ্যাপে নিরাপত্তা কোড পাঠাতে কোন বোতামটি বাছাই করব?,True,1.0,"{""otp_send_button"": 10}",10
+Postal Vote BD অ্যাপে ভেরিফিকেশন কোড পাঠাতে কোন বাটাম চাপবো?,otp_send_button,otp_send_button,Postal Vote BD অ্যাপে ভেরিফিকেশন কোড পাঠাতে কোন ট্যাব চাপবো?,True,1.0,"{""otp_send_button"": 10}",10
+পোস্টাল ভোট অ্যাপে ভেরিফাই কোড পাঠাতে কোন বোতাম ক্লিক করব?,otp_send_button,otp_send_button,পোস্টাল ভোটবিডি অ্যাপে ভেরিফিকেশন কোড পাঠানোর জন্য কোন বাটনে ক্লিক দেব?,True,0.9,"{""otp_send_button"": 9, ""otp_not_received"": 1}",10
+পোস্টাল ভোট অ্যাপে ওটিপি পাঠাতে কোনটা সিলেক্ট করলেই হবে?,otp_send_button,otp_send_button,ওটিপি পাঠাতে পোস্টাল ভোট অ্যাপে কোন অপশন সিলেক্ট করব?,True,1.0,"{""otp_send_button"": 10}",10
+Postal Vote BD অ্যাপে নিরাপত্তা কোড পাঠানোর অপশন হিসেবে কোন বাটন ধরব?,otp_send_button,otp_send_button,Postal Vote BD অ্যাপে নিরাপত্তা কোড পাঠাতে কোন বোতামটি বাছাই করব?,True,1.0,"{""otp_send_button"": 10}",10
+"Postal Vote BD অ্যাপে যাচাই কোড পাঠাতে যে বোতাম লাগে, সেটি কোনটি?",otp_send_button,otp_send_button,Postal Vote BD তে যাচাইকরণ কোড পাঠাতে কোন বোতাম ব্যবহার করতে হবে?,True,1.0,"{""otp_send_button"": 10}",10
+Postal Vote BD অ্যাপে নিরাপত্তা কোড পাঠাতে কোন বোতামটি বাছাই করব?,otp_send_button,otp_send_button,পোস্টাল ভোট BD অ্যাপে নিরাপত্তা কোড পাঠাতে কোন বোতামে টাচ করব?,True,1.0,"{""otp_send_button"": 10}",10
+ওটিপি সেন্ড করতে পোস্টাল ভোট অ্যাপে ঠিক কোনটা প্রেস করব?,otp_send_button,otp_send_button,ওটিপি সেন্ড করার জন্য পোস্টাল ভোট অ্যাপে কোনটা প্রেস দিলে হবে?,True,1.0,"{""otp_send_button"": 10}",10
+Postal Vote BD অ্যাপে ভেরিফিকেশন কোড পাঠাতে কোন ট্যাব চাপবো?,otp_send_button,otp_send_button,Postal Vote BD অ্যাপে ভেরিফিকেশন কোড পাঠাতে কোন বাটাম চাপবো?,True,0.9,"{""otp_send_button"": 9, ""otp_not_received"": 1}",10
+ওটিপি সেন্ড করার জন্য পোস্টাল ভোট অ্যাপে কোনটা প্রেস দিলে হবে?,otp_send_button,otp_send_button,ওটিপি সেন্ড করতে পোস্টাল ভোট অ্যাপে ঠিক কোনটা প্রেস করব?,True,1.0,"{""otp_send_button"": 10}",10
+Postal Vote BD তে যাচাইকরণ কোড পাঠাতে কোন বোতাম ব্যবহার করতে হবে?,otp_send_button,otp_send_button,"Postal Vote BD অ্যাপে যাচাই কোড পাঠাতে যে বোতাম লাগে, সেটি কোনটি?",True,1.0,"{""otp_send_button"": 10}",10
+পোস্টাল ভোট BD অ্যাপে ওয়ান টাইম পাসওয়ার্ড পাঠাতে কোন বোতামে ট্যাপ করব?,otp_send_button,otp_send_button,Postal Vote BD তে ওয়ান-টাইম পাসওয়ার্ড পাঠাতে কী চাপব?,True,1.0,"{""otp_send_button"": 10}",10
+পোস্টাল ভোট অ্যাপে ওটিপি সেন্ডের জন্য কোন অপশন প্রেস করতে হবে?,otp_send_button,otp_send_button,ওটিপি সেন্ড করার জন্য পোস্টাল ভোট অ্যাপে কোনটা প্রেস দিলে হবে?,True,1.0,"{""otp_send_button"": 10}",10
+Postal Vote BD তে OTP প্রেরণের অপশন কোনটি?,otp_send_button,otp_send_button,Postal Vote BD তে OTP পাঠাতে ঠিক কোন বাটনে ট্যাপ করব?,True,1.0,"{""otp_send_button"": 10}",10
+যাচাইকরণ কোড প্রেরণের জন্য পোস্টাল ভোট অ্যাপে কোন অপশন টাচ করব?,otp_send_button,otp_send_button,যাচাই কোড পাঠানোর জন্য পোস্টাল ভোট অ্যাপে কোন বাটন সিলেক্ট করব?,True,1.0,"{""otp_send_button"": 10}",10

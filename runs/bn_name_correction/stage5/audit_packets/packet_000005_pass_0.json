@@ -1,0 +1,180 @@
+{
+  "packet_id": "audit_packet:000005",
+  "pass_idx": 0,
+  "result": {
+    "decisions": [
+      {
+        "decision": "keep",
+        "rationale": "আইডিতে মাতার নামের বানান ভুল সংশোধন এবং কোথায় যেতে হবে—এটি পিতা-মাতার নাম সংশোধনের প্রক্রিয়া সম্পর্কিত পরিষ্কার প্রশ্ন।",
+        "reason_code": "clean",
+        "row_id": 21755
+      },
+      {
+        "decision": "keep",
+        "rationale": "পিতার নামের বানান ঠিক করার আবেদন ও প্রয়োজনীয় দলিল জানতে চেয়েছে; ট্যাগের উদ্দেশ্যের সঙ্গে সরাসরি মেলে।",
+        "reason_code": "clean",
+        "row_id": 21898
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডিতে পিতার নামের ভুল সংশোধনের প্রক্রিয়া ও কোথায় যেতে হবে জানতে চেয়েছে; পরিষ্কারভাবে এই ট্যাগের অন্তর্ভুক্ত।",
+        "reason_code": "clean",
+        "row_id": 21802
+      },
+      {
+        "decision": "keep",
+        "rationale": "ন্যাশনাল আইডিতে পিতার নাম সংশোধনের নথিপত্র জানতে চাওয়া হয়েছে; ট্যাগের কাগজপত্র-সংক্রান্ত intent পরিষ্কার।",
+        "reason_code": "clean",
+        "row_id": 21866
+      },
+      {
+        "decision": "flag",
+        "rationale": "এটি 21802/21754-এর মতোই জাতীয় আইডিতে বাবার নামের বানান ভুল হলে কার কাছে যেতে হবে—একই প্রক্রিয়া-ভিত্তিক প্রশ্নের কাছাকাছি paraphrase।",
+        "reason_code": "duplicate",
+        "row_id": 21837
+      },
+      {
+        "decision": "keep",
+        "rationale": "বাংলাদেশের ন্যাশনাল আইডেন্টিটি কার্ডে মা'র নাম সংশোধনের জন্য দলিল জানতে চেয়েছে; self-contained ও tag-সামঞ্জস্যপূর্ণ।",
+        "reason_code": "clean",
+        "row_id": 21936
+      },
+      {
+        "decision": "keep",
+        "rationale": "বাবা ও মায়ের নামের বানান সংশোধনের জন্য সার্টিফিকেট জানতে চেয়েছে; পিতা-মাতার নাম সংশোধন intent স্পষ্ট।",
+        "reason_code": "clean",
+        "row_id": 21912
+      },
+      {
+        "decision": "flag",
+        "rationale": "এনআইডি কার্ডে মাতার নাম সংশোধনের ডকুমেন্টস জানতে চাওয়া হয়েছে; 21936/21790/21874/21911-এর একই mother-name-documents প্রশ্নের near-paraphrase।",
+        "reason_code": "duplicate",
+        "row_id": 21787
+      },
+      {
+        "decision": "flag",
+        "rationale": "ন্যাশনাল আইডিতে মায়ের নাম সংশোধনের নথি জানতে চাওয়া হয়েছে; 21936 ও 21790-এর সঙ্গে খুব কাছাকাছি অর্থগত পুনরাবৃত্তি।",
+        "reason_code": "duplicate",
+        "row_id": 21874
+      },
+      {
+        "decision": "flag",
+        "rationale": "মা'র নামের ভুল সংশোধনে প্রমাণপত্র জানতে চাওয়া হয়েছে; 21823/21970-এর mother-name spelling/proof documents প্রশ্নের near-paraphrase।",
+        "reason_code": "duplicate",
+        "row_id": 21944
+      },
+      {
+        "decision": "flag",
+        "rationale": "ন্যাশনাল আইডি কার্ডে বাবার নাম সংশোধনের প্রয়োজনীয় কাগজপত্র জানতে চাওয়া হয়েছে; 21866-এর প্রায় একই প্রশ্ন।",
+        "reason_code": "duplicate",
+        "row_id": 21861
+      },
+      {
+        "decision": "keep",
+        "rationale": "মা'র নামের ভুল সংশোধনে এসএসসি সার্টিফিকেট আবশ্যক কি না—নির্দিষ্ট ডকুমেন্ট-সংক্রান্ত প্রশ্ন, ট্যাগের সঙ্গে মেলে।",
+        "reason_code": "clean",
+        "row_id": 21945
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডিতে মায়ের নামের বানান সংশোধনের জন্য কী প্রমাণ লাগবে জানতে চেয়েছে; পরিষ্কার ও নির্দিষ্ট tag fit।",
+        "reason_code": "clean",
+        "row_id": 21823
+      },
+      {
+        "decision": "keep",
+        "rationale": "আম্মুর নামের বানান ভুল হলে কীভাবে আবেদন করবে ও কোথায় যাবে—পিতা-মাতার নাম সংশোধনের প্রক্রিয়া intent স্পষ্ট।",
+        "reason_code": "clean",
+        "row_id": 21780
+      },
+      {
+        "decision": "keep",
+        "rationale": "বাবার নাম সংশোধনে অনলাইন জন্মনিবন্ধনের আইডি নম্বর লাগবে কি না জানতে চেয়েছে; নির্দিষ্ট সহায়ক ডকুমেন্ট বিষয়ে প্রশ্ন।",
+        "reason_code": "clean",
+        "row_id": 21919
+      },
+      {
+        "decision": "flag",
+        "rationale": "আইডিতে বাবার নামের বানান ভুল হলে কী করা ও কার কাছে যাওয়া—21802-এর একই father-name correction process প্রশ্নের near-duplicate।",
+        "reason_code": "duplicate",
+        "row_id": 21754
+      },
+      {
+        "decision": "flag",
+        "rationale": "এনআইডি কার্ডে মায়ের নাম সংশোধনের প্রয়োজনীয় ডকুমেন্টস জানতে চেয়েছে; 21936/21787/21874/21911-এর একই প্রশ্নের পুনরাবৃত্তি।",
+        "reason_code": "duplicate",
+        "row_id": 21790
+      },
+      {
+        "decision": "flag",
+        "rationale": "জাতীয় আইডিতে মায়ের নাম ঠিক করতে বাবা-মার NID দুটোই লাগবে কি না—21857-এর প্রায় একই mother-name correction document requirement প্রশ্ন।",
+        "reason_code": "duplicate",
+        "row_id": 21842
+      },
+      {
+        "decision": "flag",
+        "rationale": "মায়ের নামের বানান ঠিক করতে কাগজপত্র জানতে চাওয়া হয়েছে; 21823-এর এনআইডিতে মায়ের নামের বানান সংশোধনের প্রমাণপত্র প্রশ্নের near-paraphrase।",
+        "reason_code": "duplicate",
+        "row_id": 21970
+      },
+      {
+        "decision": "keep",
+        "rationale": "জাতীয় পরিচয়পত্রে মায়ের নাম ঠিক করতে বাবা-মায়ের NID দিতে হবে কি না জানতে চেয়েছে; নির্দিষ্ট ডকুমেন্ট requirement হিসেবে clean।",
+        "reason_code": "clean",
+        "row_id": 21857
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডি কার্ডে মায়ের নামের পদবি সংশোধনে দরকারি কাগজ জানতে চেয়েছে; মায়ের নাম সংশোধনের নির্দিষ্ট উপধরন।",
+        "reason_code": "clean",
+        "row_id": 21791
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডিতে পিতার নাম ঠিক করতে বাবা-মায়ের জাতীয় পরিচয়পত্র লাগে কি না—পিতার নাম সংশোধনের ডকুমেন্ট requirement।",
+        "reason_code": "clean",
+        "row_id": 21796
+      },
+      {
+        "decision": "flag",
+        "rationale": "জাতীয় পরিচয়পত্রে মায়ের নাম সংশোধনের ডকুমেন্টস জানতে চেয়েছে; 21936/21790/21874-এর একই mother-name-documents প্রশ্নের near-paraphrase।",
+        "reason_code": "duplicate",
+        "row_id": 21911
+      },
+      {
+        "decision": "keep",
+        "rationale": "মাতার নাম সংশোধনের জন্য কোন অফিসে দেখা করতে হবে জানতে চেয়েছে; প্রক্রিয়া/অফিস-সংক্রান্ত clean উদাহরণ।",
+        "reason_code": "clean",
+        "row_id": 21950
+      }
+    ],
+    "packet_id": "audit_packet:000005",
+    "packet_rationale": "Rows generally match the parent-name correction tag. I kept clean, self-contained questions about father/mother name spelling/name correction and required documents or process. I flagged only close paraphrase duplicates within repeated father-process, father-documents, mother-documents, mother-proof, and parents-NID-requirement clusters."
+  },
+  "row_ids": [
+    21755,
+    21898,
+    21802,
+    21866,
+    21837,
+    21936,
+    21912,
+    21787,
+    21874,
+    21944,
+    21861,
+    21945,
+    21823,
+    21780,
+    21919,
+    21754,
+    21790,
+    21842,
+    21970,
+    21857,
+    21791,
+    21796,
+    21911,
+    21950
+  ]
+}

@@ -1,0 +1,180 @@
+{
+  "packet_id": "audit_packet:000009",
+  "pass_idx": 0,
+  "result": {
+    "decisions": [
+      {
+        "decision": "keep",
+        "rationale": "Locked NID portal with immediate request for someone to unlock it; matches service unlock intent.",
+        "reason_code": "clean",
+        "row_id": 480
+      },
+      {
+        "decision": "keep",
+        "rationale": "Explicitly asks 'you' to open/unlock the locked account immediately.",
+        "reason_code": "clean",
+        "row_id": 423
+      },
+      {
+        "decision": "flag",
+        "rationale": "Only asks whether urgent unlock is possible; lacks direct support/agent service request or 'করেদিতে' framing.",
+        "reason_code": "too_generic",
+        "row_id": 439
+      },
+      {
+        "decision": "flag",
+        "rationale": "Asks how the user can get it unlocked quickly, which is a how-to/process intent rather than direct agent unlock request.",
+        "reason_code": "sibling_collision",
+        "row_id": 356
+      },
+      {
+        "decision": "keep",
+        "rationale": "Blocked NID access with request for on-the-spot unlock; fits immediate service unlock intent.",
+        "reason_code": "clean",
+        "row_id": 448
+      },
+      {
+        "decision": "keep",
+        "rationale": "Locked account asks if it can be unlocked now; passive but clearly an immediate unlock service request.",
+        "reason_code": "clean",
+        "row_id": 432
+      },
+      {
+        "decision": "keep",
+        "rationale": "Explicitly asks 'you' to open the blocked NID login immediately.",
+        "reason_code": "clean",
+        "row_id": 468
+      },
+      {
+        "decision": "flag",
+        "rationale": "Asks for the way to get a copy after profile block; this is a how-to/download-copy intent, not agent action on behalf.",
+        "reason_code": "sibling_collision",
+        "row_id": 462
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks whether download can be arranged/done while profile is locked, matching on-behalf download service intent.",
+        "reason_code": "clean",
+        "row_id": 506
+      },
+      {
+        "decision": "flag",
+        "rationale": "Uses account recovery framing rather than unlock/open-for-me request, colliding with recovery intent.",
+        "reason_code": "sibling_collision",
+        "row_id": 442
+      },
+      {
+        "decision": "flag",
+        "rationale": "Asks if you can urgently do 'something' for a blocked ID; too vague for this specific unlock/download request tag.",
+        "reason_code": "too_generic",
+        "row_id": 360
+      },
+      {
+        "decision": "keep",
+        "rationale": "Profile block plus asks whether you can immediately unblock it; direct service intent.",
+        "reason_code": "clean",
+        "row_id": 464
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks to open the closed/locked ID immediately, matching direct unlock service request.",
+        "reason_code": "clean",
+        "row_id": 359
+      },
+      {
+        "decision": "flag",
+        "rationale": "Asks whether it will be unlocked immediately, more of a status/timing question than a request for support to unlock it.",
+        "reason_code": "wrong_intent",
+        "row_id": 363
+      },
+      {
+        "decision": "flag",
+        "rationale": "Focuses on downloading from Gazipur/location while account is locked; not a direct support unlock or on-behalf download request.",
+        "reason_code": "context_dependent",
+        "row_id": 379
+      },
+      {
+        "decision": "flag",
+        "rationale": "Asks for the way to get an NID copy after profile block, a how-to/copy retrieval intent rather than direct service.",
+        "reason_code": "sibling_collision",
+        "row_id": 499
+      },
+      {
+        "decision": "keep",
+        "rationale": "Directly asks if the inactive account can be enabled now; close equivalent to immediate unlock request.",
+        "reason_code": "clean",
+        "row_id": 401
+      },
+      {
+        "decision": "keep",
+        "rationale": "Polite direct request to open the locked NID login immediately.",
+        "reason_code": "clean",
+        "row_id": 474
+      },
+      {
+        "decision": "flag",
+        "rationale": "The 'instant unlock token' concept is artificial and asks about a token, not support unlocking the account.",
+        "reason_code": "synthetic_artifact",
+        "row_id": 433
+      },
+      {
+        "decision": "flag",
+        "rationale": "Asks how the user can download NID after lock; self/how-to download intent, not agent unlocking or downloading on behalf.",
+        "reason_code": "sibling_collision",
+        "row_id": 381
+      },
+      {
+        "decision": "flag",
+        "rationale": "Asks whether the user can open it themselves immediately; self-service, not support/agent unlock request.",
+        "reason_code": "wrong_intent",
+        "row_id": 508
+      },
+      {
+        "decision": "keep",
+        "rationale": "Blocked NID account with immediate request for manual opening; fits direct unlock service intent.",
+        "reason_code": "clean",
+        "row_id": 450
+      },
+      {
+        "decision": "flag",
+        "rationale": "Statement about urgent download need due to being in Rangpur; no direct request for support to unlock or download on behalf.",
+        "reason_code": "context_dependent",
+        "row_id": 382
+      },
+      {
+        "decision": "flag",
+        "rationale": "Asks by what method the user will download after account lock; how-to download intent rather than direct service request.",
+        "reason_code": "sibling_collision",
+        "row_id": 393
+      }
+    ],
+    "packet_id": "audit_packet:000009",
+    "packet_rationale": "Kept rows that directly ask support/agent, explicitly or implicitly, to unlock/open/unblock/enable a locked NID account now or to have download done on the user’s behalf. Flagged rows that ask for methods, ways, self-service, recovery, location-specific download, vague action, timing/status, or artificial token concepts rather than a direct unlock/download service request."
+  },
+  "row_ids": [
+    480,
+    423,
+    439,
+    356,
+    448,
+    432,
+    468,
+    462,
+    506,
+    442,
+    360,
+    464,
+    359,
+    363,
+    379,
+    499,
+    401,
+    474,
+    433,
+    381,
+    508,
+    450,
+    382,
+    393
+  ]
+}

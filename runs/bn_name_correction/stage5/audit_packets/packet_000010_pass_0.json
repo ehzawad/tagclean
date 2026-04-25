@@ -1,0 +1,180 @@
+{
+  "packet_id": "audit_packet:000010",
+  "pass_idx": 0,
+  "result": {
+    "decisions": [
+      {
+        "decision": "keep",
+        "rationale": "এনআইডিতে spouse নামের ভুল এন্ট্রি সংশোধনের জন্য কাগজপত্র জানতে চাওয়া হয়েছে; ট্যাগের intent স্পষ্ট।",
+        "reason_code": "clean",
+        "row_id": 29334
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডি কার্ডে স্ত্রীর নাম বদলানোর জন্য প্রয়োজনীয় কাগজপত্র জানতে চায়; spouse name correction-এর সঙ্গে মেলে।",
+        "reason_code": "clean",
+        "row_id": 29307
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডিতে স্বামী নাম প্রবিষ্ট/যোগ করতে কোন দলিল লাগবে—এটি spouse নাম যোগ সংক্রান্ত পরিষ্কার প্রশ্ন।",
+        "reason_code": "clean",
+        "row_id": 29357
+      },
+      {
+        "decision": "flag",
+        "rationale": "স্বামীর নাম সংশোধনের কথা আছে, কিন্তু এনআইডি/ভোটার কার্ড/স্মার্টকার্ড প্রসঙ্গ নেই; একাধিক ডকুমেন্ট/সেবা প্রসঙ্গে প্রযোজ্য হতে পারে।",
+        "reason_code": "too_generic",
+        "row_id": 29492
+      },
+      {
+        "decision": "keep",
+        "rationale": "জাতীয় আইডিতে স্ত্রী নাম অ্যাড করার কাগজপত্র জানতে চাওয়া হয়েছে; spouse নাম যোগের পরিষ্কার উদাহরণ।",
+        "reason_code": "clean",
+        "row_id": 29386
+      },
+      {
+        "decision": "keep",
+        "rationale": "জাতীয় আইডিতে স্ত্রী নাম সংশোধনের জন্য নথি জানতে চায়; ট্যাগের intent স্পষ্ট।",
+        "reason_code": "clean",
+        "row_id": 29388
+      },
+      {
+        "decision": "keep",
+        "rationale": "জাতীয় পরিচয়পত্রে স্বামীর নাম বসাতে প্রয়োজনীয় ডকুমেন্ট জানতে চাওয়া হয়েছে; spouse নাম যোগের সঙ্গে মেলে।",
+        "reason_code": "clean",
+        "row_id": 29428
+      },
+      {
+        "decision": "keep",
+        "rationale": "বিয়ের পর এনআইডিতে স্বামীর নাম অ্যাড করার প্রমাণ/ডকুমেন্ট জানতে চায়; ট্যাগের কেন্দ্রীয় intent।",
+        "reason_code": "clean",
+        "row_id": 29346
+      },
+      {
+        "decision": "keep",
+        "rationale": "জাতীয় পরিচয়পত্রের spouse ফিল্ড সংশোধনের জন্য নথিপত্র জানতে চাওয়া হয়েছে; পরিষ্কারভাবে spouse তথ্য সংশোধন।",
+        "reason_code": "clean",
+        "row_id": 29406
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডিতে বউ/স্ত্রীর নাম সংশোধনের কাগজপত্র জানতে চায়; spouse name correction হিসেবে স্পষ্ট।",
+        "reason_code": "clean",
+        "row_id": 29296
+      },
+      {
+        "decision": "keep",
+        "rationale": "স্মার্ট এনআইডিতে spouse তথ্য সংশোধনের জন্য সনদপত্র জানতে চাওয়া হয়েছে; ট্যাগের সঙ্গে সরাসরি মেলে।",
+        "reason_code": "clean",
+        "row_id": 29497
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডিতে স্ত্রী নাম সংশোধনের জন্য দলিল জানতে চায়; spouse নাম সংশোধনের পরিষ্কার প্রশ্ন।",
+        "reason_code": "clean",
+        "row_id": 29320
+      },
+      {
+        "decision": "keep",
+        "rationale": "জাতীয় আইডির spouse field update করতে কাগজ জমার বিষয়ে প্রশ্ন; spouse তথ্য যোগ/সংশোধন intent-এর মধ্যে পড়ে।",
+        "reason_code": "clean",
+        "row_id": 29370
+      },
+      {
+        "decision": "keep",
+        "rationale": "বিবাহের পর এনআইডিতে spouse name আপডেটের ডকুমেন্ট জানতে চাওয়া হয়েছে; ট্যাগের intent স্পষ্ট।",
+        "reason_code": "clean",
+        "row_id": 29437
+      },
+      {
+        "decision": "keep",
+        "rationale": "স্মার্টকার্ডে spouse name আপডেটের জন্য কাগজ জানতে চায়; স্মার্টকার্ড/এনআইডি spouse তথ্য সংশোধনের পরিষ্কার উদাহরণ।",
+        "reason_code": "clean",
+        "row_id": 29506
+      },
+      {
+        "decision": "keep",
+        "rationale": "জাতীয় পরিচয়পত্রে স্ত্রী নাম সংশোধনের জন্য কাগজ দেখানোর প্রশ্ন; spouse name correction-এর সঙ্গে মেলে।",
+        "reason_code": "clean",
+        "row_id": 29476
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডিতে spouse তথ্য যোগের জন্য কাগজ attach করার কথা জিজ্ঞেস করা হয়েছে; spouse তথ্য যোগ intent স্পষ্ট।",
+        "reason_code": "clean",
+        "row_id": 29325
+      },
+      {
+        "decision": "flag",
+        "rationale": "“দাম্পত্য নাম” অস্বাভাবিক ও অস্পষ্ট শব্দবন্ধ; spouse/স্বামী/স্ত্রীর নাম বোঝালেও ভাষাটি কৃত্রিম ও দ্ব্যর্থক।",
+        "reason_code": "synthetic_artifact",
+        "row_id": 29339
+      },
+      {
+        "decision": "flag",
+        "rationale": "শুধু “কার্ডে” বলা হয়েছে, এনআইডি/ভোটার/স্মার্টকার্ড স্পষ্ট নয়; তাই প্রশ্নটি প্রয়োজনীয় প্রেক্ষাপট ছাড়া বেশি সাধারণ।",
+        "reason_code": "too_generic",
+        "row_id": 29365
+      },
+      {
+        "decision": "keep",
+        "rationale": "ভোটার আইডিতে স্ত্রী নাম change করার জন্য দলিলপত্র জানতে চাওয়া হয়েছে; ভোটার আইডি/NID spouse নাম সংশোধনের পরিষ্কার প্রশ্ন।",
+        "reason_code": "clean",
+        "row_id": 29457
+      },
+      {
+        "decision": "keep",
+        "rationale": "স্মার্টকার্ডে spouse নাম পরিবর্তনের জন্য কাগজপত্র জানতে চাওয়া হয়েছে; spouse নাম সংশোধনের সঙ্গে সরাসরি মেলে।",
+        "reason_code": "clean",
+        "row_id": 29509
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডিতে spouse field সংশোধনের জন্য ডকুমেন্ট জানতে চাওয়া হয়েছে; ট্যাগের intent পরিষ্কার।",
+        "reason_code": "clean",
+        "row_id": 29322
+      },
+      {
+        "decision": "flag",
+        "rationale": "এনআইডি বা কোনো পরিচয়পত্রের প্রসঙ্গ নেই; “স্বামীর নাম পরিবর্তন” সাধারণভাবে অন্য সেবা বা স্বামীর নিজের নাম পরিবর্তনও বোঝাতে পারে।",
+        "reason_code": "too_generic",
+        "row_id": 34932
+      },
+      {
+        "decision": "keep",
+        "rationale": "ভোটার কার্ডে স্ত্রী নাম সংশোধনের জন্য প্রমাণপত্র জানতে চাওয়া হয়েছে; spouse name correction-এর পরিষ্কার উদাহরণ।",
+        "reason_code": "clean",
+        "row_id": 29472
+      }
+    ],
+    "packet_id": "audit_packet:000010",
+    "packet_rationale": "অধিকাংশ সারি এনআইডি/জাতীয় পরিচয়পত্র/ভোটার কার্ড/স্মার্টকার্ডে spouse, স্বামী বা স্ত্রীর নাম যোগ/সংশোধনের ডকুমেন্ট জানতে চেয়েছে, তাই রাখা হয়েছে। যেসব প্রশ্নে পরিচয়পত্রের প্রসঙ্গ নেই বা শুধু অস্পষ্ট “কার্ড” বলা হয়েছে, সেগুলো self-contained নয় বলে flag করা হয়েছে। অস্বাভাবিক/কৃত্রিম শব্দবন্ধযুক্ত একটি সারিও flag করা হয়েছে।"
+  },
+  "row_ids": [
+    29334,
+    29307,
+    29357,
+    29492,
+    29386,
+    29388,
+    29428,
+    29346,
+    29406,
+    29296,
+    29497,
+    29320,
+    29370,
+    29437,
+    29506,
+    29476,
+    29325,
+    29339,
+    29365,
+    29457,
+    29509,
+    29322,
+    34932,
+    29472
+  ]
+}

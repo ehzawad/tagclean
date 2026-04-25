@@ -1,0 +1,180 @@
+{
+  "packet_id": "audit_packet:000004",
+  "pass_idx": 0,
+  "result": {
+    "decisions": [
+      {
+        "decision": "keep",
+        "rationale": "Self-contained and directly asks what to do if OTP is not received in the Postal Vote BD app.",
+        "reason_code": "clean",
+        "row_id": 47500
+      },
+      {
+        "decision": "keep",
+        "rationale": "Clearly asks how to request OTP again after not receiving it in the Postal Vote app.",
+        "reason_code": "clean",
+        "row_id": 53075
+      },
+      {
+        "decision": "keep",
+        "rationale": "Fits the tag by asking how to proceed when OTP does not reach the user in the EC Postal Vote BD app.",
+        "reason_code": "clean",
+        "row_id": 53001
+      },
+      {
+        "decision": "keep",
+        "rationale": "Directly about a 6-digit OTP not arriving in the Postal Vote BD app and seeking a solution.",
+        "reason_code": "clean",
+        "row_id": 53087
+      },
+      {
+        "decision": "keep",
+        "rationale": "Verification code is an OTP-equivalent; the question asks what to do if it does not arrive in the app.",
+        "reason_code": "clean",
+        "row_id": 53010
+      },
+      {
+        "decision": "keep",
+        "rationale": "Self-contained question about repeated failure to receive OTP in the Postal Vote BD app.",
+        "reason_code": "clean",
+        "row_id": 53017
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks about alternatives when OTP is not received/sent in Postal Vote BD, matching the tag intent.",
+        "reason_code": "clean",
+        "row_id": 53020
+      },
+      {
+        "decision": "keep",
+        "rationale": "Verification code not received in Postal Vote BD is the same user issue as OTP not received.",
+        "reason_code": "clean",
+        "row_id": 52997
+      },
+      {
+        "decision": "keep",
+        "rationale": "Natural, self-contained question stating OTP is not coming in the Postal Vote app and asking what to do.",
+        "reason_code": "clean",
+        "row_id": 53014
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks when to retry after not receiving OTP in Postal Voting BD, within the not-received OTP flow.",
+        "reason_code": "clean",
+        "row_id": 53090
+      },
+      {
+        "decision": "keep",
+        "rationale": "Despite minor wording awkwardness, it clearly asks what steps to take if the OTP code does not arrive.",
+        "reason_code": "clean",
+        "row_id": 53093
+      },
+      {
+        "decision": "keep",
+        "rationale": "Directly concerns an OTP message not arriving in Postal Vote BD and whether to wait.",
+        "reason_code": "clean",
+        "row_id": 53046
+      },
+      {
+        "decision": "keep",
+        "rationale": "One-time code is an OTP synonym; the question asks how to request it again if not received.",
+        "reason_code": "clean",
+        "row_id": 53057
+      },
+      {
+        "decision": "keep",
+        "rationale": "Clearly asks how long to wait before requesting OTP again when it does not arrive.",
+        "reason_code": "clean",
+        "row_id": 53040
+      },
+      {
+        "decision": "keep",
+        "rationale": "Confirmation code not arriving in Postal Vote BD is a clear OTP-not-received scenario.",
+        "reason_code": "clean",
+        "row_id": 52999
+      },
+      {
+        "decision": "keep",
+        "rationale": "A 6-digit verification code not arriving is a clean OTP-not-received example for Postal Vote BD.",
+        "reason_code": "clean",
+        "row_id": 53064
+      },
+      {
+        "decision": "keep",
+        "rationale": "Security code not arriving in the app is an OTP-equivalent not-received issue.",
+        "reason_code": "clean",
+        "row_id": 53016
+      },
+      {
+        "decision": "keep",
+        "rationale": "Self-contained question about a security OTP not arriving in Postal Vote BD and what to do.",
+        "reason_code": "clean",
+        "row_id": 53049
+      },
+      {
+        "decision": "keep",
+        "rationale": "Verification PIN not received is close enough to OTP not received in this app context.",
+        "reason_code": "clean",
+        "row_id": 53041
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks what to do when OTP is delayed, which is within the OTP not yet received intent.",
+        "reason_code": "clean",
+        "row_id": 53026
+      },
+      {
+        "decision": "keep",
+        "rationale": "Security code not arriving in Postal Vote BD clearly matches the OTP-not-received support intent.",
+        "reason_code": "clean",
+        "row_id": 53074
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks how long to wait and retry when OTP does not arrive, matching the tag.",
+        "reason_code": "clean",
+        "row_id": 53058
+      },
+      {
+        "decision": "keep",
+        "rationale": "Canonical clean example asking what to do if OTP does not arrive in the Postal Vote BD app.",
+        "reason_code": "clean",
+        "row_id": 52996
+      },
+      {
+        "decision": "keep",
+        "rationale": "Directly asks when to retry after OTP does not arrive in Postal Vote BD.",
+        "reason_code": "clean",
+        "row_id": 53070
+      }
+    ],
+    "packet_id": "audit_packet:000004",
+    "packet_rationale": "All rows are self-contained questions about OTP, verification, confirmation, security, or one-time codes not arriving or being delayed in the Postal Vote BD app/service. Retry and waiting-time variants remain within the tag’s central not-received OTP intent, and no row clearly belongs better to a sibling tag or is too generic."
+  },
+  "row_ids": [
+    47500,
+    53075,
+    53001,
+    53087,
+    53010,
+    53017,
+    53020,
+    52997,
+    53014,
+    53090,
+    53093,
+    53046,
+    53057,
+    53040,
+    52999,
+    53064,
+    53016,
+    53049,
+    53041,
+    53026,
+    53074,
+    53058,
+    52996,
+    53070
+  ]
+}

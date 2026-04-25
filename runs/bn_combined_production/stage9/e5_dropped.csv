@@ -1,0 +1,2 @@
+question,tag,top1_neighbor_tag,top1_neighbor_question,top1_correct,own_share_top_k,neighbor_tag_dist,audit_top_k
+বাবা ও মায়ের নামের বানান সংশোধনে কোন সার্টিফিকেটগুলো দরকার?,parents_name_correction_new,name_correction_in_nid_card,নাম বানান ত্রুটি সংশোধনে কোন কোন প্রমাণপত্র প্রয়োজন হয়?,False,0.4,"{""name_correction_in_nid_card"": 5, ""parents_name_correction_new"": 4, ""spouse_name_correction_new"": 1}",10

@@ -1,0 +1,83 @@
+{
+  "audit_top_k": 10,
+  "drop_on_top1_mismatch": true,
+  "input_csv": "/Users/ehz/tagclean/runs/bn_account_locked/stage6/question_tag.cleaned.csv",
+  "median_own_share_top_k": 1.0,
+  "per_tag": [
+    {
+      "dropped": 1,
+      "input_rows": 76,
+      "median_own_share": 1.0,
+      "tag": "account_locked",
+      "top1_accuracy": 0.9868421052631579
+    },
+    {
+      "dropped": 1,
+      "input_rows": 73,
+      "median_own_share": 1.0,
+      "tag": "account_locked_retrials",
+      "top1_accuracy": 0.9863013698630136
+    },
+    {
+      "dropped": 4,
+      "input_rows": 45,
+      "median_own_share": 0.9,
+      "tag": "account_locked_unlock_request",
+      "top1_accuracy": 0.9111111111111111
+    }
+  ],
+  "rows_dropped": 6,
+  "rows_in": 194,
+  "rows_kept": 188,
+  "top1_accuracy_in": 0.9690721649484536,
+  "top_drop_examples": [
+    {
+      "neighbor_tag_dist": "{\"account_locked_unlock_request\": 3, \"account_locked\": 7}",
+      "own_share_top_k": 0.7,
+      "question": "এনআইডি পোর্টালের ইউজার লকড; আনলক করতে কী নির্দেশনা আছে?",
+      "tag": "account_locked",
+      "top1_neighbor_question": "এনআইডি সেবা পোর্টাল লক হয়ে গেলে কি কেউ তাৎক্ষণিকভাবে আনলক করে দিতে পারেন?",
+      "top1_neighbor_tag": "account_locked_unlock_request"
+    },
+    {
+      "neighbor_tag_dist": "{\"account_locked_unlock_request\": 7, \"account_locked_retrials\": 3}",
+      "own_share_top_k": 0.3,
+      "question": "লকড একাউন্ট আনলক করার জন্য কি অপেক্ষা করা ছাড়া উপায় নেই?",
+      "tag": "account_locked_retrials",
+      "top1_neighbor_question": "একাউন্ট লক হয়ে গেছে এখনি কি আনলক করে দিতে পারবেন?",
+      "top1_neighbor_tag": "account_locked_unlock_request"
+    },
+    {
+      "neighbor_tag_dist": "{\"account_locked\": 8, \"account_locked_unlock_request\": 2}",
+      "own_share_top_k": 0.2,
+      "question": "আমার এনআইডি অনলাইন একাউন্ট লকড হয়েছে, এখনই কি আপনারা আনলক করে দিতে পারবেন?",
+      "tag": "account_locked_unlock_request",
+      "top1_neighbor_question": "আমার এনআইডি একাউন্ট লক হয়ে গেছে, কিভাবে আনলক করবো?",
+      "top1_neighbor_tag": "account_locked"
+    },
+    {
+      "neighbor_tag_dist": "{\"account_locked\": 5, \"account_locked_unlock_request\": 5}",
+      "own_share_top_k": 0.5,
+      "question": "এনআইডি সেবা পোর্টাল লক হয়ে গেলে কি কেউ তাৎক্ষণিকভাবে আনলক করে দিতে পারেন?",
+      "tag": "account_locked_unlock_request",
+      "top1_neighbor_question": "এনআইডি পোর্টালের ইউজার লকড; আনলক করতে কী নির্দেশনা আছে?",
+      "top1_neighbor_tag": "account_locked"
+    },
+    {
+      "neighbor_tag_dist": "{\"account_locked\": 5, \"account_locked_unlock_request\": 5}",
+      "own_share_top_k": 0.5,
+      "question": "এনআইডি একাউন্ট ব্লকড, এখনি কি ম্যানুয়ালি খুলে দেওয়া সম্ভব?",
+      "tag": "account_locked_unlock_request",
+      "top1_neighbor_question": "এনআইডি অ্যাকাউন্ট ইস্যু: লক হয়েছে, কিভাবে খুলবো?",
+      "top1_neighbor_tag": "account_locked"
+    },
+    {
+      "neighbor_tag_dist": "{\"account_locked\": 8, \"account_locked_unlock_request\": 2}",
+      "own_share_top_k": 0.2,
+      "question": "এনআইডি সাইটে অ্যাকাউন্ট ব্লক হয়ে গেছে, এইমাত্র কি আনলক করে দেবেন?",
+      "tag": "account_locked_unlock_request",
+      "top1_neighbor_question": "এনআইডি ওয়েবসাইটে আমার অ্যাকাউন্টে লক পড়ে গেছে; কীভাবে আনলক করব?",
+      "top1_neighbor_tag": "account_locked"
+    }
+  ]
+}

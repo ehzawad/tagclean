@@ -23,7 +23,9 @@ from tagclean.cleaner import (
     missing_row_ids_in_packet_result,
     normalize_question,
     resolve_target_tags,
+    run_compose,
     run_stage0,
+    run_stage9,
     token_alignment_score,
     _resolve_consistency,
 )
@@ -280,3 +282,148 @@ def test_resolve_target_tags_keeps_corpus_scope_separate() -> None:
     tag_to_canon = {"b": "b_canon"}
 
     assert resolve_target_tags(rows, cfg, tag_to_canon) == {"a", "b_canon"}
+
+
+def test_stage9_audits_emit_expected_artifacts(tmp_path: Path) -> None:
+    """Stage 9 produces audit/kept/dropped CSVs and a report whose counts
+    are internally consistent. Hashing backend is too noisy to assert
+    on which specific rows get dropped; structure invariants are enough.
+    Drop semantics (top1 mismatch) are validated end-to-end on a real
+    Bengali run, not in unit tests.
+    """
+    cleaned_csv = tmp_path / "cleaned.csv"
+    rows = [
+        ("the cat sat on the mat", "feline"),
+        ("a cat purred softly", "feline"),
+        ("kittens love yarn", "feline"),
+        ("dogs chase squirrels", "canine"),
+        ("the puppy barked loudly", "canine"),
+        ("a wolf howled at the moon", "canine"),
+        ("apples are sweet fruit", "fruit"),
+        ("oranges grow on trees", "fruit"),
+        ("ripe banana tastes good", "fruit"),
+    ]
+    with cleaned_csv.open("w", encoding="utf-8", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["question", "tag"])
+        w.writerows(rows)
+
+    tag_answer = tmp_path / "tag_answer.json"
+    tag_answer.write_text("{}", encoding="utf-8")
+    cfg = CleanerConfig(
+        input_csv=cleaned_csv,  # ignored when stage9_input_csv is set
+        tag_answer_json=tag_answer,
+        artifact_root=tmp_path / "artifacts",
+        run_id="stage9_test",
+        embedding_backend="hashing",
+        judge_mode="heuristic",
+        e5_use_prefixes=False,
+        e5_audit_top_k=3,
+        stage9_input_csv=str(cleaned_csv),
+    )
+
+    run_stage9(cfg, resume=False)
+
+    stage_dir = cfg.run_dir() / "stage9"
+    audit = pd.read_csv(stage_dir / "e5_neighbor_audit.csv")
+    kept = pd.read_csv(stage_dir / "production_filtered.csv")
+    dropped = pd.read_csv(stage_dir / "e5_dropped.csv")
+    report = json.loads((stage_dir / "audit_report.json").read_text())
+
+    assert len(audit) == len(rows)
+    assert set(audit.columns) >= {
+        "question",
+        "tag",
+        "top1_neighbor_tag",
+        "top1_correct",
+        "own_share_top_k",
+        "neighbor_tag_dist",
+    }
+    assert audit["audit_top_k"].iloc[0] == 3
+    # kept ∪ dropped == audit, and top1_correct flag aligns with drop set.
+    assert len(kept) + len(dropped) == len(audit)
+    assert (audit["top1_correct"]).sum() == len(kept)
+    assert ((~audit["top1_correct"]).sum()) == len(dropped)
+    assert report["rows_in"] == len(rows)
+    assert report["rows_kept"] + report["rows_dropped"] == report["rows_in"]
+    assert 0.0 <= report["top1_accuracy_in"] <= 1.0
+
+
+def test_compose_concats_and_dedupes_top40s(tmp_path: Path) -> None:
+    """compose merges per-run top40s, dedupes (question, tag), validates schema,
+    and emits a deterministic 2-column CSV."""
+    artifact_root = tmp_path / "artifacts"
+    # family A: 2 rows, tags {a, b}
+    a_dir = artifact_root / "family_a" / "stage6"
+    a_dir.mkdir(parents=True)
+    (a_dir / "question_tag.top40.csv").write_text(
+        "question,tag\nq1,a\nq2,b\n", encoding="utf-8"
+    )
+    # family B: 2 rows; q1/a duplicates family_a's row; q3/c is new
+    b_dir = artifact_root / "family_b" / "stage6"
+    b_dir.mkdir(parents=True)
+    (b_dir / "question_tag.top40.csv").write_text(
+        "question,tag\nq1,a\nq3,c\n", encoding="utf-8"
+    )
+    cfg = CleanerConfig(artifact_root=artifact_root)
+    out = artifact_root / "production" / "composed.csv"
+
+    run_compose(cfg, ["family_a", "family_b"], "top40", out)
+
+    df = pd.read_csv(out)
+    assert list(df.columns) == ["question", "tag"]
+    # 3 unique (q,t) pairs after dedup
+    assert len(df) == 3
+    assert sorted(zip(df.question, df.tag)) == [("q1", "a"), ("q2", "b"), ("q3", "c")]
+    # deterministic sort by (tag, question)
+    assert list(df.tag) == ["a", "b", "c"]
+
+
+def test_compose_errors_on_missing_source(tmp_path: Path) -> None:
+    cfg = CleanerConfig(artifact_root=tmp_path / "artifacts")
+    out = tmp_path / "out.csv"
+    try:
+        run_compose(cfg, ["nope"], "top40", out)
+    except FileNotFoundError as e:
+        assert "nope" in str(e)
+    else:
+        raise AssertionError("compose should raise when a source run is missing")
+
+
+def test_stage9_no_drop_mode_keeps_all_rows(tmp_path: Path) -> None:
+    """With drop_on_top1_mismatch=False, every row passes through to
+    production_filtered.csv and e5_dropped.csv is empty. Audit CSV still
+    annotates each row's neighborhood for human review.
+    """
+    cleaned_csv = tmp_path / "cleaned.csv"
+    rows = [
+        ("alpha apple", "a"),
+        ("beta banana", "b"),
+        ("alpha apricot", "a"),
+        ("beta blueberry", "b"),
+    ]
+    with cleaned_csv.open("w", encoding="utf-8", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["question", "tag"])
+        w.writerows(rows)
+
+    tag_answer = tmp_path / "tag_answer.json"
+    tag_answer.write_text("{}", encoding="utf-8")
+    cfg = CleanerConfig(
+        input_csv=cleaned_csv,
+        tag_answer_json=tag_answer,
+        artifact_root=tmp_path / "artifacts",
+        run_id="stage9_no_drop",
+        embedding_backend="hashing",
+        judge_mode="heuristic",
+        e5_use_prefixes=False,
+        e5_audit_top_k=2,
+        stage9_input_csv=str(cleaned_csv),
+        e5_audit_drop_on_top1_mismatch=False,
+    )
+    run_stage9(cfg, resume=False)
+    stage_dir = cfg.run_dir() / "stage9"
+    kept = pd.read_csv(stage_dir / "production_filtered.csv")
+    dropped = pd.read_csv(stage_dir / "e5_dropped.csv")
+    assert len(kept) == len(rows)
+    assert len(dropped) == 0

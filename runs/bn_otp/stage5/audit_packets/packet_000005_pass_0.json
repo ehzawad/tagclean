@@ -1,0 +1,180 @@
+{
+  "packet_id": "audit_packet:000005",
+  "pass_idx": 0,
+  "result": {
+    "decisions": [
+      {
+        "decision": "flag",
+        "rationale": "Near-paraphrase of row 53036; both ask how to request/resend another OTP when it does not arrive.",
+        "reason_code": "duplicate",
+        "row_id": 53009
+      },
+      {
+        "decision": "keep",
+        "rationale": "Self-contained and directly asks what to do when the OTP does not reach the Postal Vote BD app.",
+        "reason_code": "clean",
+        "row_id": 53062
+      },
+      {
+        "decision": "keep",
+        "rationale": "Self-contained; asks about a missing confirmation SMS and locating resend in Postal Vote BD, aligned with an OTP-not-received flow.",
+        "reason_code": "clean",
+        "row_id": 53088
+      },
+      {
+        "decision": "keep",
+        "rationale": "Clearly about a verification OTP not arriving in the Postal Vote BD app and how to resend it.",
+        "reason_code": "clean",
+        "row_id": 53083
+      },
+      {
+        "decision": "keep",
+        "rationale": "Central, self-contained question about resending an OTP when it does not arrive in the Postal Voting BD app.",
+        "reason_code": "clean",
+        "row_id": 53036
+      },
+      {
+        "decision": "flag",
+        "rationale": "Near-paraphrase of resend rows 53036 and 53083; missing OTP message and re-requesting adds no distinct case.",
+        "reason_code": "duplicate",
+        "row_id": 53043
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks whether an OTP can be resent when not received; a clean OTP-not-received yes/no variant.",
+        "reason_code": "clean",
+        "row_id": 53031
+      },
+      {
+        "decision": "keep",
+        "rationale": "Clearly asks what to do if the SMS OTP is not received in Postal Vote BD.",
+        "reason_code": "clean",
+        "row_id": 53023
+      },
+      {
+        "decision": "keep",
+        "rationale": "Self-contained central next-steps question for OTP not received in the Postal Voting BD app.",
+        "reason_code": "clean",
+        "row_id": 53077
+      },
+      {
+        "decision": "flag",
+        "rationale": "Near-paraphrase of row 53062; 'OTP delivery not happen' is the same missing-delivery case.",
+        "reason_code": "duplicate",
+        "row_id": 53002
+      },
+      {
+        "decision": "flag",
+        "rationale": "Asks about the waiting time before requesting another OTP, not about an OTP failing to arrive; better fits OTP resend/cooldown.",
+        "reason_code": "sibling_collision",
+        "row_id": 53034
+      },
+      {
+        "decision": "flag",
+        "rationale": "Near-paraphrase of row 53036; both ask how to get/send another OTP when it does not arrive.",
+        "reason_code": "duplicate",
+        "row_id": 53066
+      },
+      {
+        "decision": "flag",
+        "rationale": "Near-paraphrase of row 53036; it asks to request a new OTP after not receiving one.",
+        "reason_code": "duplicate",
+        "row_id": 53085
+      },
+      {
+        "decision": "flag",
+        "rationale": "Near-paraphrase of row 53023; both ask what to do when an SMS OTP is not received.",
+        "reason_code": "duplicate",
+        "row_id": 53005
+      },
+      {
+        "decision": "flag",
+        "rationale": "Near-paraphrase of row 53077; both ask what to do when the OTP is not being received.",
+        "reason_code": "duplicate",
+        "row_id": 52998
+      },
+      {
+        "decision": "flag",
+        "rationale": "Near-paraphrase of row 53023; both cover SMS OTP not arriving and the next action.",
+        "reason_code": "duplicate",
+        "row_id": 53063
+      },
+      {
+        "decision": "keep",
+        "rationale": "Uses code-delivery wording, but in this app context clearly asks about the OTP/verification code not being delivered.",
+        "reason_code": "clean",
+        "row_id": 53053
+      },
+      {
+        "decision": "keep",
+        "rationale": "Self-contained; asks how to request the missing verification code in the Postal Vote BD app, aligned with OTP-not-received.",
+        "reason_code": "clean",
+        "row_id": 53025
+      },
+      {
+        "decision": "keep",
+        "rationale": "Directly asks what to do when the confirmation OTP is not received in Postal Vote BD.",
+        "reason_code": "clean",
+        "row_id": 53044
+      },
+      {
+        "decision": "flag",
+        "rationale": "Near-paraphrase of row 53036; both ask whether/how to request another OTP after not receiving one.",
+        "reason_code": "duplicate",
+        "row_id": 53065
+      },
+      {
+        "decision": "flag",
+        "rationale": "Near-paraphrase of row 53044; confirmation code not arriving is the same confirmation OTP-not-received case.",
+        "reason_code": "duplicate",
+        "row_id": 53028
+      },
+      {
+        "decision": "flag",
+        "rationale": "Near-paraphrase of rows 53023 and 53077; it only rewords OTP message not received and what to do.",
+        "reason_code": "duplicate",
+        "row_id": 53029
+      },
+      {
+        "decision": "flag",
+        "rationale": "Near-paraphrase of row 53077; both ask what to do about an OTP-not-received problem.",
+        "reason_code": "duplicate",
+        "row_id": 53072
+      },
+      {
+        "decision": "flag",
+        "rationale": "Near-paraphrase of row 53036; both ask how to send/resend the OTP again when it does not arrive.",
+        "reason_code": "duplicate",
+        "row_id": 53051
+      }
+    ],
+    "packet_id": "audit_packet:000005",
+    "packet_rationale": "Rows were judged against the OTP-not-received intent for the Postal Vote BD app. Clean rows are self-contained and directly concern missing OTP/SMS/code delivery or resending after non-receipt. I flagged one cooldown-style question as a sibling collision because it asks only about resend timing. I also flagged close paraphrases where another target row already covers the same wording and subintent."
+  },
+  "row_ids": [
+    53009,
+    53062,
+    53088,
+    53083,
+    53036,
+    53043,
+    53031,
+    53023,
+    53077,
+    53002,
+    53034,
+    53066,
+    53085,
+    53005,
+    52998,
+    53063,
+    53053,
+    53025,
+    53044,
+    53065,
+    53028,
+    53029,
+    53072,
+    53051
+  ]
+}

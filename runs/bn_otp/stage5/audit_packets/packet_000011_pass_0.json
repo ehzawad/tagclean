@@ -1,0 +1,68 @@
+{
+  "packet_id": "audit_packet:000011",
+  "pass_idx": 0,
+  "result": {
+    "decisions": [
+      {
+        "decision": "keep",
+        "rationale": "Asks which tab/button to press in Postal Vote BD to send a verification code, which matches the OTP send button intent.",
+        "reason_code": "clean",
+        "row_id": 53174
+      },
+      {
+        "decision": "keep",
+        "rationale": "Clearly asks which button is needed to send a verification code in Postal Vote BD; verification code maps to OTP sending.",
+        "reason_code": "clean",
+        "row_id": 53171
+      },
+      {
+        "decision": "flag",
+        "rationale": "Asks about submitting an OTP, not sending/requesting one. This fits an OTP submit button intent better than OTP send button.",
+        "reason_code": "sibling_collision",
+        "row_id": 53110
+      },
+      {
+        "decision": "keep",
+        "rationale": "Directly asks which option to press for OTP send in the Postal Vote app, matching the tag intent.",
+        "reason_code": "clean",
+        "row_id": 53135
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks which button to tap to send a one-time password in Postal Vote BD, a clear OTP send button question.",
+        "reason_code": "clean",
+        "row_id": 53107
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks which option is for OTP sending in Postal Vote BD, fitting the OTP send button concept.",
+        "reason_code": "clean",
+        "row_id": 53141
+      },
+      {
+        "decision": "keep",
+        "rationale": "Asks which option to touch in the Postal Vote app to send a verification code, matching OTP send/request button intent.",
+        "reason_code": "clean",
+        "row_id": 53112
+      },
+      {
+        "decision": "flag",
+        "rationale": "Asks which button to click to submit a verification code, not to send/request the OTP. This is closer to an OTP/code submit button tag.",
+        "reason_code": "sibling_collision",
+        "row_id": 53122
+      }
+    ],
+    "packet_id": "audit_packet:000011",
+    "packet_rationale": "Rows that ask which button, tab, or option sends/requests an OTP or verification code in the Postal Vote app are clean. Rows using 'submit' for the OTP or verification code indicate entering/submitting a received code, so they collide with an OTP submit-button intent and should be dropped from this tag."
+  },
+  "row_ids": [
+    53174,
+    53171,
+    53110,
+    53135,
+    53107,
+    53141,
+    53112,
+    53122
+  ]
+}

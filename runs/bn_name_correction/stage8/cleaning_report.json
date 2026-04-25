@@ -1,0 +1,52 @@
+{
+  "cleaned": {
+    "confusions": [
+      {
+        "count": 3,
+        "predicted_tag": "name_correction_in_nid_card",
+        "true_tag": "parents_name_correction_new"
+      },
+      {
+        "count": 2,
+        "predicted_tag": "spouse_name_correction_new",
+        "true_tag": "parents_name_correction_new"
+      },
+      {
+        "count": 1,
+        "predicted_tag": "parents_name_correction_new",
+        "true_tag": "name_correction_in_nid_card"
+      },
+      {
+        "count": 1,
+        "predicted_tag": "name_correction_in_nid_card",
+        "true_tag": "spouse_name_correction_new"
+      }
+    ],
+    "rows": 165,
+    "top1_accuracy": 0.9575757575757575,
+    "top5_accuracy": 1.0
+  },
+  "low_support_tags": [],
+  "top40": {
+    "confusions": [
+      {
+        "count": 2,
+        "predicted_tag": "parents_name_correction_new",
+        "true_tag": "name_correction_in_nid_card"
+      },
+      {
+        "count": 2,
+        "predicted_tag": "name_correction_in_nid_card",
+        "true_tag": "parents_name_correction_new"
+      },
+      {
+        "count": 2,
+        "predicted_tag": "spouse_name_correction_new",
+        "true_tag": "parents_name_correction_new"
+      }
+    ],
+    "rows": 117,
+    "top1_accuracy": 0.9487179487179487,
+    "top5_accuracy": 1.0
+  }
+}

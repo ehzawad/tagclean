@@ -155,6 +155,14 @@ class CleanerConfig:
     validation_top_k: int = 5
     validation_chunk_size: int = 4096
 
+    # Stage 9: E5-only post-clean audit. Mimics production retrieval (E5 alone)
+    # over the cleaned corpus and emits per-row neighborhood diagnostics.
+    # Default drops rows whose top-1 LOO neighbor is a different tag — same
+    # rows Stage 8 reports as confusions, but materialized as a filtered set.
+    e5_audit_top_k: int = 10
+    e5_audit_drop_on_top1_mismatch: bool = True
+    stage9_input_csv: str | None = None  # override: external CSV (union of multiple runs)
+
     def resolved_run_id(self) -> str:
         return self.run_id or time.strftime("run_%Y%m%d_%H%M%S")
 
@@ -930,10 +938,15 @@ def run_stage3(config: CleanerConfig, resume: bool = True) -> None:
     e5_centroids = np.load(run_dir / "stage2" / "tag_centroids_e5.npy")
     gemma_centroids = np.load(run_dir / "stage2" / "tag_centroids_gemma.npy")
     emb_e5 = np.load(run_dir / "stage1" / "emb_e5.npy")
-    input_hash = hashlib.sha256(
-        dataframe_hash(profiles, ["tag", "row_count", "description"]).encode("utf-8")
-        + file_sha256(config.tag_answer_json).encode("utf-8")
-    ).hexdigest()
+    hash_parts = [
+        dataframe_hash(profiles, ["tag", "row_count", "description"]),
+        file_sha256(config.tag_answer_json),
+    ]
+    if config.target_tags:
+        # Scope-aware hash: a target-restricted run is a different artifact
+        # than a corpus-wide one and must not silently resume from each other.
+        hash_parts.append("target_tags=" + ",".join(sorted(config.target_tags)))
+    input_hash = hashlib.sha256("|".join(hash_parts).encode("utf-8")).hexdigest()
     if resume and stage_done(stage_dir, input_hash):
         print(f"[stage3] skip: {stage_dir}")
         return
@@ -1029,9 +1042,28 @@ def run_stage3(config: CleanerConfig, resume: bool = True) -> None:
         max_cluster_size=config.boundary_policy_max_cluster_size,
     )
     distinct_clusters: list[list[str]] = []
-    for members in raw_clusters:
-        canonicals = {canon_for_tag.get(t, t) for t in members}
-        if len(canonicals) >= 2:
+    target_canon = (
+        [canon_for_tag.get(t, t) for t in config.target_tags]
+        if config.target_tags
+        else None
+    )
+    if target_canon is not None and len(set(target_canon)) >= 2:
+        # User-provided cluster: --target-tags or --seed-tag's resolved set
+        # IS the cluster Stage 3 should author a policy for. Skipping the
+        # union-find avoids two failure modes at corpus scale:
+        # (1) target tags landing in a 400+-tag mega-component that gets
+        #     truncated to alphabetically-first 6 by max_cluster_size,
+        #     dropping the targets entirely;
+        # (2) burning ~100+ GPT calls authoring policies for irrelevant
+        #     clusters Stage 5 will never use.
+        distinct_clusters = [list(dict.fromkeys(target_canon))]
+    else:
+        for members in raw_clusters:
+            canonicals = {canon_for_tag.get(t, t) for t in members}
+            if len(canonicals) < 2:
+                continue
+            if target_canon is not None and not (set(target_canon) & canonicals):
+                continue
             distinct_clusters.append(members)
 
     policy_records: list[dict[str, Any]] = []
@@ -2684,6 +2716,144 @@ def run_stage8(config: CleanerConfig, resume: bool = True) -> None:
     print(f"[stage8] wrote {stage_dir}")
 
 
+def run_stage9(config: CleanerConfig, resume: bool = True) -> None:
+    """E5-only production-risk audit. Runs leave-one-out top-K retrieval over
+    the cleaned set using E5 alone (no Gemma) — this mimics production, where
+    inference is E5-only. Reports per-row neighborhood and, by default, drops
+    rows whose nearest non-self neighbor belongs to a different tag.
+
+    Input is by default `stage6/question_tag.cleaned.csv`. Pass
+    `config.stage9_input_csv` to audit an external CSV — typically the
+    concatenation of top-40 sets across multiple family runs (the actual
+    production candidate set).
+
+    Stage 9 NEVER chains Stage 0–8: chaining would silently overwrite the
+    cleaned set under a different config (e.g. running stage9 with a
+    different judge_mode would re-run stage4–6 with that config, clobbering
+    the original cleaned.csv). The user must run Stage 8 (or earlier)
+    explicitly first; Stage 9 only audits what's already there.
+    """
+    run_dir = config.run_dir()
+    stage_dir = run_dir / "stage9"
+    if config.stage9_input_csv:
+        input_csv = Path(config.stage9_input_csv).expanduser().resolve()
+    else:
+        input_csv = run_dir / "stage6" / "question_tag.cleaned.csv"
+    if not input_csv.exists():
+        raise FileNotFoundError(
+            f"Stage 9 input not found: {input_csv}\n"
+            f"Run `tagclean stage6` (or stage8) first, or pass --e5-audit-input <csv>."
+        )
+
+    knobs = f"{config.e5_audit_top_k}|{int(config.e5_audit_drop_on_top1_mismatch)}|{config.e5_model}|{int(config.e5_use_prefixes)}"
+    input_hash = hashlib.sha256((file_sha256(input_csv) + "|" + knobs).encode("utf-8")).hexdigest()
+    if resume and stage_done(stage_dir, input_hash):
+        print(f"[stage9] skip: {stage_dir}")
+        return
+
+    df = pd.read_csv(input_csv)
+    if "tag" not in df.columns and "tag_clean" in df.columns:
+        df = df.rename(columns={"tag_clean": "tag"})
+    if "question" not in df.columns or "tag" not in df.columns:
+        raise ValueError(f"Stage 9 input must have question,tag columns; got {list(df.columns)}")
+    df = df[["question", "tag"]].dropna().reset_index(drop=True).copy()
+    df["question_norm"] = df["question"].astype(str).map(normalize_question)
+    df = df[df["question_norm"].str.len() > 0].reset_index(drop=True)
+    if len(df) < 2:
+        raise ValueError(f"Stage 9 needs >=2 rows; got {len(df)}")
+
+    texts = df["question_norm"].tolist()
+    e5_inputs = _format_e5_passages(texts, config)
+    if config.embedding_backend == "hashing":
+        vecs = _hashing_embeddings(e5_inputs, config.hashing_dim)
+    else:
+        vecs = _encode_sentence_transformer(config.e5_model, e5_inputs, config)
+
+    # Pure-numpy top-K — avoids importing FAISS after sentence-transformers
+    # in the same process (segfaults at shutdown on Python 3.14 / Mac).
+    # Vectors are L2-normalized by sentence-transformers; matmul gives cosine.
+    top_k = max(2, int(config.e5_audit_top_k))
+    search_k = min(top_k + 1, len(df))
+    sims = vecs @ vecs.T
+    np.fill_diagonal(sims, -np.inf)  # exclude self
+    indices = np.argpartition(-sims, kth=search_k - 1, axis=1)[:, :search_k]
+    # argpartition isn't sorted; re-sort the top slice by similarity
+    row_idx = np.arange(len(df))[:, None]
+    ordered = np.argsort(-sims[row_idx, indices], axis=1)
+    indices = indices[row_idx, ordered]
+    tags = df["tag"].tolist()
+    questions = df["question"].tolist()
+
+    top1_tag, top1_q, top1_correct, own_share, neighbor_dist = [], [], [], [], []
+    for i, neighbors in enumerate(indices):
+        # diagonal already masked out, but keep the self-guard for safety.
+        filtered = [int(n) for n in neighbors if int(n) != i][:top_k]
+        if not filtered:
+            top1_tag.append("")
+            top1_q.append("")
+            top1_correct.append(False)
+            own_share.append(0.0)
+            neighbor_dist.append("{}")
+            continue
+        nbr_tags = [tags[n] for n in filtered]
+        own = sum(1 for t in nbr_tags if t == tags[i]) / len(nbr_tags)
+        top1_tag.append(nbr_tags[0])
+        top1_q.append(questions[filtered[0]])
+        top1_correct.append(nbr_tags[0] == tags[i])
+        own_share.append(round(own, 3))
+        neighbor_dist.append(json.dumps(dict(Counter(nbr_tags)), ensure_ascii=False))
+
+    audit = df[["question", "tag"]].copy()
+    audit["top1_neighbor_tag"] = top1_tag
+    audit["top1_neighbor_question"] = top1_q
+    audit["top1_correct"] = top1_correct
+    audit["own_share_top_k"] = own_share
+    audit["neighbor_tag_dist"] = neighbor_dist
+    audit["audit_top_k"] = top_k
+
+    drop_mask = (~audit["top1_correct"]) if config.e5_audit_drop_on_top1_mismatch else pd.Series([False] * len(audit))
+    kept = audit.loc[~drop_mask, ["question", "tag"]].copy()
+    dropped = audit.loc[drop_mask].copy()
+
+    stage_dir.mkdir(parents=True, exist_ok=True)
+    audit.to_csv(stage_dir / "e5_neighbor_audit.csv", index=False)
+    kept.to_csv(stage_dir / "production_filtered.csv", index=False)
+    dropped.to_csv(stage_dir / "e5_dropped.csv", index=False)
+
+    per_tag_stats = (
+        audit.groupby("tag")
+        .agg(
+            input_rows=("question", "size"),
+            top1_accuracy=("top1_correct", "mean"),
+            median_own_share=("own_share_top_k", "median"),
+            dropped=("top1_correct", lambda s: int((~s).sum())),
+        )
+        .reset_index()
+        .to_dict(orient="records")
+    )
+
+    report = {
+        "input_csv": str(input_csv),
+        "rows_in": int(len(audit)),
+        "audit_top_k": top_k,
+        "drop_on_top1_mismatch": bool(config.e5_audit_drop_on_top1_mismatch),
+        "rows_kept": int(len(kept)),
+        "rows_dropped": int(len(dropped)),
+        "top1_accuracy_in": float(audit["top1_correct"].mean()),
+        "median_own_share_top_k": float(audit["own_share_top_k"].median()),
+        "per_tag": per_tag_stats,
+        "top_drop_examples": dropped.head(10)[
+            ["question", "tag", "top1_neighbor_tag", "top1_neighbor_question", "own_share_top_k", "neighbor_tag_dist"]
+        ].to_dict(orient="records"),
+    }
+    write_json(stage_dir / "audit_report.json", report)
+    finish_stage(stage_dir, config, input_hash, {"rows_in": len(audit), "rows_kept": len(kept), "rows_dropped": len(dropped)})
+    print(
+        f"[stage9] wrote {stage_dir}  in={len(audit)} kept={len(kept)} dropped={len(dropped)}  "
+        f"top1_acc={report['top1_accuracy_in']:.4f}  drop_on_mismatch={config.e5_audit_drop_on_top1_mismatch}"
+    )
+
+
 STAGES = {
     "stage0": run_stage0,
     "stage1": run_stage1,
@@ -2694,12 +2864,80 @@ STAGES = {
     "stage6": run_stage6,
     "stage7": run_stage7,
     "stage8": run_stage8,
+    "stage9": run_stage9,
 }
+
+
+def run_compose(
+    config: CleanerConfig,
+    from_runs: list[str],
+    source: str,
+    out_path: Path,
+) -> None:
+    """Concatenate per-family cleaning outputs into a single production CSV.
+
+    Each entry in `from_runs` contributes its `stage6/question_tag.<source>.csv`
+    (default `top40`). Rows are deduplicated on (question, tag) and emitted in
+    deterministic (tag, question) order. The result is the corpus you feed to
+    `tagclean stage9 --e5-audit-input <path>` for the cross-family E5 audit.
+
+    Compose from `top40.csv`, not from per-family `production_filtered.csv` —
+    a row that fails LOO inside a 3-tag family can be safely separable in the
+    9+-tag production union (its in-family competitor is no longer a peer).
+    Filter once, globally, after composition.
+    """
+    if source not in {"top40", "cleaned"}:
+        raise ValueError(f"--compose-source must be 'top40' or 'cleaned'; got {source!r}")
+    file_name = (
+        "question_tag.top40.csv" if source == "top40" else "question_tag.cleaned.csv"
+    )
+
+    rows: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    duplicates = 0
+    per_run: dict[str, tuple[int, int]] = {}
+    for run_id in from_runs:
+        src = config.artifact_root / run_id / "stage6" / file_name
+        if not src.exists():
+            raise FileNotFoundError(f"Source CSV not found for run {run_id!r}: {src}")
+        frame = pd.read_csv(src)
+        if "tag" not in frame.columns and "tag_clean" in frame.columns:
+            frame = frame.rename(columns={"tag_clean": "tag"})
+        if "question" not in frame.columns or "tag" not in frame.columns:
+            raise ValueError(
+                f"{src} must have question,tag columns; got {list(frame.columns)}"
+            )
+        frame = frame[["question", "tag"]].dropna()
+        added = 0
+        for _, r in frame.iterrows():
+            key = (str(r["question"]), str(r["tag"]))
+            if key in seen:
+                duplicates += 1
+                continue
+            seen.add(key)
+            rows.append({"question": key[0], "tag": key[1]})
+            added += 1
+        per_run[run_id] = (len(frame), added)
+
+    out_path = Path(out_path).expanduser().resolve()
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    composed = pd.DataFrame(rows)
+    composed = composed.sort_values(["tag", "question"]).reset_index(drop=True)
+    composed.to_csv(out_path, index=False)
+
+    print(f"[compose] wrote {out_path}")
+    print(
+        f"[compose] total rows: {len(composed)}, "
+        f"unique tags: {composed['tag'].nunique()}, "
+        f"duplicates skipped: {duplicates}"
+    )
+    for run_id, (in_rows, added) in per_run.items():
+        print(f"[compose]   {run_id}: {in_rows} {source} rows -> {added} added")
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="tagclean", description="LLM-assisted FAQ dataset cleaner.")
-    parser.add_argument("stage", choices=[*STAGES.keys(), "all"])
+    parser.add_argument("stage", choices=[*STAGES.keys(), "all", "compose"])
     parser.add_argument("--config", type=Path, default=None)
     parser.add_argument("--input", type=Path, default=None, help="Path to question_tag.csv (overrides config)")
     parser.add_argument("--tag-answer", type=Path, default=None, help="Path to tag_answer.json (overrides config)")
@@ -2722,6 +2960,41 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--tags-per-judge-call", type=int, default=None)
     parser.add_argument("--rows-per-tag-per-judge-call", type=int, default=None)
     parser.add_argument("--batch-output", type=Path, default=None)
+    parser.add_argument(
+        "--e5-audit-input",
+        type=Path,
+        default=None,
+        help="Stage 9: external CSV (question,tag) to audit instead of <run>/stage6/question_tag.cleaned.csv. "
+        "Use when auditing a unioned production set across multiple family runs.",
+    )
+    parser.add_argument(
+        "--e5-audit-k",
+        type=int,
+        default=None,
+        help="Stage 9: top-K neighborhood size for own-share severity (default 10).",
+    )
+    parser.add_argument(
+        "--no-e5-drop",
+        action="store_true",
+        help="Stage 9: report only — do not drop top-1 mismatches into a filtered set.",
+    )
+    parser.add_argument(
+        "--from-runs",
+        default=None,
+        help="compose: comma-separated list of run_ids to combine into a single production CSV.",
+    )
+    parser.add_argument(
+        "--compose-source",
+        choices=["top40", "cleaned"],
+        default="top40",
+        help="compose: which per-run file to pull from (default: top40).",
+    )
+    parser.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help="compose: output CSV path. Default: <artifact_root>/<run_id>/composed_<source>.csv.",
+    )
     return parser.parse_args()
 
 
@@ -2867,10 +3140,29 @@ def main() -> None:
         config.tags_per_judge_call = args.tags_per_judge_call
     if args.rows_per_tag_per_judge_call is not None:
         config.rows_per_tag_per_judge_call = args.rows_per_tag_per_judge_call
+    if args.e5_audit_input is not None:
+        config.stage9_input_csv = str(args.e5_audit_input.resolve())
+    if args.e5_audit_k is not None:
+        config.e5_audit_top_k = args.e5_audit_k
+    if args.no_e5_drop:
+        config.e5_audit_drop_on_top1_mismatch = False
 
     _NORMALIZATION_LANGUAGE = config.language
 
     resume = args.resume or not args.no_resume
+    if args.stage == "compose":
+        if not args.from_runs:
+            raise SystemExit("compose requires --from-runs run1,run2,...")
+        from_runs = [r.strip() for r in args.from_runs.split(",") if r.strip()]
+        if not from_runs:
+            raise SystemExit("--from-runs is empty")
+        out_path = (
+            args.out
+            if args.out
+            else config.run_dir() / f"composed_{args.compose_source}.csv"
+        )
+        run_compose(config, from_runs, args.compose_source, out_path)
+        return
     if args.stage == "all":
         if config.judge_mode in {"batch_prepare", "batch_submit"}:
             run_stage5(config, resume=resume, batch_output=args.batch_output)

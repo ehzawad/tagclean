@@ -1,0 +1,68 @@
+{
+  "packet_id": "audit_packet:000011",
+  "pass_idx": 0,
+  "result": {
+    "decisions": [
+      {
+        "decision": "keep",
+        "rationale": "লক/ব্লকড একাউন্ট অবস্থায় ‘এই মুহূর্তে’ ডাউনলোড করে দেওয়ার অনুরোধ আছে; এজেন্টের পক্ষ থেকে কাজ করে দেওয়ার intent মেলে।",
+        "reason_code": "clean",
+        "row_id": 407
+      },
+      {
+        "decision": "keep",
+        "rationale": "‘আপনি কি আমার হয়ে কপি ডাউনলোড করবেন’ সরাসরি support/agent-কে locked account অবস্থায় ডাউনলোড করে দিতে বলছে।",
+        "reason_code": "clean",
+        "row_id": 405
+      },
+      {
+        "decision": "flag",
+        "rationale": "‘কপি পাওয়ার কোনো উপায়’ জিজ্ঞেস করছে; agent-কে আনলক/ডাউনলোড করে দিতে সরাসরি অনুরোধ নয়।",
+        "reason_code": "too_generic",
+        "row_id": 472
+      },
+      {
+        "decision": "keep",
+        "rationale": "লক হওয়া আইডি ‘আজই’ আনলক করে দিতে পারবেন কি—এটি সরাসরি আনলক সার্ভিস অনুরোধ।",
+        "reason_code": "clean",
+        "row_id": 376
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডি পোর্টাল লকড এবং ‘আজই খুলে দেওয়া’ সম্ভব কি—এজেন্টের মাধ্যমে দ্রুত unlock করে দেওয়ার request।",
+        "reason_code": "clean",
+        "row_id": 454
+      },
+      {
+        "decision": "flag",
+        "rationale": "‘কিভাবে দ্রুত অ্যাক্সেস পাব’ একটি how-to/নিজে করণীয় ধরনের প্রশ্ন; support-কে এখনই আনলক করে দিতে বলা হয়নি।",
+        "reason_code": "wrong_intent",
+        "row_id": 390
+      },
+      {
+        "decision": "keep",
+        "rationale": "‘আপনারা কি ফোনে সাথে সাথে খুলে দিতে পারবেন’ locked account unlock করার সরাসরি service request।",
+        "reason_code": "clean",
+        "row_id": 436
+      },
+      {
+        "decision": "flag",
+        "rationale": "‘ব্লক থাকলে কি দ্রুত আনলক করানো যায়’ সাধারণ সম্ভাবনা/প্রক্রিয়া জানতে চাওয়া; নির্দিষ্ট agent-কে এখনই করে দিতে বলা নয়।",
+        "reason_code": "too_generic",
+        "row_id": 488
+      }
+    ],
+    "packet_id": "audit_packet:000011",
+    "packet_rationale": "এই ট্যাগে রাখা হয়েছে শুধু সেসব প্রশ্ন যেখানে locked NID/account অবস্থায় support/agent-কে এখনই আনলক বা ব্যবহারকারীর হয়ে ডাউনলোড করে দিতে সরাসরি বলা হয়েছে। সাধারণ উপায়, how-to, বা সম্ভাবনা জানতে চাওয়া প্রশ্ন flag করা হয়েছে।"
+  },
+  "row_ids": [
+    407,
+    405,
+    472,
+    376,
+    454,
+    390,
+    436,
+    488
+  ]
+}

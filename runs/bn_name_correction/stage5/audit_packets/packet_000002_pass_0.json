@@ -1,0 +1,180 @@
+{
+  "packet_id": "audit_packet:000002",
+  "pass_idx": 0,
+  "result": {
+    "decisions": [
+      {
+        "decision": "keep",
+        "rationale": "জাতীয় পরিচয়পত্রে নিজের নামের বানান ঠিক করতে প্রয়োজনীয় নথি জানতে চাওয়া হয়েছে; tag intent-এর সঙ্গে সরাসরি মেলে।",
+        "reason_code": "clean",
+        "row_id": 13089
+      },
+      {
+        "decision": "keep",
+        "rationale": "নাম বানান সংশোধনের জন্য প্রয়োজনীয় কাগজের তালিকা জানতে চাওয়া হয়েছে; এটি tag-এর কেন্দ্রীয় intent।",
+        "reason_code": "clean",
+        "row_id": 13097
+      },
+      {
+        "decision": "flag",
+        "rationale": "জাতীয় পরিচয়পত্রে নামের বানান সংশোধনের নথি জানতে চাওয়া; row 13089-এর খুব কাছাকাছি paraphrase।",
+        "reason_code": "duplicate",
+        "row_id": 13083
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডিতে বাংলা ও ইংরেজি নিজের নাম ঠিক করার জন্য প্রমাণ জানতে চাওয়া হয়েছে; name correction intent পরিষ্কার।",
+        "reason_code": "clean",
+        "row_id": 13058
+      },
+      {
+        "decision": "flag",
+        "rationale": "এটি ভোটার তালিকায় নামের বানান correction নিয়ে, এনআইডি/কার্ডে নিজের নাম সংশোধনের চেয়ে ভোটার তালিকা সংশোধন tag-এ ভালো ফিট করে।",
+        "reason_code": "sibling_collision",
+        "row_id": 13149
+      },
+      {
+        "decision": "flag",
+        "rationale": "স্মার্ট এনআইডিতে নামের spelling update-এর ডকুমেন্ট জানতে চাওয়া; row 13170-এর smart card name spelling proof প্রশ্নের near-paraphrase।",
+        "reason_code": "duplicate",
+        "row_id": 13162
+      },
+      {
+        "decision": "keep",
+        "rationale": "ভোটার আইডিতে নামের বানান ঠিক করতে কোন নথি লাগবে জানতে চাওয়া হয়েছে; tag intent-এর সঙ্গে মেলে।",
+        "reason_code": "clean",
+        "row_id": 13138
+      },
+      {
+        "decision": "flag",
+        "rationale": "ভোটার রোল-এ নিজের নাম ঠিক করার নথি নিয়ে প্রশ্ন; এনআইডি/জাতীয় পরিচয়পত্রের নাম correction নয়, voter roll correction-এ বেশি ফিট।",
+        "reason_code": "sibling_collision",
+        "row_id": 13153
+      },
+      {
+        "decision": "keep",
+        "rationale": "এনআইডি রেকর্ডে নিজের নামের বানান ঠিক করতে কোন নথি লাগবে তা জানতে চাওয়া হয়েছে; self-contained ও পরিষ্কার।",
+        "reason_code": "clean",
+        "row_id": 13042
+      },
+      {
+        "decision": "flag",
+        "rationale": "এনআইডিতে নামের বানান ঠিক করার ডকুমেন্টস নিয়ে প্রশ্ন; row 13042-এর same intent-এর near-paraphrase।",
+        "reason_code": "duplicate",
+        "row_id": 13051
+      },
+      {
+        "decision": "flag",
+        "rationale": "জাতীয় পরিচয়পত্রে নিজের নামের বানান সংশোধনের নথিপত্র নিয়ে প্রশ্ন; row 13089-এর near-duplicate।",
+        "reason_code": "duplicate",
+        "row_id": 13062
+      },
+      {
+        "decision": "flag",
+        "rationale": "ভোটার আইডিতে নামের বানান ঠিক করতে দলিল জানতে চাওয়া; row 13138-এর খুব কাছাকাছি paraphrase।",
+        "reason_code": "duplicate",
+        "row_id": 13139
+      },
+      {
+        "decision": "flag",
+        "rationale": "নাম বানান সংশোধন আবেদনের আগে নথি প্রস্তুত রাখা নিয়ে প্রশ্ন; row 13097-এর প্রয়োজনীয় কাগজ তালিকা প্রশ্নের near-duplicate।",
+        "reason_code": "duplicate",
+        "row_id": 13096
+      },
+      {
+        "decision": "keep",
+        "rationale": "স্মার্ট কার্ডে নামের spelling ঠিক করতে প্রয়োজনীয় প্রমাণপত্র জানতে চাওয়া হয়েছে; tag-এর smart card/name spelling concept স্পষ্ট।",
+        "reason_code": "clean",
+        "row_id": 13170
+      },
+      {
+        "decision": "flag",
+        "rationale": "এনআইডি ডাটায় নিজের নামের বানান ঠিক করতে নথি দরকার—row 13042-এর record/data wording বদলানো near-duplicate।",
+        "reason_code": "duplicate",
+        "row_id": 13028
+      },
+      {
+        "decision": "flag",
+        "rationale": "নামের বানান সংশোধনী আবেদনে কী কাগজ জমা দিতে হবে—row 13097/13096-এর same document-list intent-এর near-paraphrase।",
+        "reason_code": "duplicate",
+        "row_id": 13113
+      },
+      {
+        "decision": "flag",
+        "rationale": "নামের বানান ঠিক করার আবেদনে প্রমাণপত্র সংযুক্ত করার প্রশ্ন; row 13113-এর near-duplicate।",
+        "reason_code": "duplicate",
+        "row_id": 13105
+      },
+      {
+        "decision": "keep",
+        "rationale": "NID name correction-এর জন্য কোন কাগজপত্র লাগবে জানতে চাওয়া হয়েছে; tag-এর সরাসরি ও কেন্দ্রীয় উদাহরণ।",
+        "reason_code": "clean",
+        "row_id": 13005
+      },
+      {
+        "decision": "flag",
+        "rationale": "এনআইডিতে নিজের নামের বানান শুদ্ধ করার ডকুমেন্টস নিয়ে প্রশ্ন; row 13042/13051-এর near-paraphrase।",
+        "reason_code": "duplicate",
+        "row_id": 13057
+      },
+      {
+        "decision": "flag",
+        "rationale": "জাতীয় পরিচয়পত্রে নামের বানান সংশোধনে ডকুমেন্ট attach করার প্রশ্ন; row 13083/13089-এর near-duplicate।",
+        "reason_code": "duplicate",
+        "row_id": 13082
+      },
+      {
+        "decision": "flag",
+        "rationale": "নামের বানান সংশোধনের অনুরোধে সহায়ক কাগজ দেওয়ার প্রশ্ন; row 13097/13113-এর near-paraphrase।",
+        "reason_code": "duplicate",
+        "row_id": 13115
+      },
+      {
+        "decision": "flag",
+        "rationale": "ভোটার আইডিতে নিজের নামের বানান সংশোধনের নথি নিয়ে প্রশ্ন; row 13138-এর same intent-এর near-duplicate।",
+        "reason_code": "duplicate",
+        "row_id": 13143
+      },
+      {
+        "decision": "flag",
+        "rationale": "ভোটার আইডিতে নামের বানান সঠিক করতে কাগজ লাগবে কি না জানতে চাওয়া; row 13138-এর near-paraphrase।",
+        "reason_code": "duplicate",
+        "row_id": 13142
+      },
+      {
+        "decision": "flag",
+        "rationale": "নামের বানান সংশোধন বিষয়ে দরকারি প্রমাণপত্র জানতে চাওয়া; row 13097-এর প্রয়োজনীয় কাগজ/প্রমাণপত্র প্রশ্নের near-duplicate।",
+        "reason_code": "duplicate",
+        "row_id": 13112
+      }
+    ],
+    "packet_id": "audit_packet:000002",
+    "packet_rationale": "Rows were kept when they were self-contained requests for documents/proofs needed to correct one’s own name or name spelling in NID/voter ID/smart card contexts. Voter list/roll rows were flagged as sibling collisions because they target voter roll/list correction rather than NID card correction. Several otherwise valid rows were flagged as duplicates where they were near-paraphrases of a kept representative in the same sub-cluster."
+  },
+  "row_ids": [
+    13089,
+    13097,
+    13083,
+    13058,
+    13149,
+    13162,
+    13138,
+    13153,
+    13042,
+    13051,
+    13062,
+    13139,
+    13096,
+    13170,
+    13028,
+    13113,
+    13105,
+    13005,
+    13057,
+    13082,
+    13115,
+    13143,
+    13142,
+    13112
+  ]
+}

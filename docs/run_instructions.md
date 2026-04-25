@@ -231,6 +231,50 @@ History rewrite (squash/reset) is fine while the branch isn't pushed; once pushe
 ### "I want to verify the cleaned set is actually better"
 After Stage 8 runs, `stage8/cleaning_report.json` has leave-one-out top-1 retrieval accuracy. >0.95 = cleanly separable in E5 space. Manually eyeball the top-5 of `cleaned.csv` per tag — they should be textbook examples of each intent.
 
+### "Build the final production CSV from N family runs"
+The end-to-end pipeline once you've cleaned several close-tag families:
+
+```bash
+# 1. Clean each family separately (one stage8 invocation per family)
+tagclean stage8 --target-tags T1,T2,T3 --run-id family_a ...
+tagclean stage8 --target-tags U1,U2,U3 --run-id family_b ...
+tagclean stage8 --target-tags V1,V2,V3 --run-id family_c ...
+
+# 2. Compose all family top-40s into a single production candidate CSV
+tagclean compose \
+    --from-runs family_a,family_b,family_c \
+    --run-id production \
+    --compose-source top40 \
+    --out runs/production/composed_top40.csv
+
+# 3. Run cross-family Stage 9 audit on the composed CSV
+tagclean stage9 \
+    --e5-audit-input runs/production/composed_top40.csv \
+    --run-id production
+```
+
+The final E5-ready production set is `runs/production/stage9/production_filtered.csv`.
+
+**Why compose from `top40` (not from per-family `stage9/production_filtered.csv`)?** A row that fails LOO inside a 3-tag family can be safely separable in the 9+-tag production union (its in-family rival is no longer a peer). Filter once globally, after composition. Per-family Stage 9 stays useful for per-family diagnostics; compose treats top40s as the production-recommended subset.
+
+### "Filter the cleaned set against production E5 retrieval"
+Production inference is E5-only (no Gemma). Stage 9 audits the cleaned set against an E5 leave-one-out retrieval and, by default, drops rows whose top-1 neighbor belongs to a different tag — the rows E5 itself confuses at inference time. Severity per row is reported as "own-share-top-K" (% of K nearest neighbors with the same tag).
+
+```bash
+# Audit + drop top-1 mismatches from the current run's cleaned.csv
+tagclean stage9 --config my-config.yaml --run-id <existing>
+
+# Report-only mode (no drop)
+tagclean stage9 --config my-config.yaml --run-id <existing> --no-e5-drop
+
+# Audit a unioned production set across multiple family runs
+tagclean stage9 --config my-config.yaml \
+    --e5-audit-input /path/to/combined_top40.csv \
+    --run-id production_audit_v1
+```
+
+Outputs land in `<run>/stage9/`: `e5_neighbor_audit.csv` (per-row diagnostics), `production_filtered.csv` (the filtered set), `e5_dropped.csv`, `audit_report.json`. Stage 9 is opt-in; existing top40.csv ships unchanged.
+
 ## Costs reference
 
 | Scope | GPT calls | $$ (gpt-5.5, high reasoning) | Wall time |
