@@ -80,8 +80,26 @@ For a run with `run_id=foo`, in `<artifact_root>/foo/`:
 ```
 tagclean <stage> [--config FILE] [--judge-mode MODE] [--openai-model NAME]
                  [--input PATH] [--tag-answer PATH] [--artifact-root PATH]
-                 [--target-tags T1,T2,T3] [--language bn|none] [--no-resume]
+                 [--target-tags T1,T2,T3] [--seed-tag X]
+                 [--language bn|none] [--no-resume]
 ```
+
+### Picking which tags to clean
+
+Three ways, in order of automation:
+
+```bash
+# manual: explicit tag list
+tagclean stage8 --target-tags account_locked,account_locked_retrials,account_locked_unlock_request
+
+# semi-automatic: give one tag, the harness expands to its close-tag cluster
+tagclean stage8 --seed-tag account_locked
+
+# corpus-wide: omit both flags; clean every tag, discover all clusters
+tagclean stage8
+```
+
+`--seed-tag X` runs Stages 0–2 first to get tag centroids, then walks the close-tag graph (cosine ≥ `boundary_policy_threshold` in BOTH E5 and Gemma) and resolves the connected component containing X. The resolved tags are printed and recorded in `run_manifest.json`. Singletons fall back to cleaning just X.
 
 Stages: `stage0 stage1 stage2 stage3 stage4 stage5 stage6 stage7 stage8 all`.
 Judge modes: `heuristic` (no GPT), `sync`, `agents`, `batch_prepare`, `batch_collect`.

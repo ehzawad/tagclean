@@ -2641,11 +2641,45 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-rows-per-tag", type=int, default=None)
     parser.add_argument("--target-tags", default=None, help="Comma-separated tags to clean while using the full corpus as evidence")
     parser.add_argument("--target-max-tags", type=int, default=None, help="Clean only the first N tags while keeping full corpus evidence")
+    parser.add_argument("--seed-tag", default=None, help="Resolve the close-tag cluster containing this tag and clean its members")
     parser.add_argument("--self-consistency-passes", type=int, default=None)
     parser.add_argument("--tags-per-judge-call", type=int, default=None)
     parser.add_argument("--rows-per-tag-per-judge-call", type=int, default=None)
     parser.add_argument("--batch-output", type=Path, default=None)
     return parser.parse_args()
+
+
+def resolve_seed_cluster(config: CleanerConfig, seed_tag: str) -> list[str]:
+    """Run stages 0-2 (resume-friendly), then return the close-tag cluster
+    containing `seed_tag`. Falls back to [seed_tag] if it has no close siblings.
+
+    Uses the same find_close_tag_clusters logic Stage 3 relies on, so the
+    cluster the user gets is exactly the one that will receive a boundary policy.
+    """
+    run_stage2(config, resume=True)
+    run_dir = config.run_dir()
+    tag_index = read_json(run_dir / "stage2" / "tag_index.json")
+    tags: list[str] = list(tag_index.get("tags", []))
+    if seed_tag not in tags:
+        raise ValueError(
+            f"Seed tag {seed_tag!r} not found in dataset (have {len(tags)} tags). "
+            f"Sample: {tags[:5]}"
+        )
+    e5_cents = np.load(run_dir / "stage2" / "tag_centroids_e5.npy")
+    gemma_cents = np.load(run_dir / "stage2" / "tag_centroids_gemma.npy")
+    sim_e5 = e5_cents @ e5_cents.T
+    sim_gemma = gemma_cents @ gemma_cents.T
+    clusters = find_close_tag_clusters(
+        tags,
+        np.asarray(sim_e5, dtype=np.float32),
+        np.asarray(sim_gemma, dtype=np.float32),
+        threshold=config.boundary_policy_threshold,
+        max_cluster_size=config.boundary_policy_max_cluster_size,
+    )
+    for cluster in clusters:
+        if seed_tag in cluster:
+            return list(cluster)
+    return [seed_tag]
 
 
 def write_run_manifest(config: CleanerConfig, stage: str) -> Path:
@@ -2655,6 +2689,7 @@ def write_run_manifest(config: CleanerConfig, stage: str) -> Path:
         "tagclean_version": "0.1.0",
         "stage_invoked": stage,
         "run_id": config.resolved_run_id(),
+        "seed_tag": getattr(config, "_seed_tag", None),
         "input_csv": str(config.input_csv),
         "input_csv_sha256": file_sha256(config.input_csv) if config.input_csv.exists() else None,
         "tag_answer_json": str(config.tag_answer_json),
@@ -2706,6 +2741,13 @@ def main() -> None:
         config.target_tags = [tag.strip() for tag in args.target_tags.split(",") if tag.strip()]
     if args.target_max_tags is not None:
         config.target_max_tags = args.target_max_tags
+    if args.seed_tag:
+        if config.target_tags:
+            print(f"[seed] --seed-tag overrides --target-tags ({config.target_tags})")
+        cluster = resolve_seed_cluster(config, args.seed_tag)
+        print(f"[seed] resolved cluster from '{args.seed_tag}': {cluster}")
+        config.target_tags = cluster
+        config._seed_tag = args.seed_tag  # surfaced in run_manifest.json
     if args.self_consistency_passes is not None:
         config.self_consistency_passes = args.self_consistency_passes
     if args.tags_per_judge_call is not None:

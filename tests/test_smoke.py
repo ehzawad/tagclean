@@ -46,3 +46,29 @@ def test_smoke_pipeline_runs_in_heuristic_mode():
     assert set(top40_df["tag"].unique()).issubset(set(cleaned_df["tag_clean"].unique()))
     # Heuristic mode should still keep at least a few per tag in this small fixture.
     assert (cleaned_df.groupby("tag_clean").size() >= 1).all()
+
+
+def test_seed_tag_resolves_close_cluster():
+    """--seed-tag X should pull X's two siblings into target_tags automatically."""
+    cmd = [
+        sys.executable,
+        "-m",
+        "tagclean.cleaner",
+        "stage6",
+        "--config",
+        str(FIXTURE_CONFIG),
+        "--seed-tag",
+        "password_reset_self",
+        "--no-resume",
+    ]
+    result = subprocess.run(cmd, cwd=REPO_ROOT, capture_output=True, text=True, timeout=120)
+    assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+
+    # The CLI should print the resolved cluster.
+    assert "[seed] resolved cluster from 'password_reset_self'" in result.stdout
+    for tag in ("password_reset_self", "password_reset_failed", "password_reset_help_request"):
+        assert tag in result.stdout
+
+    import json
+    manifest = json.loads((SMOKE_ARTIFACTS / "smoke" / "run_manifest.json").read_text())
+    assert manifest["seed_tag"] == "password_reset_self"

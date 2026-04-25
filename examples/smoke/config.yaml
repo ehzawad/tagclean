@@ -19,3 +19,8 @@ language: none
 audit_buffer_size: 12
 audit_rows_per_packet: 8
 top_n: 8
+
+# Hashing embeddings are random-ish; real centroid sim is far below 0.85.
+# Lower the boundary-policy threshold so clustering actually fires on the
+# fixture. With sentence-transformers + a real corpus, leave the default 0.85.
+boundary_policy_threshold: 0.3
