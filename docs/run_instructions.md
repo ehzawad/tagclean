@@ -231,6 +231,13 @@ History rewrite (squash/reset) is fine while the branch isn't pushed; once pushe
 ### "I want to verify the cleaned set is actually better"
 After Stage 8 runs, `stage8/cleaning_report.json` has leave-one-out top-1 retrieval accuracy. >0.95 = cleanly separable in E5 space. Manually eyeball the top-5 of `cleaned.csv` per tag — they should be textbook examples of each intent.
 
+### "I want to change which tags get cleaned"
+See the README's "Adjusting which tags to clean" section for the full breakdown. Quick pointer:
+
+- Editing the manifest (`runs/families.yaml`) is the canonical way once you've run `tagclean discover`. Flip `status: approved` ↔ `rejected`, or edit `target_tags` per family. `run-families --skip-completed` (default) won't re-clean families whose stage8 outputs already exist.
+- For one-off runs without a manifest, pass `--target-tags T1,T2,T3` directly to `tagclean stage8`.
+- To restrict `discover` to a curated subset of the corpus, write a `production_tags.txt` (one tag per line) and pass `--production-tags production_tags.txt`. Unknown tags hard-fail.
+
 ### "Build the final production CSV from N family runs"
 The end-to-end pipeline once you've cleaned several close-tag families:
 

@@ -319,6 +319,69 @@ tagclean stage9 --config configs/bn_full.yaml \
 
 Final clean data: `runs/production/stage9/production_filtered.csv`.
 
+## Adjusting which tags to clean
+
+Three places, depending on whether you've discovered families yet or are running a single family by hand.
+
+**1. Per-family in `families.yaml`** (the manifest produced by `tagclean discover`).
+
+Open `runs/families.yaml`. Each family is one block:
+
+```yaml
+- family_id: fam_feb20f8e            # stable hash of sorted tag set
+  status: approved                    # approved | singleton | rejected
+  target_tags:
+    - account_locked
+    - account_locked_retrials
+    - account_locked_unlock_request
+  score: { min_edge_sim: 0.906, avg_edge_sim: 0.914 }
+  row_counts: { account_locked: 169, ... }
+  excluded_neighbors: [...]           # diagnostics only
+  notes: ""
+```
+
+To customize:
+
+- **Skip a family** entirely → flip `status: approved` to `status: rejected`. `run-families` ignores it; `compose --manifest` excludes it from the production union.
+- **Add a tag** to a family → append to `target_tags` and change `status` if needed. Note: the `family_id` is no longer the canonical hash of the new tag set, so add a comment in `notes` if you care; `run-families` keys runs by `family_id` regardless.
+- **Remove a tag** from a family → drop it from `target_tags`. Same caveat about the now-stale `family_id`.
+- **Make a singleton clean as part of a multi-tag family** → find the singleton's record, change `status: singleton` to `approved`, and add the sibling tag(s) to `target_tags`. `run-families` will then run it as a multi-tag family.
+- **Re-discover with different thresholds** → `tagclean discover ... --threshold 0.86 --pair-threshold 0.84` (looser, more families) or `0.92` (tighter, fewer / cleaner). Re-runs are deterministic; same tag sets produce the same `family_id` so completed runs survive.
+
+After editing, just rerun:
+
+```bash
+tagclean run-families --config configs/bn_full.yaml --manifest runs/families.yaml --judge-mode sync --openai-model gpt-5.5
+```
+
+`--skip-completed` (default) means previously-clean families are not re-cleaned.
+
+**2. One-off via `--target-tags`** when you know exactly which tags to clean and don't want a manifest:
+
+```bash
+tagclean stage8 --config configs/bn_full.yaml \
+    --target-tags tag1,tag2,tag3 \
+    --run-id my_run \
+    --judge-mode sync --openai-model gpt-5.5
+```
+
+This runs the full per-family pipeline (Stage 0–8) for that exact target set. Stage 3 treats `--target-tags` (≥2 tags) as the cluster directly — no `find_close_tag_clusters` mega-component issue.
+
+**3. Pre-discover allowlist** if you want `discover` to only consider a subset of the corpus:
+
+```bash
+echo "tag1
+tag2
+tag3" > production_tags.txt
+
+tagclean discover --config configs/bn_full.yaml \
+    --centroids-from corpus_bootstrap \
+    --production-tags production_tags.txt \
+    --out runs/families.yaml
+```
+
+Unknown tags in the allowlist hard-fail (no silent typos). Use this when you have a curated production-tag list and want discovery confined to it.
+
 ## Validation status
 
 The 9-tag, 3-family validation reported above (account_locked / name_correction / otp) was run end-to-end against gpt-5.5 high-reasoning. Final clean sets in `runs/bn_production/stage9/production_filtered.csv` (343 rows, top-40 path) and `runs/bn_production_max/stage9/production_filtered.csv` (554 rows, max-clean path).
