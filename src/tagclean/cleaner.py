@@ -1520,7 +1520,7 @@ def build_boundary_policy_prompt(
 
     payload = {
         "task": (
-            "These Bengali FAQ tags are semantically close. Author short, concrete rules "
+            "These These tags are semantically close. Author short, concrete rules "
             "that let a downstream automated audit decide whether a question belongs to "
             "each tag, without relabeling. For each tag write one_line_intent, "
             "must_have_concepts (3-7 short concrete cues that a clean question for THIS tag "
@@ -1643,7 +1643,7 @@ def build_packet_prompt(packet_id: str, packet: pd.DataFrame, profiles: dict[str
 
     payload = {
         "task": (
-            "Judge each target Bengali FAQ question independently. Decide whether it is a clean, self-contained "
+            "Judge each target question independently. Decide whether it is a clean, self-contained "
             "example for its current tag. Do not relabel rows. If uncertain, jettison."
         ),
         "packet_id": packet_id,
@@ -1681,7 +1681,7 @@ def _responses_request_body(config: CleanerConfig, prompt: str, schema: dict[str
         "input": [
             {
                 "role": "system",
-                "content": "You are a strict Bengali FAQ dataset cleaning judge. Return only schema-valid JSON.",
+                "content": "You are a strict dataset cleaning judge. Return only schema-valid JSON.",
             },
             {"role": "user", "content": prompt},
         ],
@@ -1839,8 +1839,8 @@ async def _agents_judge_one(config: CleanerConfig, prompt: str) -> JudgeResult:
     from openai.types.shared import Reasoning
 
     agent = Agent(
-        name="Bengali FAQ dataset cleaning judge",
-        instructions="You are a strict Bengali FAQ dataset cleaning judge. Return only the structured result.",
+        name="dataset cleaning judge",
+        instructions="You are a strict dataset cleaning judge. Return only the structured result.",
         model=config.openai_model,
         model_settings=ModelSettings(
             reasoning=Reasoning(effort=config.openai_reasoning_effort),
@@ -1879,8 +1879,8 @@ async def run_agents_judge(config: CleanerConfig, feature_df: pd.DataFrame, prof
 
                     prompt = build_packet_prompt(packet_id, packet, profiles, config)
                     agent = Agent(
-                        name="Bengali FAQ packet cleaning judge",
-                        instructions="You are a strict Bengali FAQ dataset cleaning judge. Return only the structured packet result.",
+                        name="dataset packet cleaning judge",
+                        instructions="You are a strict dataset cleaning judge. Return only the structured packet result.",
                         model=config.openai_model,
                         model_settings=ModelSettings(
                             reasoning=Reasoning(effort=config.openai_reasoning_effort),
@@ -2032,7 +2032,7 @@ def build_audit_packet_prompt(
     profile = profiles.get(tag, {})
     payload = {
         "task": (
-            "Audit candidate Bengali FAQ questions against ONE tag's intent + boundary rules. "
+            "Audit candidate questions against ONE tag's intent + boundary rules. "
             "For each row decide 'keep' (clean, fits this tag, no sibling collision, not synthetic) "
             "or 'flag' (drop from this tag — wrong intent, sibling collision, too generic, "
             "duplicate, synthetic, or context-dependent). Do not relabel; this is single-tag audit."
@@ -2082,9 +2082,9 @@ async def _agents_audit_one(config: CleanerConfig, prompt: str) -> AuditPacketRe
     from openai.types.shared import Reasoning
 
     agent = Agent(
-        name="Bengali FAQ tag-audit agent",
+        name="tag-audit agent",
         instructions=(
-            "You audit candidate Bengali FAQ rows for a single tag using its boundary "
+            "You audit candidate rows for a single tag using its boundary "
             "rules. Return only schema-valid AuditPacketResult JSON."
         ),
         model=config.openai_model,
@@ -2676,10 +2676,45 @@ def resolve_seed_cluster(config: CleanerConfig, seed_tag: str) -> list[str]:
         threshold=config.boundary_policy_threshold,
         max_cluster_size=config.boundary_policy_max_cluster_size,
     )
+    cluster_for_seed = [seed_tag]
     for cluster in clusters:
         if seed_tag in cluster:
-            return list(cluster)
-    return [seed_tag]
+            cluster_for_seed = list(cluster)
+            break
+
+    # Diagnostics: top-5 nearest tags NOT in the cluster so the user sees why
+    # siblings didn't make the cut and can lower the threshold or pass
+    # --target-tags explicitly.
+    seed_idx = tags.index(seed_tag)
+    in_cluster = set(cluster_for_seed)
+    excluded = [
+        (
+            tags[j],
+            float(sim_e5[seed_idx, j]),
+            float(sim_gemma[seed_idx, j]),
+            min(float(sim_e5[seed_idx, j]), float(sim_gemma[seed_idx, j])),
+        )
+        for j in range(len(tags))
+        if tags[j] != seed_tag and tags[j] not in in_cluster
+    ]
+    excluded.sort(key=lambda r: r[3], reverse=True)
+    if excluded:
+        print(
+            f"[seed] threshold={config.boundary_policy_threshold:.2f} "
+            f"(min of E5/Gemma must clear). Nearest excluded tags:"
+        )
+        for tag, e5, gemma, mn in excluded[:5]:
+            hint = " ← sibling, just below threshold" if mn >= 0.75 else ""
+            print(f"        {tag:<40s}  E5={e5:.3f}  Gemma={gemma:.3f}  min={mn:.3f}{hint}")
+    return cluster_for_seed
+
+
+_SECRET_KEY_PATTERN = re.compile(r"(?i)(api[_-]?key|secret|token|password|bearer)")
+
+
+def _redact_secrets(payload: dict[str, Any]) -> dict[str, Any]:
+    """Defensive: if a future config field looks like a secret, don't dump it."""
+    return {k: ("***REDACTED***" if _SECRET_KEY_PATTERN.search(k) else v) for k, v in payload.items()}
 
 
 def write_run_manifest(config: CleanerConfig, stage: str) -> Path:
@@ -2701,7 +2736,9 @@ def write_run_manifest(config: CleanerConfig, stage: str) -> Path:
         },
         "judge_mode": config.judge_mode,
         "language": config.language,
-        "config": {k: str(v) if isinstance(v, Path) else v for k, v in asdict(config).items()},
+        "config": _redact_secrets({
+            k: str(v) if isinstance(v, Path) else v for k, v in asdict(config).items()
+        }),
         "finished_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
     }
     path = run_dir / "run_manifest.json"

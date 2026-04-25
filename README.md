@@ -39,6 +39,13 @@ python -m venv .venv && source .venv/bin/activate
 pip install -e ".[all]"
 ```
 
+The smoke test below confirms a clean install:
+
+```bash
+pytest -q                      # 15 passing tests, all offline (no API)
+tagclean stage6 --config examples/smoke/config.yaml --no-resume
+```
+
 Smoke test (synthetic English fixture, no GPT needed):
 
 ```bash

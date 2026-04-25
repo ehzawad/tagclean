@@ -8,4 +8,5 @@ build/
 dist/
 .DS_Store
 artifacts/
+**/artifacts/
 *.checksum
