@@ -119,7 +119,7 @@ class CleanerConfig:
     judge_mode: str = "sync"  # sync | agents | batch_prepare | batch_submit | batch_collect | heuristic
     openai_batch_endpoint: str = "/v1/responses"
     openai_completion_window: str = "24h"
-    concurrency: int = 32
+    concurrency: int = 6  # bounded; gpt-5.5 high reasoning saturates well below 32
     self_consistency_passes: int = 2
     judge_granularity: str = "tag_batch"  # tag_batch | row
     tags_per_judge_call: int = 3
@@ -1358,7 +1358,7 @@ def build_judge_prompt(row: pd.Series, profiles: dict[str, dict[str, Any]], conf
     )
 
     payload = {
-        "task": "Decide whether the target Bengali question is a clean example for its current tag. Do not relabel. If uncertain, jettison.",
+        "task": "Decide whether the target question is a clean example for its current tag. Do not relabel. If uncertain, jettison.",
         "target_question_raw": row["question_raw"],
         "target_question_normalized": row["question_norm"],
         "current_tag": row["canonical_tag"],
@@ -1518,23 +1518,28 @@ def build_boundary_policy_prompt(
             "discriminative_phrases": _compact_examples(profile.get("discriminative_phrases"), 10),
         }
 
+    # Structured spec following the GPT-5 prompting guide: explicit task,
+    # concrete rules without redundant emphasis, examples grounded in evidence.
     payload = {
         "task": (
-            "These These tags are semantically close. Author short, concrete rules "
-            "that let a downstream automated audit decide whether a question belongs to "
-            "each tag, without relabeling. For each tag write one_line_intent, "
-            "must_have_concepts (3-7 short concrete cues that a clean question for THIS tag "
-            "should mention or imply — Bengali or English, NOT generic words), and "
-            "must_avoid_concepts (cues that signal a sibling tag instead). Concepts can be "
-            "Bengali words/phrases, English words, or short patterns (e.g. 'agent imperative')."
+            "Author distinguishing rules for each tag in this close-tag cluster. "
+            "The downstream audit will use these rules to decide whether a question "
+            "belongs to its current tag, without relabeling. For each tag produce: "
+            "one_line_intent, must_have_concepts, must_avoid_concepts."
         ),
         "cluster_id": cluster_id,
         "tags_in_cluster": [tag_context(tag) for tag in cluster_tags],
-        "rules": {
-            "use_question_evidence_only": True,
-            "no_generic_concepts": "Skip concepts that fit every sibling tag (e.g. 'NID', 'লক')",
+        "concept_spec": {
+            "language": "Use the natural language of the central_examples. Concepts "
+                "may be words, short phrases, or short patterns (e.g. 'agent imperative').",
+            "must_have_concepts": "3 to 7 concrete cues a clean question for THIS tag "
+                "would mention or imply. Empty list is valid for the most generic tag "
+                "in a cluster — do not invent forced cues.",
+            "must_avoid_concepts": "0 to 5 cues that signal a SIBLING tag instead.",
+            "no_generic_concepts": "Skip concepts that fit every tag in the cluster.",
             "prefer_concrete_phrases": True,
-            "concept_count_per_tag": "between 3 and 7 must_have, 0-5 must_avoid",
+            "evidence_only": "Base concepts on the supplied central_examples and "
+                "discriminative_phrases; do not invent.",
         },
         "required_json_schema": BoundaryPolicyResult.model_json_schema(),
     }
@@ -2032,11 +2037,23 @@ def build_audit_packet_prompt(
     profile = profiles.get(tag, {})
     payload = {
         "task": (
-            "Audit candidate questions against ONE tag's intent + boundary rules. "
-            "For each row decide 'keep' (clean, fits this tag, no sibling collision, not synthetic) "
-            "or 'flag' (drop from this tag — wrong intent, sibling collision, too generic, "
-            "duplicate, synthetic, or context-dependent). Do not relabel; this is single-tag audit."
+            "For each target_row, return one decision: 'keep' if the row is a clean "
+            "example of THIS tag, or 'flag' if it should be dropped from this tag. "
+            "Do not relabel — this is a single-tag pass/reject audit."
         ),
+        "decision_spec": {
+            "keep": "Question is self-contained and clearly fits the tag's intent; "
+                "no sibling-tag collision; not too generic; not synthetic.",
+            "flag_reasons": {
+                "wrong_intent": "Row's intent doesn't match this tag at all.",
+                "sibling_collision": "Row fits a sibling/competing tag better.",
+                "too_generic": "Row is generic enough to fit several tags.",
+                "duplicate": "Row is a near-paraphrase of another row in the set.",
+                "synthetic_artifact": "Awkward repetition, malformed, looks GPT-generated.",
+                "context_dependent": "Row needs prior conversation context to make sense.",
+            },
+            "if_unsure": "Prefer flag.",
+        },
         "packet_id": packet_id,
         "tag": tag,
         "tag_one_line_intent": rule.get("one_line_intent", ""),
@@ -2044,10 +2061,6 @@ def build_audit_packet_prompt(
         "must_avoid_concepts": rule.get("must_avoid", []),
         "tag_description": profile.get("description"),
         "tag_central_examples": _compact_examples(profile.get("central_questions"), config.central_examples),
-        "policy": {
-            "no_relabeling": True,
-            "prefer_flag_when_unsure": True,
-        },
         "target_rows": [
             {
                 "row_id": int(row["row_id"]),
@@ -2056,6 +2069,8 @@ def build_audit_packet_prompt(
             }
             for _, row in packet.iterrows()
         ],
+        "output_contract": "Return ONE AuditRowDecision per target_row, in any order. "
+            "Every target row_id must appear exactly once in decisions.",
         "required_json_schema": AuditPacketResult.model_json_schema(),
     }
     return json.dumps(payload, ensure_ascii=False, indent=2)
@@ -2072,16 +2087,12 @@ async def _responses_audit_one(client: Any, config: CleanerConfig, prompt: str) 
     return AuditPacketResult.model_validate(json.loads(response.output_text))
 
 
-@retry(
-    retry=retry_if_exception_type(Exception),
-    wait=wait_exponential(multiplier=1, min=1, max=60),
-    stop=stop_after_attempt(5),
-)
-async def _agents_audit_one(config: CleanerConfig, prompt: str) -> AuditPacketResult:
-    from agents import Agent, ModelSettings, Runner
+def _build_audit_agent(config: CleanerConfig) -> Any:
+    """Construct the audit Agent once per Stage 5 run; reuse across packets."""
+    from agents import Agent, ModelSettings
     from openai.types.shared import Reasoning
 
-    agent = Agent(
+    return Agent(
         name="tag-audit agent",
         instructions=(
             "You audit candidate rows for a single tag using its boundary "
@@ -2094,7 +2105,21 @@ async def _agents_audit_one(config: CleanerConfig, prompt: str) -> AuditPacketRe
         ),
         output_type=AuditPacketResult,
     )
-    result = await asyncio.to_thread(Runner.run_sync, agent, prompt)
+
+
+@retry(
+    retry=retry_if_exception_type(Exception),
+    wait=wait_exponential(multiplier=1, min=1, max=60),
+    stop=stop_after_attempt(5),
+)
+async def _agents_audit_one(agent: Any, prompt: str) -> AuditPacketResult:
+    """Native async Runner.run; no asyncio.to_thread wrapper.
+
+    Lets `asyncio.gather` actually run packets concurrently.
+    """
+    from agents import Runner
+
+    result = await Runner.run(agent, prompt)
     return result.final_output
 
 
@@ -2137,31 +2162,75 @@ async def _run_audit_loop(
     profiles: dict[str, dict[str, Any]],
     stage_dir: Path,
     audit_one: Any,
+    trace_label: str | None = None,
 ) -> None:
+    """Run audit packets concurrently with bounded semaphore.
+
+    `audit_one` is an async callable taking a prompt and returning
+    AuditPacketResult. `trace_label`, when set, wraps the gather in
+    `agents.trace(label, group_id=run_id)` for observability.
+
+    Cached packets (out_path exists) are skipped without an API call.
+    Atomic write: tmp-file + rename.
+    """
     audit = feature_df[feature_df["audit_buffer"]].copy()
     expected_row_ids = [int(v) for v in audit["row_id"].tolist()]
     packets = build_audit_packets(feature_df, config)
     (stage_dir / "audit_packets").mkdir(parents=True, exist_ok=True)
-    for packet_idx, packet in enumerate(packets):
+
+    semaphore = asyncio.Semaphore(max(1, int(config.concurrency)))
+    state: dict[str, int] = {"ok": 0, "skipped": 0, "failed": 0}
+
+    async def process_packet(packet_idx: int, packet: pd.DataFrame) -> None:
         packet_id = f"audit_packet:{packet_idx:06d}"
         out_path = stage_dir / "audit_packets" / f"packet_{packet_idx:06d}_pass_0.json"
-        if not out_path.exists():
-            prompt = build_audit_packet_prompt(packet_id, packet, tag_to_rule, profiles, config)
+        if out_path.exists():
+            state["skipped"] += 1
+            return
+        prompt = build_audit_packet_prompt(packet_id, packet, tag_to_rule, profiles, config)
+        async with semaphore:
             try:
                 result = await audit_one(prompt)
             except Exception as exc:
                 print(f"[stage5] audit packet {packet_id} failed after retries: {exc}")
-                continue
-            write_json(
-                out_path,
-                {
-                    "packet_id": packet_id,
-                    "pass_idx": 0,
-                    "row_ids": [int(v) for v in packet["row_id"].tolist()],
-                    "result": result.model_dump(),
-                },
-            )
-        aggregate_audit_results(stage_dir, expected_row_ids)
+                state["failed"] += 1
+                return
+        # Atomic write: tmp + rename so concurrent readers never see a partial file.
+        tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
+        write_json(
+            tmp_path,
+            {
+                "packet_id": packet_id,
+                "pass_idx": 0,
+                "row_ids": [int(v) for v in packet["row_id"].tolist()],
+                "result": result.model_dump(),
+            },
+        )
+        tmp_path.replace(out_path)
+        state["ok"] += 1
+        # Show progress as packets land (order arbitrary under concurrency).
+        completed = state["ok"] + state["skipped"] + state["failed"]
+        print(f"[stage5] audit progress: {completed}/{len(packets)} packets")
+
+    cm: Any = None
+    if trace_label:
+        try:
+            from agents import trace  # type: ignore
+
+            cm = trace(trace_label, group_id=config.resolved_run_id())
+        except Exception:
+            cm = None
+
+    if cm is not None:
+        with cm:
+            await asyncio.gather(*(process_packet(i, p) for i, p in enumerate(packets)))
+    else:
+        await asyncio.gather(*(process_packet(i, p) for i, p in enumerate(packets)))
+
+    print(
+        f"[stage5] audit done: {state['ok']} ok, {state['skipped']} cached, "
+        f"{state['failed']} failed; concurrency={config.concurrency}"
+    )
     aggregate_audit_results(stage_dir, expected_row_ids)
 
 
@@ -2222,10 +2291,17 @@ def run_stage5(config: CleanerConfig, resume: bool = True, batch_output: Path | 
 
         asyncio.run(_run_audit_loop(config, feature_df, tag_to_rule, profiles, stage_dir, _audit_one))
     elif config.judge_mode == "agents":
-        async def _audit_one(prompt: str) -> AuditPacketResult:
-            return await _agents_audit_one(config, prompt)
+        agent = _build_audit_agent(config)
 
-        asyncio.run(_run_audit_loop(config, feature_df, tag_to_rule, profiles, stage_dir, _audit_one))
+        async def _audit_one(prompt: str) -> AuditPacketResult:
+            return await _agents_audit_one(agent, prompt)
+
+        asyncio.run(
+            _run_audit_loop(
+                config, feature_df, tag_to_rule, profiles, stage_dir, _audit_one,
+                trace_label="tagclean.audit",
+            )
+        )
     elif config.judge_mode in {"batch_prepare", "batch_submit", "batch_collect"}:
         raise NotImplementedError(
             "Audit-mode batch path is not yet wired. Use judge_mode=sync or agents for now."
