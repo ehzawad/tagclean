@@ -28,6 +28,8 @@ from tagclean.cleaner import (
     run_stage9,
     token_alignment_score,
     _resolve_consistency,
+    _stable_family_id,
+    _symlink_shared_stages,
 )
 
 
@@ -388,6 +390,45 @@ def test_compose_errors_on_missing_source(tmp_path: Path) -> None:
         assert "nope" in str(e)
     else:
         raise AssertionError("compose should raise when a source run is missing")
+
+
+def test_stable_family_id_is_order_invariant() -> None:
+    """family_id must depend only on the SET of tags, not their input order —
+    the manifest uses these IDs as the persistence key, so re-running discover
+    must hit the same dirs whether the seed enters first or last.
+    """
+    a = _stable_family_id(["alpha", "beta", "gamma"])
+    b = _stable_family_id(["gamma", "alpha", "beta"])
+    c = _stable_family_id(["alpha", "beta", "gamma"])
+    assert a == b == c
+    assert a.startswith("fam_")
+    # different tag set -> different id
+    assert _stable_family_id(["alpha", "beta", "delta"]) != a
+
+
+def test_symlink_shared_stages_refuses_geometry_mismatch(tmp_path: Path) -> None:
+    """If a family run dir already symlinks stage1 to a DIFFERENT centroids run,
+    refuse to silently mix geometries — that would corrupt downstream stages.
+    """
+    artifact_root = tmp_path / "artifacts"
+    # Make two centroid sources with stage0/1/2 directories.
+    for run_id in ("centroids_a", "centroids_b"):
+        for stage in ("stage0", "stage1", "stage2"):
+            (artifact_root / run_id / stage).mkdir(parents=True)
+
+    family_id = "fam_test"
+    _symlink_shared_stages(artifact_root, family_id, "centroids_a")
+    # Simulate a stale family dir pointing at the wrong centroids run.
+    # First run created symlinks to centroids_a; now demand centroids_b.
+    try:
+        _symlink_shared_stages(artifact_root, family_id, "centroids_b")
+    except RuntimeError as e:
+        assert "centroids_b" in str(e)
+    else:
+        raise AssertionError(
+            "_symlink_shared_stages should refuse to overwrite a symlink that "
+            "points at a different centroids run."
+        )
 
 
 def test_stage9_no_drop_mode_keeps_all_rows(tmp_path: Path) -> None:

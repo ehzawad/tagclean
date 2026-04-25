@@ -1053,7 +1053,12 @@ def run_stage3(config: CleanerConfig, resume: bool = True) -> None:
         if config.target_tags
         else None
     )
-    if target_canon is not None and len(set(target_canon)) >= 2:
+    if target_canon is not None and len(set(target_canon)) == 1:
+        # Singleton target — no sibling cluster to disambiguate against.
+        # Emit no boundary policy; Stage 5 audits the lone tag's buffer with
+        # central exemplars + discriminative phrases only.
+        distinct_clusters = []
+    elif target_canon is not None and len(set(target_canon)) >= 2:
         # User-provided cluster: --target-tags or --seed-tag's resolved set
         # IS the cluster Stage 3 should author a policy for. Skipping the
         # union-find avoids two failure modes at corpus scale:
@@ -2934,6 +2939,15 @@ def run_discover(
     n = len(tags)
     allow = np.ones(n, dtype=bool)
     if production_tags is not None:
+        tag_set = set(tags)
+        unknown = sorted(t for t in production_tags if t not in tag_set)
+        if unknown:
+            # Hard-fail — at 990-tag scale, one allowlist typo silently drops
+            # production coverage and we'd never notice. Refuse and surface.
+            raise ValueError(
+                f"--production-tags contains {len(unknown)} entries not in the "
+                f"corpus tag_index: {unknown[:8]}{'...' if len(unknown) > 8 else ''}"
+            )
         for i, t in enumerate(tags):
             if t not in production_tags:
                 allow[i] = False
@@ -3018,11 +3032,13 @@ def run_discover(
         [c for c in candidates if not c["is_singleton"]],
         key=lambda c: (-c["min_sim"], -c["avg_sim"], -len(c["members"])),
     )
-    covered: set[int] = set()
+    multi_covered: set[int] = set()  # only tags claimed by a SELECTED multi-family
+    covered: set[int] = set()  # multi_covered + singleton fills (full coverage)
     selected: list[dict[str, Any]] = []
     for c in multi:
-        if any(m in covered for m in c["members"]):
+        if any(m in multi_covered for m in c["members"]):
             continue
+        multi_covered.update(c["members"])
         covered.update(c["members"])
         selected.append(c)
     # Singletons fill the gaps so coverage is complete. Iterate ALL allowed
@@ -3050,10 +3066,15 @@ def run_discover(
                 s = float(sim[m, jj])
                 if s < threshold:
                     reason = "below_threshold"
-                elif jj in covered:
+                elif m not in in_top_k[jj] or jj not in in_top_k[m]:
+                    reason = "non_reciprocal"
+                elif jj in multi_covered:
+                    # Only true if neighbor was claimed by another selected
+                    # multi-tag family (not by a singleton fill); otherwise
+                    # the reason is "missed reciprocity / pair threshold".
                     reason = "covered_by_other_family"
                 else:
-                    reason = "non_reciprocal"
+                    reason = "below_pair_threshold"
                 if tag_j not in excluded or s > excluded[tag_j]["min_sim"]:
                     excluded[tag_j] = {"tag": tag_j, "min_sim": round(s, 4), "reason": reason}
         excluded_list = sorted(excluded.values(), key=lambda e: -e["min_sim"])[:5]
@@ -3141,7 +3162,9 @@ def _symlink_shared_stages(
 
     Stages 0–2 are corpus-wide and identical across families that share the
     same input CSV; symlinking saves ~30-60 min Mac MPS embedding per family.
-    Skipped if the destination already exists (so resumes don't clobber).
+    If a destination already exists, verify it points at the expected source
+    — a stale family dir from a different centroids run mixes geometries and
+    silently corrupts downstream stages. Refuse rather than guess.
     """
     src_root = (artifact_root / centroids_run_id).resolve()
     dst_root = artifact_root / family_run_id
@@ -3151,9 +3174,24 @@ def _symlink_shared_stages(
         dst = dst_root / stage
         if not src.exists():
             continue
-        if dst.exists() or dst.is_symlink():
+        if dst.is_symlink():
+            try:
+                existing = (dst_root / os.readlink(dst)).resolve()
+            except OSError:
+                existing = None
+            if existing != src:
+                raise RuntimeError(
+                    f"{dst} is a symlink to {existing}, not the manifest's "
+                    f"centroids_run_id={centroids_run_id} ({src}). Refusing to "
+                    "mix geometries; remove the stale family dir and retry."
+                )
             continue
-        # Use a relative symlink so the run dir is portable.
+        if dst.exists():
+            # A real directory at this path — assume the user intentionally
+            # populated it (e.g. a separate stage0/1/2 run with matching hash).
+            # We don't validate hash equality here; cross-run mismatch would
+            # surface as stage-manifest hash failures downstream.
+            continue
         rel = os.path.relpath(src, dst_root)
         dst.symlink_to(rel)
 
@@ -3163,6 +3201,7 @@ def run_families_manifest(
     manifest_path: Path,
     skip_completed: bool = True,
     include_singletons: bool = False,
+    force_rerun: bool = False,
 ) -> None:
     """Run stage8 for every approved family in the manifest.
 
@@ -3215,7 +3254,9 @@ def run_families_manifest(
         family_config.run_id = run_id
         family_config.target_tags = target_tags
         try:
-            run_stage8(family_config, resume=True)
+            # force_rerun bypasses every per-stage cache so a manual override
+            # actually re-runs (resume=True would silently skip-on-hash).
+            run_stage8(family_config, resume=not force_rerun)
             successes.append(run_id)
         except Exception as exc:
             print(f"[run-families] FAILED {run_id}: {exc}")
@@ -3405,7 +3446,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--no-skip-completed",
         action="store_true",
-        help="run-families: re-run families that already have a stage8 cleaning_report.json.",
+        help="run-families: re-include families that already have a stage8 cleaning_report.json. "
+        "Per-stage caches still apply unless --force-rerun is set.",
+    )
+    parser.add_argument(
+        "--force-rerun",
+        action="store_true",
+        help="run-families: force resume=False on each family — every stage re-runs from scratch.",
     )
     parser.add_argument(
         "--include-singletons",
@@ -3609,6 +3656,7 @@ def main() -> None:
             manifest_path=args.manifest,
             skip_completed=not args.no_skip_completed,
             include_singletons=args.include_singletons,
+            force_rerun=args.force_rerun,
         )
         return
     if args.stage == "compose":
@@ -3616,13 +3664,31 @@ def main() -> None:
             payload = yaml.safe_load(
                 Path(args.manifest).expanduser().read_text(encoding="utf-8")
             )
+            # Include singletons too — if run-families --include-singletons
+            # was used, those single-tag runs produce stage6 outputs that
+            # belong in the production union. Filter only on status, not size.
             from_runs = [
                 fam["family_id"]
                 for fam in payload.get("families", [])
-                if fam.get("status") == "approved" and len(fam.get("target_tags", [])) >= 2
+                if fam.get("status") in {"approved", "singleton"}
+                and len(fam.get("target_tags", [])) >= 1
+            ]
+            # Drop runs whose stage6/cleaned.csv (or top40.csv) doesn't exist —
+            # singletons that weren't run via --include-singletons fall here.
+            file_name = (
+                "question_tag.top40.csv"
+                if args.compose_source == "top40"
+                else "question_tag.cleaned.csv"
+            )
+            from_runs = [
+                fid
+                for fid in from_runs
+                if (config.artifact_root / fid / "stage6" / file_name).exists()
             ]
             if not from_runs:
-                raise SystemExit("manifest has no approved multi-tag families")
+                raise SystemExit(
+                    "manifest has no families with cleaned stage6 outputs to compose"
+                )
         elif args.from_runs:
             from_runs = [r.strip() for r in args.from_runs.split(",") if r.strip()]
         else:

@@ -61,7 +61,7 @@
 ### `fam_42b52936`  min=0.950  avg=0.950
 - tags: password_character_requirements, password_requirements
 - row counts: {'password_character_requirements': 99, 'password_requirements': 96}
-- nearest excluded: [{'tag': 'password_min_length', 'min_sim': 0.9107, 'reason': 'covered_by_other_family'}, {'tag': 'strong_password_importance', 'min_sim': 0.898, 'reason': 'covered_by_other_family'}, {'tag': 'password_reset_required_info', 'min_sim': 0.8846, 'reason': 'covered_by_other_family'}]
+- nearest excluded: [{'tag': 'password_min_length', 'min_sim': 0.9107, 'reason': 'below_pair_threshold'}, {'tag': 'strong_password_importance', 'min_sim': 0.898, 'reason': 'below_pair_threshold'}, {'tag': 'password_reset_required_info', 'min_sim': 0.8846, 'reason': 'covered_by_other_family'}]
 
 ### `fam_09d12671`  min=0.950  avg=0.950
 - tags: nid_opportunity_for_foreign_spouse, nid_probashi_eligibility_01
@@ -71,7 +71,7 @@
 ### `fam_ee2150d3`  min=0.949  avg=0.949
 - tags: nid_correction_category_approver_05, nid_correction_category_approver_07
 - row counts: {'nid_correction_category_approver_05': 71, 'nid_correction_category_approver_07': 78}
-- nearest excluded: [{'tag': 'nid_correction_category_approver_06', 'min_sim': 0.9119, 'reason': 'covered_by_other_family'}, {'tag': 'nid_correction_category_approver_01', 'min_sim': 0.8718, 'reason': 'below_threshold'}, {'tag': 'nid_correction_category_approver_03', 'min_sim': 0.8684, 'reason': 'below_threshold'}]
+- nearest excluded: [{'tag': 'nid_correction_category_approver_06', 'min_sim': 0.9119, 'reason': 'below_pair_threshold'}, {'tag': 'nid_correction_category_approver_01', 'min_sim': 0.8718, 'reason': 'below_threshold'}, {'tag': 'nid_correction_category_approver_03', 'min_sim': 0.8684, 'reason': 'below_threshold'}]
 
 ### `fam_49649103`  min=0.946  avg=0.946
 - tags: foreign_address_entry_tips, foreign_address_fields
@@ -91,7 +91,7 @@
 ### `fam_d242dbee`  min=0.934  avg=0.934
 - tags: card_damaged_how_to_get_new_card, nid_probashi_smart_card_06
 - row counts: {'card_damaged_how_to_get_new_card': 170, 'nid_probashi_smart_card_06': 80}
-- nearest excluded: [{'tag': 'smart_card_lost_how_to_get_new_one_again', 'min_sim': 0.8911, 'reason': 'covered_by_other_family'}, {'tag': 'voter_slip_lost_how_to_get_nid', 'min_sim': 0.8856, 'reason': 'covered_by_other_family'}, {'tag': 'card_lost_no_info_how_to_get_new', 'min_sim': 0.884, 'reason': 'covered_by_other_family'}]
+- nearest excluded: [{'tag': 'smart_card_lost_how_to_get_new_one_again', 'min_sim': 0.8911, 'reason': 'below_pair_threshold'}, {'tag': 'voter_slip_lost_how_to_get_nid', 'min_sim': 0.8856, 'reason': 'covered_by_other_family'}, {'tag': 'card_lost_no_info_how_to_get_new', 'min_sim': 0.884, 'reason': 'covered_by_other_family'}]
 
 ### `fam_65e2edf3`  min=0.933  avg=0.933
 - tags: nid_correction_category_approver_02, nid_correction_category_approver_04
@@ -101,7 +101,7 @@
 ### `fam_963878f5`  min=0.931  avg=0.931
 - tags: not_getting_smart_card_though_newer_voter_getting, photo_done_years_ago_but_no_card
 - row counts: {'not_getting_smart_card_though_newer_voter_getting': 170, 'photo_done_years_ago_but_no_card': 176}
-- nearest excluded: [{'tag': 'smart_card_distributed_in_my_area_but_my_card_not_received', 'min_sim': 0.915, 'reason': 'covered_by_other_family'}, {'tag': 'picture_done_but_lost_or_no_sms_slip', 'min_sim': 0.9089, 'reason': 'covered_by_other_family'}, {'tag': 'nid_probashi_smart_card_03', 'min_sim': 0.897, 'reason': 'covered_by_other_family'}]
+- nearest excluded: [{'tag': 'smart_card_distributed_in_my_area_but_my_card_not_received', 'min_sim': 0.915, 'reason': 'below_pair_threshold'}, {'tag': 'picture_done_but_lost_or_no_sms_slip', 'min_sim': 0.9089, 'reason': 'below_pair_threshold'}, {'tag': 'nid_probashi_smart_card_03', 'min_sim': 0.897, 'reason': 'below_pair_threshold'}]
 
 ### `fam_08ac684d`  min=0.930  avg=0.930
 - tags: sem_app_info_03, sem_app_info_12
@@ -116,7 +116,7 @@
 ### `fam_28532617`  min=0.926  avg=0.936
 - tags: card_lost_no_info_how_to_get_new, nid_reissue_07, voter_slip_lost_how_to_get_nid
 - row counts: {'card_lost_no_info_how_to_get_new': 163, 'nid_reissue_07': 81, 'voter_slip_lost_how_to_get_nid': 161}
-- nearest excluded: [{'tag': 'correction_slip_lost_can_get_card', 'min_sim': 0.9229, 'reason': 'covered_by_other_family'}, {'tag': 'smart_card_lost_how_to_get_new_one_again', 'min_sim': 0.9052, 'reason': 'covered_by_other_family'}, {'tag': 'receipt_lost_how_to_get_new_card', 'min_sim': 0.8892, 'reason': 'covered_by_other_family'}]
+- nearest excluded: [{'tag': 'correction_slip_lost_can_get_card', 'min_sim': 0.9229, 'reason': 'below_pair_threshold'}, {'tag': 'smart_card_lost_how_to_get_new_one_again', 'min_sim': 0.9052, 'reason': 'below_pair_threshold'}, {'tag': 'receipt_lost_how_to_get_new_card', 'min_sim': 0.8892, 'reason': 'below_pair_threshold'}]
 
 ### `fam_0e45245f`  min=0.926  avg=0.926
 - tags: ballot_tracking_definition, vote_tracking_definition
@@ -136,7 +136,7 @@
 ### `fam_b95fbffa`  min=0.919  avg=0.919
 - tags: nid_new_registration_02, parent_no_card_failed_to_be_voter
 - row counts: {'nid_new_registration_02': 81, 'parent_no_card_failed_to_be_voter': 171}
-- nearest excluded: [{'tag': 'nid_misc_07', 'min_sim': 0.8881, 'reason': 'covered_by_other_family'}, {'tag': 'nid_vote_without_card_01', 'min_sim': 0.8402, 'reason': 'below_threshold'}, {'tag': 'foreign_resident_card_registration_required_documents', 'min_sim': 0.8309, 'reason': 'below_threshold'}]
+- nearest excluded: [{'tag': 'nid_misc_07', 'min_sim': 0.8881, 'reason': 'below_pair_threshold'}, {'tag': 'nid_vote_without_card_01', 'min_sim': 0.8402, 'reason': 'below_threshold'}, {'tag': 'foreign_resident_card_registration_required_documents', 'min_sim': 0.8309, 'reason': 'below_threshold'}]
 
 ### `fam_41cb210b`  min=0.919  avg=0.919
 - tags: foreign_resident_nid_adjudication_pending, nid_adjudication_pending
@@ -146,7 +146,7 @@
 ### `fam_709a5477`  min=0.918  avg=0.918
 - tags: nid_probashi_smart_card_04, nid_probashi_smart_card_09
 - row counts: {'nid_probashi_smart_card_04': 80, 'nid_probashi_smart_card_09': 78}
-- nearest excluded: [{'tag': 'foreign_resident_card_collection', 'min_sim': 0.9158, 'reason': 'covered_by_other_family'}, {'tag': 'nid_probashi_smart_card_02', 'min_sim': 0.9004, 'reason': 'covered_by_other_family'}, {'tag': 'nid_probashi_smart_card_08', 'min_sim': 0.8499, 'reason': 'below_threshold'}]
+- nearest excluded: [{'tag': 'foreign_resident_card_collection', 'min_sim': 0.9158, 'reason': 'below_pair_threshold'}, {'tag': 'nid_probashi_smart_card_02', 'min_sim': 0.9004, 'reason': 'below_pair_threshold'}, {'tag': 'nid_probashi_smart_card_08', 'min_sim': 0.8499, 'reason': 'below_threshold'}]
 
 ### `fam_54213466`  min=0.917  avg=0.917
 - tags: login_using_old_id_password, online_previously_registered
@@ -161,7 +161,7 @@
 ### `fam_59e08db1`  min=0.914  avg=0.914
 - tags: fingerprint_error_info_not_found, nid_biometric_update_not_working_01
 - row counts: {'fingerprint_error_info_not_found': 169, 'nid_biometric_update_not_working_01': 80}
-- nearest excluded: [{'tag': 'nid_afis_01', 'min_sim': 0.9037, 'reason': 'covered_by_other_family'}, {'tag': 'nid_fingerprint_mismatch_sim_issue_01', 'min_sim': 0.882, 'reason': 'covered_by_other_family'}, {'tag': 'fingerprint_update_applied_not_approved', 'min_sim': 0.8554, 'reason': 'below_threshold'}]
+- nearest excluded: [{'tag': 'nid_afis_01', 'min_sim': 0.9037, 'reason': 'below_pair_threshold'}, {'tag': 'nid_fingerprint_mismatch_sim_issue_01', 'min_sim': 0.882, 'reason': 'covered_by_other_family'}, {'tag': 'fingerprint_update_applied_not_approved', 'min_sim': 0.8554, 'reason': 'below_threshold'}]
 
 ### `fam_ff3c2fbf`  min=0.914  avg=0.914
 - tags: new_voter_how_to_get_card, new_voter_smart_card_how_to_get
@@ -171,7 +171,7 @@
 ### `fam_cbcd947f`  min=0.912  avg=0.912
 - tags: nid_probashi_smart_card_08, smart_card_collect_by_other
 - row counts: {'nid_probashi_smart_card_08': 80, 'smart_card_collect_by_other': 176}
-- nearest excluded: [{'tag': 'nid_probashi_smart_card_02', 'min_sim': 0.8874, 'reason': 'covered_by_other_family'}, {'tag': 'nid_probashi_smart_card_04', 'min_sim': 0.8499, 'reason': 'below_threshold'}, {'tag': 'nid_probashi_smart_card_09', 'min_sim': 0.8414, 'reason': 'below_threshold'}]
+- nearest excluded: [{'tag': 'nid_probashi_smart_card_02', 'min_sim': 0.8874, 'reason': 'below_pair_threshold'}, {'tag': 'nid_probashi_smart_card_04', 'min_sim': 0.8499, 'reason': 'below_threshold'}, {'tag': 'nid_probashi_smart_card_09', 'min_sim': 0.8414, 'reason': 'below_threshold'}]
 
 ### `fam_d17ef271`  min=0.910  avg=0.910
 - tags: face_verification_no_next_option, no_face_verification
@@ -206,12 +206,12 @@
 ### `fam_6f21f3aa`  min=0.907  avg=0.907
 - tags: foreign_resident_card_registration_process, nid_dual_citizenship_02
 - row counts: {'foreign_resident_card_registration_process': 196, 'nid_dual_citizenship_02': 81}
-- nearest excluded: [{'tag': 'foreign_resident_multiple_registration_new', 'min_sim': 0.9004, 'reason': 'covered_by_other_family'}, {'tag': 'foreign_resident_card_registration_query_country_limitation', 'min_sim': 0.8975, 'reason': 'covered_by_other_family'}, {'tag': 'foreign_resident_passport_expaired_card_registration_process', 'min_sim': 0.8923, 'reason': 'covered_by_other_family'}]
+- nearest excluded: [{'tag': 'foreign_resident_multiple_registration_new', 'min_sim': 0.9004, 'reason': 'below_pair_threshold'}, {'tag': 'foreign_resident_card_registration_query_country_limitation', 'min_sim': 0.8975, 'reason': 'below_pair_threshold'}, {'tag': 'foreign_resident_passport_expaired_card_registration_process', 'min_sim': 0.8923, 'reason': 'below_pair_threshold'}]
 
 ### `fam_feb20f8e`  min=0.906  avg=0.914
 - tags: account_locked, account_locked_retrials, account_locked_unlock_request
 - row counts: {'account_locked': 183, 'account_locked_retrials': 174, 'account_locked_unlock_request': 182}
-- nearest excluded: [{'tag': 'eight_hours_time_up', 'min_sim': 0.9487, 'reason': 'covered_by_other_family'}, {'tag': 'information_correct_but_account_locked', 'min_sim': 0.8756, 'reason': 'below_threshold'}, {'tag': 'card_lock', 'min_sim': 0.7981, 'reason': 'below_threshold'}]
+- nearest excluded: [{'tag': 'eight_hours_time_up', 'min_sim': 0.9487, 'reason': 'below_pair_threshold'}, {'tag': 'information_correct_but_account_locked', 'min_sim': 0.8756, 'reason': 'below_threshold'}, {'tag': 'card_lock', 'min_sim': 0.7981, 'reason': 'below_threshold'}]
 
 ### `fam_8630be1e`  min=0.906  avg=0.943
 - tags: nid_afis_04, nid_fingerprint_mismatch_sim_issue_01, nid_missing_fingerprint_sim_issue_01
@@ -231,12 +231,12 @@
 ### `fam_c3604b7f`  min=0.902  avg=0.902
 - tags: nid_required_for_postal_vote, nid_vote_without_card_01
 - row counts: {'nid_required_for_postal_vote': 100, 'nid_vote_without_card_01': 81}
-- nearest excluded: [{'tag': 'accepted_nid_types', 'min_sim': 0.8928, 'reason': 'covered_by_other_family'}, {'tag': 'nid_misc_01', 'min_sim': 0.8901, 'reason': 'covered_by_other_family'}, {'tag': 'nid_required_for_registration', 'min_sim': 0.8682, 'reason': 'below_threshold'}]
+- nearest excluded: [{'tag': 'accepted_nid_types', 'min_sim': 0.8928, 'reason': 'below_pair_threshold'}, {'tag': 'nid_misc_01', 'min_sim': 0.8901, 'reason': 'below_pair_threshold'}, {'tag': 'nid_required_for_registration', 'min_sim': 0.8682, 'reason': 'below_threshold'}]
 
 ### `fam_cf10ae61`  min=0.899  avg=0.899
 - tags: nid_fee_09, smart_card_lost_reissue
 - row counts: {'nid_fee_09': 81, 'smart_card_lost_reissue': 171}
-- nearest excluded: [{'tag': 'smart_card_lost_how_to_get_new_one_again', 'min_sim': 0.9513, 'reason': 'covered_by_other_family'}, {'tag': 'nid_probashi_smart_card_06', 'min_sim': 0.8825, 'reason': 'covered_by_other_family'}, {'tag': 'voter_slip_lost_how_to_get_nid', 'min_sim': 0.8719, 'reason': 'below_threshold'}]
+- nearest excluded: [{'tag': 'smart_card_lost_how_to_get_new_one_again', 'min_sim': 0.9513, 'reason': 'below_pair_threshold'}, {'tag': 'nid_probashi_smart_card_06', 'min_sim': 0.8825, 'reason': 'covered_by_other_family'}, {'tag': 'voter_slip_lost_how_to_get_nid', 'min_sim': 0.8719, 'reason': 'below_threshold'}]
 
 ### `fam_e1a2b2f1`  min=0.899  avg=0.899
 - tags: card_reissue_fees, nid_reissue_03
@@ -256,7 +256,7 @@
 ### `fam_3c2a1190`  min=0.893  avg=0.893
 - tags: correction_applied_more_correction_needed, wrong_information_in_online_application_what_to_do
 - row counts: {'correction_applied_more_correction_needed': 171, 'wrong_information_in_online_application_what_to_do': 193}
-- nearest excluded: [{'tag': 'nid_probashi_registration_02', 'min_sim': 0.9355, 'reason': 'covered_by_other_family'}, {'tag': 'nid_new_registration_05', 'min_sim': 0.8905, 'reason': 'covered_by_other_family'}, {'tag': 'card_information_correction', 'min_sim': 0.8716, 'reason': 'below_threshold'}]
+- nearest excluded: [{'tag': 'nid_probashi_registration_02', 'min_sim': 0.9355, 'reason': 'below_pair_threshold'}, {'tag': 'nid_new_registration_05', 'min_sim': 0.8905, 'reason': 'below_pair_threshold'}, {'tag': 'card_information_correction', 'min_sim': 0.8716, 'reason': 'below_threshold'}]
 
 ### `fam_e779f754`  min=0.893  avg=0.893
 - tags: wrong_mobile_number_consequence, wrong_otp_registration
@@ -276,7 +276,7 @@
 ### `fam_a6208ad3`  min=0.891  avg=0.929
 - tags: forgot_password_flow, password_reset_required_info, post_registration_password_reset
 - row counts: {'forgot_password_flow': 97, 'password_reset_required_info': 98, 'post_registration_password_reset': 94}
-- nearest excluded: [{'tag': 'show_password', 'min_sim': 0.8871, 'reason': 'covered_by_other_family'}, {'tag': 'password_change_process', 'min_sim': 0.8865, 'reason': 'covered_by_other_family'}, {'tag': 'password_requirements', 'min_sim': 0.8846, 'reason': 'covered_by_other_family'}]
+- nearest excluded: [{'tag': 'show_password', 'min_sim': 0.8871, 'reason': 'below_pair_threshold'}, {'tag': 'password_change_process', 'min_sim': 0.8865, 'reason': 'below_pair_threshold'}, {'tag': 'password_requirements', 'min_sim': 0.8846, 'reason': 'covered_by_other_family'}]
 
 ### `fam_c8a0fa16`  min=0.890  avg=0.890
 - tags: pre_use_privacy_policy_read, preparation_before_app_use
