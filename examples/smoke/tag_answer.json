@@ -1,0 +1,5 @@
+{
+  "password_reset_self": "Self-service password reset: open Settings → Security → Reset Password, then follow the link emailed to you. The link is valid for 30 minutes.",
+  "password_reset_failed": "If your reset attempt is failing: confirm the link is fresh (request a new one if the old token expired), check that account email and OTP are correct, and try a different browser if errors persist. Contact support if it still fails.",
+  "password_reset_help_request": "We can reset your password from our side after identity verification. Reply with your account email and the last four digits of your registered phone, and an agent will process the reset within one business day."
+}

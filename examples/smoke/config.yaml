@@ -1,0 +1,21 @@
+# Tagclean smoke-test config — synthetic English fixture, no GPU/API needed.
+input_csv: examples/smoke/question_tag.csv
+tag_answer_json: examples/smoke/tag_answer.json
+artifact_root: examples/smoke/artifacts
+
+run_id: smoke
+
+# Heuristic backend: deterministic embeddings via hashing, no model download.
+# Switch to "sentence-transformers" once you've installed E5/Gemma weights.
+embedding_backend: hashing
+
+# Heuristic judge: no GPT calls. Run with --judge-mode agents (or sync) for real GPT.
+judge_mode: heuristic
+
+# English fixture: skip Bengali normalization.
+language: none
+
+# Smaller numbers because fixture is small.
+audit_buffer_size: 12
+audit_rows_per_packet: 8
+top_n: 8

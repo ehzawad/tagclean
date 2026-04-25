@@ -1,0 +1,35 @@
+# Example tagclean config. Copy and edit to point at your dataset.
+input_csv: data/question_tag.csv
+tag_answer_json: data/tag_answer.json
+artifact_root: artifacts
+run_id: cleaning_run_v1
+
+# Models
+embedding_backend: sentence-transformers
+e5_model: intfloat/multilingual-e5-large-instruct
+gemma_model: google/embeddinggemma-300m
+gemma_dim: 768
+
+# Optionally override the E5-instruct prompt for your domain.
+# e5_instruction: "You are an expert at matching banking-FAQ questions ..."
+
+# Text normalization. "bn" runs Bengali Unicode normalization;
+# "none" disables language-specific steps.
+language: bn
+
+# OpenAI judge / audit
+openai_model: gpt-5.5
+openai_reasoning_effort: high
+judge_mode: agents      # heuristic | sync | agents | batch_prepare | batch_collect
+self_consistency_passes: 1
+
+# Pipeline knobs
+audit_buffer_size: 80
+audit_rows_per_packet: 24
+boundary_policy_threshold: 0.85
+boundary_policy_max_cluster_size: 6
+top_n: 40
+near_duplicate_threshold: 0.98
+e5_merge_threshold: 0.90
+gemma_merge_threshold: 0.88
+knn_overlap_threshold: 0.30
