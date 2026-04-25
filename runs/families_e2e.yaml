@@ -1,0 +1,97 @@
+schema_version: 1
+source:
+  centroids_run_id: bn_name_correction
+  tag_index: /Users/ehz/tagclean/runs/bn_name_correction/stage2/tag_index.json
+  e5_centroids: /Users/ehz/tagclean/runs/bn_name_correction/stage2/tag_centroids_e5.npy
+  gemma_centroids: /Users/ehz/tagclean/runs/bn_name_correction/stage2/tag_centroids_gemma.npy
+discover_config:
+  threshold: 0.88
+  pair_threshold: 0.86
+  top_k: 8
+  max_family_size: 4
+  production_tags_count: 461
+families:
+- family_id: fam_ee2150d3
+  status: approved
+  target_tags:
+  - nid_correction_category_approver_05
+  - nid_correction_category_approver_07
+  score:
+    min_edge_sim: 0.9485
+    avg_edge_sim: 0.9485
+  row_counts:
+    nid_correction_category_approver_05: 71
+    nid_correction_category_approver_07: 78
+  excluded_neighbors:
+  - tag: nid_correction_category_approver_06
+    min_sim: 0.9119
+    reason: below_pair_threshold
+  - tag: nid_correction_category_approver_01
+    min_sim: 0.8718
+    reason: below_threshold
+  - tag: nid_correction_category_approver_03
+    min_sim: 0.8684
+    reason: below_threshold
+  - tag: nid_correction_category_approver_04
+    min_sim: 0.8066
+    reason: below_threshold
+  - tag: nid_correction_category_approver_02
+    min_sim: 0.7929
+    reason: below_threshold
+  notes: ''
+- family_id: fam_7087768c
+  status: approved
+  target_tags:
+  - nid_fee_04
+  - nid_fee_wrong_nid_refund_01
+  score:
+    min_edge_sim: 0.9743
+    avg_edge_sim: 0.9743
+  row_counts:
+    nid_fee_04: 79
+    nid_fee_wrong_nid_refund_01: 77
+  excluded_neighbors:
+  - tag: card_correction_request_canceled_by_consumer_regarding_refund_fees
+    min_sim: 0.8132
+    reason: below_threshold
+  - tag: card_correction_request_failed_query_regarding_refund_fees
+    min_sim: 0.7938
+    reason: below_threshold
+  - tag: nid_fee_usage_status_01
+    min_sim: 0.7431
+    reason: below_threshold
+  - tag: nid_misc_06
+    min_sim: 0.7412
+    reason: below_threshold
+  - tag: card_correction_request_failed_query_regarding_repayment_fees
+    min_sim: 0.7361
+    reason: below_threshold
+  notes: ''
+- family_id: fam_24f54532
+  status: approved
+  target_tags:
+  - nid_correction_category_approver_01
+  - nid_correction_category_approver_03
+  score:
+    min_edge_sim: 0.9074
+    avg_edge_sim: 0.9074
+  row_counts:
+    nid_correction_category_approver_01: 82
+    nid_correction_category_approver_03: 75
+  excluded_neighbors:
+  - tag: nid_correction_category_approver_04
+    min_sim: 0.9039
+    reason: covered_by_other_family
+  - tag: nid_correction_category_approver_02
+    min_sim: 0.9011
+    reason: covered_by_other_family
+  - tag: nid_correction_category_approver_07
+    min_sim: 0.8718
+    reason: below_threshold
+  - tag: nid_correction_category_approver_05
+    min_sim: 0.8579
+    reason: below_threshold
+  - tag: nid_reissue_approvers_01
+    min_sim: 0.8191
+    reason: below_threshold
+  notes: ''

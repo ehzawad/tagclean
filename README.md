@@ -282,6 +282,61 @@ Per-tag retention in the final production CSV (`runs/bn_production/stage9/produc
 
 We chose to ship 343 rows as-is rather than backfill to 40-per-tag with rank-41+ rows. The Stage 9 gate is the production-aligned guarantee — backfilling re-introduces rows production E5 itself routes to the wrong tag, weakening that guarantee. If a tag has 33 clean rows, ship 33.
 
+## Scaling commands (for cleaning all 1394 tags)
+
+```bash
+# 1. Bootstrap stage0/1/2 once on the full corpus (any small family run does it).
+tagclean stage8 --config configs/bn_full.yaml \
+    --target-tags account_locked,account_locked_retrials,account_locked_unlock_request \
+    --run-id corpus_bootstrap --judge-mode sync --openai-model gpt-5.5
+
+# 2. Auto-discover close-tag families. No GPT, no spend.
+tagclean discover --config configs/bn_full.yaml \
+    --centroids-from corpus_bootstrap \
+    --threshold 0.88 --pair-threshold 0.86 --top-k 8 --max-family-size 4 \
+    --exclude-tag-pattern '_followup_[a-d]$' \
+    --out runs/families.yaml --report runs/families_report.md
+
+# 3. (optional) hand-edit families.yaml; flip questionable families to status: rejected.
+
+# 4. Run all approved families. stage0/1/2 are symlinked from corpus_bootstrap.
+tagclean run-families --config configs/bn_full.yaml \
+    --manifest runs/families.yaml \
+    --judge-mode sync --openai-model gpt-5.5
+# add --include-singletons to also clean lone tags
+
+# 5. Compose all family outputs into one production candidate CSV.
+tagclean compose --config configs/bn_full.yaml \
+    --manifest runs/families.yaml \
+    --compose-source cleaned \
+    --out runs/production/composed.csv
+
+# 6. Cross-family Stage 9 audit (E5-only, no GPT).
+tagclean stage9 --config configs/bn_full.yaml \
+    --e5-audit-input runs/production/composed.csv \
+    --run-id production --judge-mode heuristic --device cpu
+```
+
+Final clean data: `runs/production/stage9/production_filtered.csv`.
+
+## Validation status
+
+The 9-tag, 3-family validation reported above (account_locked / name_correction / otp) was run end-to-end against gpt-5.5 high-reasoning. Final clean sets in `runs/bn_production/stage9/production_filtered.csv` (343 rows, top-40 path) and `runs/bn_production_max/stage9/production_filtered.csv` (554 rows, max-clean path).
+
+The new scaling commands (`discover`, `run-families`, `compose --manifest`) are unit-tested (19 tests pass: stable-family-id order invariance, symlink geometry-mismatch refusal, compose dedup + schema, Stage 9 audit/drop semantics, etc.). End-to-end validation in `--judge-mode heuristic` confirmed the dispatcher iterates families correctly, stage0/1/2 symlinks resolve and SKIP cache, and Stage 3's singleton path emits an empty boundary policy as designed.
+
+End-to-end validation against real GPT (gpt-5.5 sync) for the discover→run-families pipeline at corpus scale was NOT run — the OpenAI quota was exhausted partway through. To resume:
+
+```bash
+# (assumes API credit is available again)
+tagclean run-families --config configs/bn_full.yaml \
+    --manifest runs/families.yaml \
+    --judge-mode sync --openai-model gpt-5.5
+# --skip-completed (default) means a partial run can resume safely.
+```
+
+The 6 issues codex flagged on the first pass of the scaling commands are fixed in commit `ba4f8d7` (compose-includes-singletons, force-rerun semantics, singleton Stage 3 no-op policy, --production-tags allowlist hard-fail on unknown entries, excluded_neighbors reason classification, symlink geometry-mismatch refusal).
+
 ## Known limitations
 
 1. **`--seed-tag` cluster expansion is broken at corpus scale.** With 1395 tags, `find_close_tag_clusters` at the default 0.85 threshold forms a 488-tag mega-component (Bengali NID vocabulary is heavily shared). `max_cluster_size=6` then truncates by alphabetical tag-index order, dropping the seed entirely. Workaround: use `--target-tags` with the explicit list. Stage 3 honors the user's choice directly when `--target-tags` has ≥2 tags (skips union-find). A proper seed-centric expansion (seed + N nearest direct neighbors, no transitive closure) is a planned follow-up.
