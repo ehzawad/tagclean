@@ -400,7 +400,15 @@ tagclean run-families --config configs/bn_full.yaml \
 
 The 6 issues codex flagged on the first pass of the scaling commands are fixed in commit `ba4f8d7` (compose-includes-singletons, force-rerun semantics, singleton Stage 3 no-op policy, --production-tags allowlist hard-fail on unknown entries, excluded_neighbors reason classification, symlink geometry-mismatch refusal).
 
-## Known limitations
+## Known limitations (read before scaling)
+
+1. **Stage 4 ranker scales linearly with full-corpus rows × target families.** It loops every row in target scope but uses the full corpus as KNN-overlap evidence, so each per-family `stage8` invocation walks all 79k rows. We saw a ~20-min Stage 4 in a 2-tag heuristic run. At 264 family runs, this is the new wall-clock bottleneck (the dominant scaling cost was previously Stage 1 embedding, which `run-families` already eliminates via stage0/1/2 symlinks). Future fix: compute the expensive row features only for target-scope rows while still using global centroids/neighbors as evidence — should drop per-family Stage 4 from minutes to seconds.
+
+2. **Stage 9 is chunked but still has a ceiling.** The dense `vecs @ vecs.T` is replaced with row-chunked top-K (default chunk = 4096 rows; peak memory ≈ chunk × N × 4 bytes). At N=40k that's ~640 MB per chunk — fine for 16+ GB machines, tight on smaller. If you hit OOM, drop the `CHUNK` constant in `run_stage9` (currently a magic number; could be made configurable later).
+
+3. **`compose --manifest` skips families whose stage6 output is missing.** Convenient for partial runs but dangerous for the production handoff if a family failed silently. Pass `--require-complete` to compose to make it hard-fail when any approved/singleton family lacks stage6 outputs.
+
+## Other limitations
 
 1. **`--seed-tag` cluster expansion is broken at corpus scale.** With 1395 tags, `find_close_tag_clusters` at the default 0.85 threshold forms a 488-tag mega-component (Bengali NID vocabulary is heavily shared). `max_cluster_size=6` then truncates by alphabetical tag-index order, dropping the seed entirely. Workaround: use `--target-tags` with the explicit list. Stage 3 honors the user's choice directly when `--target-tags` has ≥2 tags (skips union-find). A proper seed-centric expansion (seed + N nearest direct neighbors, no transitive closure) is a planned follow-up.
 

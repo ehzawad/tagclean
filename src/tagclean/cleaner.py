@@ -2784,14 +2784,26 @@ def run_stage9(config: CleanerConfig, resume: bool = True) -> None:
     # in the same process (segfaults at shutdown on Python 3.14 / Mac).
     # Vectors are L2-normalized by sentence-transformers; matmul gives cosine.
     top_k = max(2, int(config.e5_audit_top_k))
-    search_k = min(top_k + 1, len(df))
-    sims = vecs @ vecs.T
-    np.fill_diagonal(sims, -np.inf)  # exclude self
-    indices = np.argpartition(-sims, kth=search_k - 1, axis=1)[:, :search_k]
-    # argpartition isn't sorted; re-sort the top slice by similarity
-    row_idx = np.arange(len(df))[:, None]
-    ordered = np.argsort(-sims[row_idx, indices], axis=1)
-    indices = indices[row_idx, ordered]
+    n = len(df)
+    search_k = min(top_k + 1, n)
+    # Chunked top-K to keep peak memory bounded at corpus scale.
+    # A dense N×N similarity matrix at N=40k is ~6.4 GB float32 — tight on
+    # most laptops and fragile under temp/index allocations. Chunked rows
+    # cap peak at CHUNK × N × 4 bytes (default ~640 MB at 4096 × 40k).
+    CHUNK = 4096
+    indices = np.empty((n, search_k), dtype=np.int64)
+    for start in range(0, n, CHUNK):
+        end = min(start + CHUNK, n)
+        chunk_sims = vecs[start:end] @ vecs.T
+        # Mask self-similarity within this chunk's diagonal.
+        for i in range(end - start):
+            chunk_sims[i, start + i] = -np.inf
+        kth = min(search_k - 1, chunk_sims.shape[1] - 1)
+        chunk_top = np.argpartition(-chunk_sims, kth=kth, axis=1)[:, :search_k]
+        # Re-sort each row's top slice by descending similarity.
+        for r in range(end - start):
+            ordered = np.argsort(-chunk_sims[r, chunk_top[r]])
+            indices[start + r] = chunk_top[r][ordered]
     tags = df["tag"].tolist()
     questions = df["question"].tolist()
 
@@ -3465,6 +3477,13 @@ def parse_args() -> argparse.Namespace:
         help="discover: regex of tag names to exclude from family discovery "
         "(e.g. '_followup_[a-d]$' to skip dialog-turn artifacts).",
     )
+    parser.add_argument(
+        "--require-complete",
+        action="store_true",
+        help="compose: hard-fail if any approved/singleton manifest family is "
+        "missing its stage6 output. Without this, missing families are warned "
+        "about and skipped — convenient for partial runs, dangerous for prod.",
+    )
     return parser.parse_args()
 
 
@@ -3667,24 +3686,46 @@ def main() -> None:
             # Include singletons too — if run-families --include-singletons
             # was used, those single-tag runs produce stage6 outputs that
             # belong in the production union. Filter only on status, not size.
-            from_runs = [
-                fam["family_id"]
+            wanted = [
+                fam
                 for fam in payload.get("families", [])
                 if fam.get("status") in {"approved", "singleton"}
                 and len(fam.get("target_tags", [])) >= 1
             ]
-            # Drop runs whose stage6/cleaned.csv (or top40.csv) doesn't exist —
-            # singletons that weren't run via --include-singletons fall here.
             file_name = (
                 "question_tag.top40.csv"
                 if args.compose_source == "top40"
                 else "question_tag.cleaned.csv"
             )
-            from_runs = [
-                fid
-                for fid in from_runs
-                if (config.artifact_root / fid / "stage6" / file_name).exists()
+            present = [
+                fam
+                for fam in wanted
+                if (config.artifact_root / fam["family_id"] / "stage6" / file_name).exists()
             ]
+            missing = [fam for fam in wanted if fam not in present]
+            if missing and args.require_complete:
+                # Production safety: refuse to ship a partial union when the
+                # caller asserted every approved family must be present.
+                lines = [
+                    f"  {fam['family_id']:<14s}  tags={fam['target_tags']}"
+                    for fam in missing[:20]
+                ]
+                tail = "" if len(missing) <= 20 else f"  ... ({len(missing) - 20} more)"
+                raise SystemExit(
+                    "compose --require-complete: "
+                    f"{len(missing)} of {len(wanted)} manifest families have no "
+                    f"stage6/{file_name}. Refusing to emit a partial production "
+                    "CSV. Run-families against the missing IDs first.\n"
+                    + "\n".join(lines)
+                    + tail
+                )
+            if missing:
+                print(
+                    f"[compose] WARNING: {len(missing)} of {len(wanted)} manifest "
+                    f"families have no stage6/{file_name}; proceeding with "
+                    f"{len(present)} (pass --require-complete to refuse)."
+                )
+            from_runs = [fam["family_id"] for fam in present]
             if not from_runs:
                 raise SystemExit(
                     "manifest has no families with cleaned stage6 outputs to compose"
