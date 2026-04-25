@@ -1,37 +1,97 @@
                                   TAGCLEAN — END-TO-END SYSTEM
                               (Bengali EC/NID FAQ corpus cleaner)
 
+
 INPUTS
 ==============================================================================================
-  question_tag.csv     -- 79k rows × 1395 tags. Columns: question, tag (UTF-8, BOM-tolerant).
+  question_tag.csv     -- 79k rows × 1394 tags. Columns: question, tag (UTF-8, BOM-tolerant).
   tag_answer.json      -- { tag: canonical_answer }. Used as merge-safety gate in Stage 3.
   config.yaml          -- e5_instruction, thresholds, openai_model, judge_mode, ...
-  CLI flags            -- --target-tags | --seed-tag | (omit for corpus-wide).
 
 MODELS  (roles fixed by design)
 ==============================================================================================
   E5-multilingual-large-instruct (1024d) -- primary geometry. ~50% of ranking weight.
                                             Same model production uses at inference.
-  EmbeddingGemma-300m            (768d)  -- independent second opinion. ~30% of weight.
-                                            Used for cluster-discovery cross-validation.
+  EmbeddingGemma-300m            (768d)  -- independent second opinion. ~25% of weight.
+                                            Used for cluster discovery cross-validation.
   GPT-5.5 (high reasoning)               -- policy author + buffer auditor only.
                                             NEVER scores rows directly.
 
-PER-FAMILY PIPELINE  (one invocation per close-tag family)
+
+CORPUS-WIDE BOOTSTRAP  (run once; cached for all family runs)
 ==============================================================================================
-  Stage 0  intake/normalize/dedup
-           Bengali NFC + ZWJ/ZWNJ strip + য়/য় canonicalize + digit fold
-           Within-tag dedup; cross-tag duplicates LOGGED (not auto-deleted)
+  Stage 0  intake / Bengali normalize / dedup
            -> stage0/intake.parquet, cross_tag_duplicates.jsonl
-  Stage 1  dual embeddings (E5 + Gemma + FAISS IndexFlatIP)
-           -> stage1/{emb_e5, emb_e5_query, emb_gemma}.npy + faiss_*.idx
-  Stage 2  tag profile: outlier-trimmed centroid, medoid, central exemplars,
-           log-odds discriminative bigrams/trigrams
+  Stage 1  dual embeddings (E5 + Gemma + FAISS IndexFlatIP) over the FULL corpus
+           -> stage1/{emb_e5, emb_gemma}.npy + faiss_*.idx
+  Stage 2  per-tag profile: outlier-trimmed centroid, medoid, central exemplars
            -> stage2/{tag_profile.parquet, tag_centroids_*.npy, tag_index.json}
+
+
+SCALING DISCOVERY  (one-shot; emits a hand-editable manifest)
+==============================================================================================
+                       stage2/tag_centroids_*.npy + tag_index.json
+                                         |
+                                         v
+  +----------------------------------------------------------------------------------+
+  | tagclean discover                                                                 |
+  |   --centroids-from <run>                                                          |
+  |   --threshold 0.88  --pair-threshold 0.86  --top-k 8  --max-family-size 4         |
+  |   [--exclude-tag-pattern '_followup_[a-d]$']    <- skip dialog-turn artifacts     |
+  |   [--production-tags FILE]                      <- optional allowlist             |
+  |                                                                                  |
+  | Algorithm (seed-centric reciprocal-NN ego-family expansion, NO union-find):       |
+  |   1. min(cos_e5, cos_gemma) per pair; top-K neighbors per tag.                    |
+  |   2. Edge kept iff reciprocal AND >= threshold.                                   |
+  |   3. Per seed: ego-family = seed + reciprocal nbrs, capped at max_family_size,    |
+  |      requiring pairwise min_sim >= pair_threshold with every existing member.     |
+  |   4. Score candidate by (min_edge_sim, avg_edge_sim, size).                       |
+  |   5. Greedy descending selection; mark members covered.                           |
+  |   6. Uncovered tags become singletons (full coverage guaranteed).                 |
+  |                                                                                  |
+  |   Replaces the broken union-find (488-tag mega-component at corpus scale).        |
+  +----------------------------------------------------------------------------------+
+                                         |
+                                         v
+                                  families.yaml
+                            (deterministic family_id from
+                             sha256 of sorted tag set)
+
+  families.yaml shape:
+    schema_version: 1
+    source: { centroids_run_id, tag_index, e5_centroids, gemma_centroids }
+    discover_config: { threshold, pair_threshold, top_k, max_family_size, ... }
+    families:
+      - family_id: fam_<8hex>           # stable across re-runs
+        status: approved | singleton | rejected
+        target_tags: [t1, t2, ...]
+        score: { min_edge_sim, avg_edge_sim }
+        row_counts: { t1: n, t2: n, ... }
+        excluded_neighbors: [{tag, min_sim, reason}, ...]   # diagnostics
+        notes: ""
+
+
+PER-FAMILY PIPELINE  (run-families dispatches one stage8 invocation per approved family)
+==============================================================================================
+  +--------------------------------------------------------------------------+
+  | tagclean run-families --manifest families.yaml                            |
+  |   [--include-singletons]                                                  |
+  |   [--no-skip-completed]                                                   |
+  |   --judge-mode sync --openai-model gpt-5.5                                |
+  |                                                                          |
+  |   For each approved family:                                              |
+  |     1. Symlink stage0/1/2 from `centroids_run_id` -> family run dir       |
+  |        (stages 0-2 are corpus-wide, identical across families;            |
+  |         symlinking saves ~30-60 min Mac MPS embedding per family.)        |
+  |     2. Run stage8 with --target-tags <family target_tags> --run-id <fid>  |
+  |     3. Skip if <fid>/stage8/cleaning_report.json already exists.          |
+  +--------------------------------------------------------------------------+
+                                         |
+                                         v
   Stage 3  tag-boundary policy (GPT-5.5)
-           Cluster: IF --target-tags / --seed-tag has >=2 tags -> cluster = user's tags
-                    ELSE: connected components where min(cos_e5, cos_gemma) >= 0.85
-           For each cluster (1 GPT call): one_line_intent, must_have, must_avoid
+           target_tags-aware: when family >= 2 tags, cluster IS target_tags
+           (skips union-find, avoids the 488-tag mega-component issue).
+           1 GPT call per family. one_line_intent + must_have + must_avoid.
            -> stage3/{tag_merge_map.csv, tag_boundary_policy.jsonl}
   Stage 4  deterministic ranker (NO GPT)
            composite_score = 0.30*cos_e5 + 0.20*margin_e5 + 0.15*cos_gemma + 0.10*margin_gemma
@@ -40,8 +100,7 @@ PER-FAMILY PIPELINE  (one invocation per close-tag family)
            Top-80 per tag -> audit_buffer=true
            -> stage4/row_features.parquet
   Stage 5  buffer audit (GPT-5.5, async, concurrency=6)
-           Packets of 24 + tag-profile context. keep|flag with reason_code.
-           Missing-row retry per packet. Policy: prefer_flag_when_unsure.
+           Packets of 24 + per-tag profile context.  keep | flag(reason_code)
            -> stage5/audit_results.jsonl
   Stage 6  selection + MMR (lambda=0.7 in E5 space) -> top-N=40 per tag
            -> stage6/{question_tag.cleaned.csv, .top40.csv, jettisoned_rows.csv}
@@ -49,45 +108,89 @@ PER-FAMILY PIPELINE  (one invocation per close-tag family)
   Stage 8  leave-one-out validation (E5-only retrieval)
            -> stage8/cleaning_report.json
 
-CROSS-FAMILY PRODUCTION COMPOSITION  (production exit shape)
-==============================================================================================
-  family_A/stage6/top40.csv ---+
-  family_B/stage6/top40.csv ---+--> tagclean compose -> composed.csv
-  family_C/stage6/top40.csv ---+    (concat + dedup + deterministic sort)
-                                    |
-                                    v
-                                    tagclean stage9 --e5-audit-input
-                                    (E5 LOO top-K audit; drops top-1 misses)
-                                    |
-                                    v
-                                    PRODUCTION CSV
-                                    stage9/production_filtered.csv
 
-  WHY compose from top40 (not from per-family stage9 production_filtered):
-    A row that fails LOO inside a 3-tag family can be safely separable in
-    the 9+-tag production union -- its in-family rival is no longer a peer.
-    Filter once globally, after composition.
+CROSS-FAMILY PRODUCTION COMPOSITION
+==============================================================================================
+  fam_xxxx/stage6/cleaned.csv ---+
+  fam_yyyy/stage6/cleaned.csv ---+--> tagclean compose --manifest families.yaml
+  fam_zzzz/stage6/cleaned.csv ---+    [--compose-source top40 | cleaned]    --> composed.csv
+                ...                   (concat + dedup + deterministic sort)
+                                          |
+                                          v
+                                    tagclean stage9 --e5-audit-input <composed.csv>
+                                    (E5 LOO top-K audit; drops top-1 misses)
+                                          |
+                                          v
+                                    PRODUCTION CSV
+                                    runs/<run_id>/stage9/production_filtered.csv
+
+  WHY compose from cleaned.csv (or top40), not per-family stage9 production_filtered:
+    A row that fails LOO inside its own family can be safely separable in the global
+    production union -- its in-family rival is no longer the closest peer. Filter once
+    globally, after composition. Per-family stage9 stays useful for diagnostics.
+
 
 STAGE 9 INTERNALS  (E5-only production-risk audit)
 ==============================================================================================
   Input CSV -> Bengali normalize -> E5 prefix -> encode (passages = queries)
-            -> vecs @ vecs.T (numpy, no FAISS to avoid Py3.14/Mac segfault)
+            -> vecs @ vecs.T   (numpy, no FAISS to avoid Py3.14/Mac segfault)
             -> diag = -inf -> argpartition top-K + sort
             -> per row: top1_neighbor_tag, top1_correct, own_share_top_K, neighbor_dist
             -> e5_neighbor_audit.csv, production_filtered.csv,
                e5_dropped.csv, audit_report.json
 
-  Default: drop rows with top-1 LOO mismatch.  --no-e5-drop = report-only.
-  Stage 9 NEVER chains stage0-8 (auto-chaining clobbered cleaned.csv when
-  judge_mode differed).
+  Default: drop rows with top-1 LOO mismatch.  --no-e5-drop = report-only mode.
+  Stage 9 NEVER chains stage0-8 (auto-chaining clobbered cleaned.csv when judge_mode
+  differed). Run stage8 (or run-families) first; stage9 only audits what's there.
 
-VALIDATION RESULTS  (Bengali EC/NID, 3 close-tag families)
+
+END-TO-END FLOW
 ==============================================================================================
-  family             cleaned  top-40  stage8 LOO  stage9 dropped  fragile tag
-  -----------------  -------  ------  ----------  --------------  ---------------------
-  account_locked     194      120     0.974       6  (3.1%)        unlock_request (top1=0.91)
-  name_correction    165      117     0.958       8  (4.8%)        parents (top1=0.86)
-  otp                212      120     0.986       3  (1.4%)        otp_not_received (top1=0.97)
 
-  PRODUCTION (composed top40 -> cross-family stage9):
-    357 rows -> 343 kept -> top1 LOO 0.961  --  0/14 cross-family drops
+   data/question_tag.csv  ---->  [stage8 once on a 3-tag family --> stage0/1/2 cached]
+                                                              |
+                                                              v
+                                  +---------------------------+
+                                  |
+                                  v
+                          tagclean discover  --centroids-from <run>
+                          --exclude-tag-pattern '_followup_[a-d]$'
+                                          |
+                                          v
+                                    families.yaml
+                              (264 multi-tag + 695 singletons
+                               unfiltered; 73 + 304 with filter)
+                                          |
+                                          v
+                       (optional) human edits status: approved/rejected
+                                          |
+                                          v
+                          tagclean run-families  --manifest families.yaml
+                          (one stage8 per approved family;
+                           stage0/1/2 symlinked from centroids run;
+                           --skip-completed default; resumable)
+                                          |
+                                          v
+                          tagclean compose  --manifest families.yaml
+                          --compose-source cleaned --out PATH
+                                          |
+                                          v
+                          tagclean stage9  --e5-audit-input PATH
+                          --run-id production
+                                          |
+                                          v
+                  runs/production/stage9/production_filtered.csv
+                          (final E5-ready clean data)
+
+
+VALIDATION ON 9 TAGS / 3 HAND-PICKED CLOSE-TAG FAMILIES
+==============================================================================================
+  family             cleaned  top-40  Stage 8 LOO  Stage 9 dropped  fragile tag
+  -----------------  -------  ------  -----------  ---------------  ---------------------
+  account_locked     194      120     0.974        6  (3.1%)         unlock_request (top1=0.91)
+  name_correction    165      117     0.958        8  (4.8%)         parents (top1=0.86)
+  otp                212      120     0.986        3  (1.4%)         otp_not_received (top1=0.97)
+
+  PRODUCTION
+   - top-40 path:   357 -> 343 kept  -> top1 LOO 0.961  -- 0/14 cross-family drops
+   - max-clean:     571 -> 554 kept  -> top1 LOO 0.970  -- 17 within-family drops only

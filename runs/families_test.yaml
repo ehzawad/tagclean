@@ -1,0 +1,68 @@
+schema_version: 1
+source:
+  tag_index: /Users/ehz/tagclean/runs/bn_name_correction/stage2/tag_index.json
+  e5_centroids: /Users/ehz/tagclean/runs/bn_name_correction/stage2/tag_centroids_e5.npy
+  gemma_centroids: /Users/ehz/tagclean/runs/bn_name_correction/stage2/tag_centroids_gemma.npy
+discover_config:
+  threshold: 0.88
+  pair_threshold: 0.86
+  top_k: 8
+  max_family_size: 4
+  production_tags_count: 1394
+families:
+- family_id: fam_700c8b67
+  status: approved
+  target_tags:
+  - logout_available
+  - logout_steps
+  score:
+    min_edge_sim: 0.9754
+    avg_edge_sim: 0.9754
+  row_counts:
+    logout_available: 98
+    logout_steps: 98
+  excluded_neighbors:
+  - tag: login_safety_precautions
+    min_sim: 0.8177
+    reason: below_threshold
+  - tag: post_login_capabilities
+    min_sim: 0.8159
+    reason: below_threshold
+  - tag: help_contact_location
+    min_sim: 0.8066
+    reason: below_threshold
+  - tag: login_credentials_required
+    min_sim: 0.806
+    reason: below_threshold
+  - tag: post_registration_password_reset
+    min_sim: 0.8023
+    reason: below_threshold
+  notes: ''
+- family_id: fam_42b52936
+  status: approved
+  target_tags:
+  - password_character_requirements
+  - password_requirements
+  score:
+    min_edge_sim: 0.9498
+    avg_edge_sim: 0.9498
+  row_counts:
+    password_character_requirements: 99
+    password_requirements: 96
+  excluded_neighbors:
+  - tag: password_min_length
+    min_sim: 0.9107
+    reason: covered_by_other_family
+  - tag: strong_password_importance
+    min_sim: 0.898
+    reason: covered_by_other_family
+  - tag: password_reset_required_info
+    min_sim: 0.8846
+    reason: covered_by_other_family
+  - tag: password_sharing_warning
+    min_sim: 0.8608
+    reason: below_threshold
+  - tag: show_password
+    min_sim: 0.849
+    reason: below_threshold
+  notes: ''

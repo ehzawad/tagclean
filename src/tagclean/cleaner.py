@@ -163,6 +163,12 @@ class CleanerConfig:
     e5_audit_drop_on_top1_mismatch: bool = True
     stage9_input_csv: str | None = None  # override: external CSV (union of multiple runs)
 
+    # Discover (multi-family scaling): regex pattern of tag names to exclude
+    # from family discovery. Default empty; for the Bengali NID corpus pass
+    # `_followup_[a-d]$` to skip dialog-turn artifacts that shouldn't form
+    # close-tag siblings.
+    discover_exclude_pattern: str = ""
+
     def resolved_run_id(self) -> str:
         return self.run_id or time.strftime("run_%Y%m%d_%H%M%S")
 
@@ -2868,6 +2874,358 @@ STAGES = {
 }
 
 
+def _stable_family_id(target_tags: Iterable[str]) -> str:
+    """Stable 8-char hash family ID from the sorted tag set.
+
+    Same tags -> same ID, regardless of discovery run. Lets us re-run discover
+    deterministically and resume completed family runs by directory name.
+    """
+    payload = "|".join(sorted(target_tags))
+    return "fam_" + hashlib.sha256(payload.encode("utf-8")).hexdigest()[:8]
+
+
+def run_discover(
+    config: CleanerConfig,
+    *,
+    centroids_from: str,
+    threshold: float = 0.88,
+    pair_threshold: float = 0.86,
+    top_k: int = 8,
+    max_family_size: int = 4,
+    out_path: Path,
+    report_path: Path | None = None,
+    production_tags: set[str] | None = None,
+) -> None:
+    """Seed-centric reciprocal-NN family discovery for the close-tag scope.
+
+    Replaces the broken union-find in `find_close_tag_clusters` for the
+    scaling case. Algorithm (Codex-approved):
+      1. Per tag, top-K neighbors by min(cos_e5, cos_gemma).
+      2. Edge kept iff reciprocal AND min(E5,Gemma) >= threshold.
+      3. Per seed, ego-family = seed + reciprocal neighbors, capped at
+         max_family_size, requiring pairwise min_sim >= pair_threshold with
+         every existing member.
+      4. Score each candidate by (min_edge_sim, avg_edge_sim, size).
+      5. Greedy selection by descending score; mark members covered.
+      6. Uncovered tags become singletons.
+    Writes a hand-editable `families.yaml` and an optional human-readable
+    report. No transitive closure -> no mega-components at corpus scale.
+    """
+    centroids_dir = config.artifact_root / centroids_from / "stage2"
+    if not (centroids_dir / "tag_index.json").exists():
+        raise FileNotFoundError(
+            f"discover needs cached stage2 outputs at {centroids_dir}; "
+            f"run a stage2 (or stage8) pass first."
+        )
+    tag_index = read_json(centroids_dir / "tag_index.json")
+    tags: list[str] = list(tag_index.get("tags", []))
+    e5 = np.load(centroids_dir / "tag_centroids_e5.npy")
+    gemma = np.load(centroids_dir / "tag_centroids_gemma.npy")
+
+    # Renormalize defensively — Stage 2 centroids are means, not unit norm.
+    e5 = e5 / np.clip(np.linalg.norm(e5, axis=1, keepdims=True), 1e-12, None)
+    gemma = gemma / np.clip(np.linalg.norm(gemma, axis=1, keepdims=True), 1e-12, None)
+
+    sim_e5 = (e5 @ e5.T).astype(np.float32)
+    sim_gem = (gemma @ gemma.T).astype(np.float32)
+    sim = np.minimum(sim_e5, sim_gem)
+    np.fill_diagonal(sim, -np.inf)
+
+    n = len(tags)
+    allow = np.ones(n, dtype=bool)
+    if production_tags is not None:
+        for i, t in enumerate(tags):
+            if t not in production_tags:
+                allow[i] = False
+    if config.discover_exclude_pattern:
+        rx = re.compile(config.discover_exclude_pattern)
+        for i, t in enumerate(tags):
+            if rx.search(t):
+                allow[i] = False
+    sim[~allow, :] = -np.inf
+    sim[:, ~allow] = -np.inf
+
+    # Top-K neighbors per tag (sorted by similarity desc).
+    eff_k = min(int(top_k), max(1, n - 1))
+    if eff_k <= 0:
+        raise ValueError(f"top_k must be >=1; got {top_k}")
+    nbr_partial = np.argpartition(-sim, eff_k - 1, axis=1)[:, :eff_k]
+    nbr_idx = np.empty_like(nbr_partial)
+    for i in range(n):
+        order = np.argsort(-sim[i, nbr_partial[i]])
+        nbr_idx[i] = nbr_partial[i][order]
+    in_top_k = [set(int(j) for j in nbr_idx[i].tolist()) for i in range(n)]
+
+    # Row counts from stage2/tag_profile.parquet (best-effort; binary may be absent
+    # in a fresh checkout, so silently degrade).
+    profile_path = centroids_dir / "tag_profile.parquet"
+    row_count: dict[str, int] = {}
+    if profile_path.exists():
+        try:
+            prof = pd.read_parquet(profile_path)
+            row_count = dict(zip(prof["tag"], prof["row_count"].astype(int)))
+        except Exception:
+            row_count = {}
+
+    # Build ego-family candidates per allowed seed.
+    candidates: list[dict[str, Any]] = []
+    for i in range(n):
+        if not allow[i]:
+            continue
+        members: list[int] = [i]
+        for j in nbr_idx[i].tolist():
+            if int(j) == i or not allow[int(j)]:
+                continue
+            if sim[i, int(j)] < threshold:
+                continue
+            if i not in in_top_k[int(j)]:  # reciprocity check
+                continue
+            # Pairwise check against existing members.
+            ok = True
+            for m in members:
+                if m == i:
+                    continue
+                if min(float(sim[m, int(j)]), float(sim[int(j), m])) < pair_threshold:
+                    ok = False
+                    break
+            if not ok:
+                continue
+            members.append(int(j))
+            if len(members) >= max_family_size:
+                break
+
+        if len(members) < 2:
+            candidates.append(
+                {"members": members, "is_singleton": True, "min_sim": 1.0, "avg_sim": 1.0}
+            )
+            continue
+        edges = [
+            float(sim[members[a], members[b]])
+            for a in range(len(members))
+            for b in range(a + 1, len(members))
+        ]
+        candidates.append(
+            {
+                "members": members,
+                "is_singleton": False,
+                "min_sim": float(min(edges)),
+                "avg_sim": float(sum(edges) / len(edges)),
+            }
+        )
+
+    # Greedy: take strongest non-singleton candidates first; mark covered.
+    multi = sorted(
+        [c for c in candidates if not c["is_singleton"]],
+        key=lambda c: (-c["min_sim"], -c["avg_sim"], -len(c["members"])),
+    )
+    covered: set[int] = set()
+    selected: list[dict[str, Any]] = []
+    for c in multi:
+        if any(m in covered for m in c["members"]):
+            continue
+        covered.update(c["members"])
+        selected.append(c)
+    # Singletons fill the gaps so coverage is complete. Iterate ALL allowed
+    # tags (not just `candidates`) — a tag whose only candidate was multi-tag
+    # may get rejected by greedy overlap and would otherwise be orphaned.
+    for i in range(n):
+        if not allow[i] or i in covered:
+            continue
+        covered.add(i)
+        selected.append({"members": [i], "is_singleton": True, "min_sim": 1.0, "avg_sim": 1.0})
+
+    # Build manifest records with excluded-neighbor diagnostics.
+    family_records: list[dict[str, Any]] = []
+    for c in selected:
+        member_set = set(c["members"])
+        target_tags = sorted(tags[m] for m in c["members"])
+        family_id = _stable_family_id(target_tags)
+        excluded: dict[str, dict[str, Any]] = {}
+        for m in c["members"]:
+            for j in nbr_idx[m].tolist():
+                jj = int(j)
+                if jj in member_set or jj == m:
+                    continue
+                tag_j = tags[jj]
+                s = float(sim[m, jj])
+                if s < threshold:
+                    reason = "below_threshold"
+                elif jj in covered:
+                    reason = "covered_by_other_family"
+                else:
+                    reason = "non_reciprocal"
+                if tag_j not in excluded or s > excluded[tag_j]["min_sim"]:
+                    excluded[tag_j] = {"tag": tag_j, "min_sim": round(s, 4), "reason": reason}
+        excluded_list = sorted(excluded.values(), key=lambda e: -e["min_sim"])[:5]
+
+        family_records.append(
+            {
+                "family_id": family_id,
+                "status": "singleton" if c["is_singleton"] else "approved",
+                "target_tags": target_tags,
+                "score": {
+                    "min_edge_sim": round(c["min_sim"], 4),
+                    "avg_edge_sim": round(c["avg_sim"], 4),
+                },
+                "row_counts": {t: int(row_count.get(t, 0)) for t in target_tags},
+                "excluded_neighbors": excluded_list,
+                "notes": "",
+            }
+        )
+
+    payload = {
+        "schema_version": 1,
+        "source": {
+            "centroids_run_id": centroids_from,
+            "tag_index": str(centroids_dir / "tag_index.json"),
+            "e5_centroids": str(centroids_dir / "tag_centroids_e5.npy"),
+            "gemma_centroids": str(centroids_dir / "tag_centroids_gemma.npy"),
+        },
+        "discover_config": {
+            "threshold": float(threshold),
+            "pair_threshold": float(pair_threshold),
+            "top_k": int(top_k),
+            "max_family_size": int(max_family_size),
+            "production_tags_count": int(allow.sum()),
+        },
+        "families": family_records,
+    }
+    out_path = Path(out_path).expanduser().resolve()
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with out_path.open("w", encoding="utf-8") as f:
+        yaml.safe_dump(payload, f, sort_keys=False, allow_unicode=True, default_flow_style=False)
+
+    multi_recs = [r for r in family_records if r["status"] == "approved"]
+    singles = [r for r in family_records if r["status"] == "singleton"]
+    size_hist = Counter(len(r["target_tags"]) for r in multi_recs)
+    print(f"[discover] wrote {out_path}")
+    print(
+        f"[discover] {len(multi_recs)} multi-tag families "
+        f"(sizes: {dict(sorted(size_hist.items()))}), {len(singles)} singletons; "
+        f"coverage {len(covered)}/{n} tags."
+    )
+
+    if report_path is not None:
+        report_path = Path(report_path).expanduser().resolve()
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        with report_path.open("w", encoding="utf-8") as f:
+            f.write(f"# tagclean discover report\n\n")
+            f.write(f"- centroids: `{centroids_dir}`\n")
+            f.write(
+                f"- thresholds: edge={threshold}, pair={pair_threshold}, top_k={top_k}, max_family_size={max_family_size}\n"
+            )
+            f.write(f"- multi-tag families: {len(multi_recs)}\n")
+            f.write(f"- singletons: {len(singles)}\n")
+            f.write(f"- coverage: {len(covered)}/{n}\n\n")
+            f.write("## Multi-tag families (sorted by min_edge_sim desc)\n\n")
+            for fam in sorted(multi_recs, key=lambda r: -r["score"]["min_edge_sim"]):
+                f.write(
+                    f"### `{fam['family_id']}`  min={fam['score']['min_edge_sim']:.3f}  avg={fam['score']['avg_edge_sim']:.3f}\n"
+                )
+                f.write(f"- tags: {', '.join(fam['target_tags'])}\n")
+                f.write(f"- row counts: {fam['row_counts']}\n")
+                if fam["excluded_neighbors"]:
+                    nearest = fam["excluded_neighbors"][:3]
+                    f.write(f"- nearest excluded: {nearest}\n")
+                f.write("\n")
+        print(f"[discover] report at {report_path}")
+
+
+def _symlink_shared_stages(
+    artifact_root: Path,
+    family_run_id: str,
+    centroids_run_id: str,
+    stages: Iterable[str] = ("stage0", "stage1", "stage2"),
+) -> None:
+    """Symlink stage0/1/2 from the centroids run into the family run dir.
+
+    Stages 0–2 are corpus-wide and identical across families that share the
+    same input CSV; symlinking saves ~30-60 min Mac MPS embedding per family.
+    Skipped if the destination already exists (so resumes don't clobber).
+    """
+    src_root = (artifact_root / centroids_run_id).resolve()
+    dst_root = artifact_root / family_run_id
+    dst_root.mkdir(parents=True, exist_ok=True)
+    for stage in stages:
+        src = src_root / stage
+        dst = dst_root / stage
+        if not src.exists():
+            continue
+        if dst.exists() or dst.is_symlink():
+            continue
+        # Use a relative symlink so the run dir is portable.
+        rel = os.path.relpath(src, dst_root)
+        dst.symlink_to(rel)
+
+
+def run_families_manifest(
+    config: CleanerConfig,
+    manifest_path: Path,
+    skip_completed: bool = True,
+    include_singletons: bool = False,
+) -> None:
+    """Run stage8 for every approved family in the manifest.
+
+    Each family becomes a `tagclean stage8 --target-tags <tags> --run-id <family_id>`
+    call, executed in-process. Stage 0–2 outputs are symlinked from the
+    manifest's `source.centroids_run_id` so each family skips the redundant
+    full-corpus embedding (huge scaling win at 264+ families).
+    """
+    import copy
+
+    manifest_path = Path(manifest_path).expanduser().resolve()
+    payload = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    families = payload.get("families", [])
+    centroids_run_id = (payload.get("source") or {}).get("centroids_run_id")
+
+    todo: list[dict[str, Any]] = []
+    for fam in families:
+        status = fam.get("status")
+        tags = fam.get("target_tags", [])
+        if status == "approved" and len(tags) >= 2:
+            todo.append(fam)
+        elif include_singletons and status == "singleton" and len(tags) == 1:
+            todo.append(fam)
+    if skip_completed:
+        todo = [
+            fam
+            for fam in todo
+            if not (
+                config.artifact_root / fam["family_id"] / "stage8" / "cleaning_report.json"
+            ).exists()
+        ]
+
+    print(f"[run-families] {len(todo)} families to run")
+    if centroids_run_id and not (config.artifact_root / centroids_run_id / "stage2").exists():
+        print(
+            f"[run-families] WARNING: centroids_run_id={centroids_run_id} stage2 missing; "
+            "each family will redo stage0-2 from scratch (slow)."
+        )
+        centroids_run_id = None
+
+    successes: list[str] = []
+    failures: list[tuple[str, str]] = []
+    for i, fam in enumerate(todo, 1):
+        run_id = fam["family_id"]
+        target_tags = list(fam["target_tags"])
+        print(f"[run-families] {i}/{len(todo)}  {run_id}  tags={target_tags}")
+        if centroids_run_id and run_id != centroids_run_id:
+            _symlink_shared_stages(config.artifact_root, run_id, centroids_run_id)
+        family_config = copy.copy(config)
+        family_config.run_id = run_id
+        family_config.target_tags = target_tags
+        try:
+            run_stage8(family_config, resume=True)
+            successes.append(run_id)
+        except Exception as exc:
+            print(f"[run-families] FAILED {run_id}: {exc}")
+            failures.append((run_id, str(exc)))
+    print(f"[run-families] done: {len(successes)} ok, {len(failures)} failed")
+    if failures:
+        for run_id, msg in failures:
+            print(f"[run-families]   FAILED {run_id}: {msg[:160]}")
+
+
 def run_compose(
     config: CleanerConfig,
     from_runs: list[str],
@@ -2937,7 +3295,9 @@ def run_compose(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="tagclean", description="LLM-assisted FAQ dataset cleaner.")
-    parser.add_argument("stage", choices=[*STAGES.keys(), "all", "compose"])
+    parser.add_argument(
+        "stage", choices=[*STAGES.keys(), "all", "compose", "discover", "run-families"]
+    )
     parser.add_argument("--config", type=Path, default=None)
     parser.add_argument("--input", type=Path, default=None, help="Path to question_tag.csv (overrides config)")
     parser.add_argument("--tag-answer", type=Path, default=None, help="Path to tag_answer.json (overrides config)")
@@ -2994,6 +3354,69 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=None,
         help="compose: output CSV path. Default: <artifact_root>/<run_id>/composed_<source>.csv.",
+    )
+    parser.add_argument(
+        "--manifest",
+        type=Path,
+        default=None,
+        help="compose / run-families: families.yaml manifest path.",
+    )
+    parser.add_argument(
+        "--centroids-from",
+        default=None,
+        help="discover: existing run_id whose stage2 outputs supply the centroids.",
+    )
+    parser.add_argument(
+        "--threshold",
+        type=float,
+        default=0.88,
+        help="discover: min(cos_e5, cos_gemma) edge threshold (default 0.88).",
+    )
+    parser.add_argument(
+        "--pair-threshold",
+        type=float,
+        default=0.86,
+        help="discover: required pairwise similarity between every family member (default 0.86).",
+    )
+    parser.add_argument(
+        "--top-k",
+        type=int,
+        default=8,
+        help="discover: candidate-pool size per tag before reciprocity check (default 8).",
+    )
+    parser.add_argument(
+        "--max-family-size",
+        type=int,
+        default=4,
+        help="discover: cap members per family (default 4; 2-4 recommended).",
+    )
+    parser.add_argument(
+        "--production-tags",
+        type=Path,
+        default=None,
+        help="discover: optional newline-delimited file of tags to restrict discovery to.",
+    )
+    parser.add_argument(
+        "--report",
+        type=Path,
+        default=None,
+        help="discover: optional Markdown report path.",
+    )
+    parser.add_argument(
+        "--no-skip-completed",
+        action="store_true",
+        help="run-families: re-run families that already have a stage8 cleaning_report.json.",
+    )
+    parser.add_argument(
+        "--include-singletons",
+        action="store_true",
+        help="run-families: also clean singleton tags (default: skip; multi-tag only).",
+    )
+    parser.add_argument(
+        "--exclude-tag-pattern",
+        default=None,
+        help="discover: regex of tag names to exclude from family discovery "
+        "(e.g. '_followup_[a-d]$' to skip dialog-turn artifacts).",
     )
     return parser.parse_args()
 
@@ -3150,12 +3573,62 @@ def main() -> None:
     _NORMALIZATION_LANGUAGE = config.language
 
     resume = args.resume or not args.no_resume
+    if args.stage == "discover":
+        if not args.centroids_from:
+            raise SystemExit(
+                "discover requires --centroids-from RUN_ID (a run with cached stage2/ output)."
+            )
+        if not args.out:
+            raise SystemExit("discover requires --out PATH (where to write families.yaml).")
+        production_tags: set[str] | None = None
+        if args.production_tags is not None:
+            production_tags = {
+                line.strip()
+                for line in args.production_tags.read_text(encoding="utf-8").splitlines()
+                if line.strip() and not line.startswith("#")
+            }
+        if args.exclude_tag_pattern is not None:
+            config.discover_exclude_pattern = args.exclude_tag_pattern
+        run_discover(
+            config,
+            centroids_from=args.centroids_from,
+            threshold=args.threshold,
+            pair_threshold=args.pair_threshold,
+            top_k=args.top_k,
+            max_family_size=args.max_family_size,
+            out_path=args.out,
+            report_path=args.report,
+            production_tags=production_tags,
+        )
+        return
+    if args.stage == "run-families":
+        if not args.manifest:
+            raise SystemExit("run-families requires --manifest families.yaml")
+        run_families_manifest(
+            config,
+            manifest_path=args.manifest,
+            skip_completed=not args.no_skip_completed,
+            include_singletons=args.include_singletons,
+        )
+        return
     if args.stage == "compose":
-        if not args.from_runs:
-            raise SystemExit("compose requires --from-runs run1,run2,...")
-        from_runs = [r.strip() for r in args.from_runs.split(",") if r.strip()]
-        if not from_runs:
-            raise SystemExit("--from-runs is empty")
+        if args.manifest:
+            payload = yaml.safe_load(
+                Path(args.manifest).expanduser().read_text(encoding="utf-8")
+            )
+            from_runs = [
+                fam["family_id"]
+                for fam in payload.get("families", [])
+                if fam.get("status") == "approved" and len(fam.get("target_tags", [])) >= 2
+            ]
+            if not from_runs:
+                raise SystemExit("manifest has no approved multi-tag families")
+        elif args.from_runs:
+            from_runs = [r.strip() for r in args.from_runs.split(",") if r.strip()]
+        else:
+            raise SystemExit(
+                "compose requires either --from-runs run1,run2,... or --manifest families.yaml"
+            )
         out_path = (
             args.out
             if args.out

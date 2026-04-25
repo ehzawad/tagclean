@@ -45,24 +45,46 @@ Each stage writes parquet/jsonl artifacts; resume is hash-based. The full pipeli
 - FAISS `IndexFlatIP` written for both — small enough that exact search beats IVF on this corpus size.
 
 ### Stage 2 — Tag profile
-- For each canonical tag T, compute:
-  - Centroid in E5 + Gemma space.
-  - **Medoid** (row closest to centroid) — robust to outliers.
-  - **Top-K central rows** (5 nearest medoid).
-  - **Discriminative phrases** — bigrams/trigrams with high log-odds vs neighbor tags.
-- Trim outliers (top/bottom 5% by within-tag distance) before computing the centroid.
+
+This is the bedrock geometry layer: every tag becomes a point in two embedding spaces (E5 and Gemma). Per-tag points are then used by every downstream stage.
+
+For each canonical tag T:
+
+- **Centroid (E5 and Gemma).** Take all of T's rows, embed each, and average the L2-normalized vectors. The centroid IS the tag's location in embedding space — a single 1024-d (E5) or 768-d (Gemma) point that summarizes "what does this intent look like?". Outlier-trimmed: drop the top/bottom 5% by within-tag distance before averaging, so a few mis-tagged rows can't drag the centroid into a sibling's territory.
+
+- **Medoid.** The actual row whose embedding is closest to the centroid. The centroid is a synthetic average, possibly nowhere near a real question; the medoid is the most "central" *real* row. Robust to outliers and useful as a tag exemplar.
+
+- **Top-K central rows.** The 5 rows nearest the medoid. These are what Stage 3 (boundary policy) and Stage 5 (audit) show GPT as "this is what a clean example of T looks like."
+
+- **Discriminative phrases.** Bigrams/trigrams in T's rows that have high log-odds against neighbor tags. Surfaces the words that *distinguish* T from its closest siblings, e.g. "নিজের নাম" for `name_correction_in_nid_card` vs "পিতার নাম" for `parents_name_correction_new`.
+
+#### Why centroids are the right abstraction
+
+The centroid lets us reduce a tag — typically 100–250 rows of paraphrased questions — to one point. From there, two things become trivial:
+
+1. **Tag-to-tag similarity.** `cos(centroid(A), centroid(B))` answers "how close are these two intents in embedding space?" Used by `find_close_tag_clusters` (Stage 3) and `discover` to find sibling families.
+2. **Row-to-tag fit.** `cos(row_emb, centroid(tag))` answers "how well does this row belong to its assigned tag?" The composite score in Stage 4 is mostly this signal — own-tag cosine + margin against the nearest competing-tag centroid.
+
+The dual-embedding centroid (E5 *and* Gemma agreeing) is the cross-validation that makes cluster discovery robust. E5 alone occasionally hallucinates similarity (e.g., on shared Bengali NID vocabulary that doesn't reflect intent overlap); Gemma's independent geometry catches that. We require `min(cos_e5, cos_gemma) ≥ threshold` for an edge between two tag centroids — both models must agree the tags are siblings.
+
+The centroid is also why outlier trimming matters: if a tag is contaminated past ~50%, the centroid reflects the contamination and Stage 3's policy will codify the wrong intent. The 5%/5% trim is calibrated to be aggressive enough to ignore obvious noise but conservative enough to preserve the real intent shape.
 
 ### Stage 3 — Tag-boundary policy
 The bottleneck where embeddings alone aren't enough.
 
-- `find_close_tag_clusters`: connected components where `cos(centroid_e5) ≥ 0.85 AND cos(centroid_gemma) ≥ 0.85`. Clusters of ≥2 tags become candidates.
-- For each cluster, GPT-5.5 authors a `BoundaryPolicyResult`:
-  - `one_line_intent` per tag.
-  - `must_have_concepts` — 3–7 short cues a clean row should mention.
-  - `must_avoid_concepts` — cues that signal a sibling tag instead.
-- **Single pass, fixed tag order, high reasoning** — multi-pass self-consistency was tried and rejected because GPT phrases concepts differently across passes for close siblings, making the consistency check too strict.
-- Validation: schema must validate AND the returned tag set must cover the input tags. Else fall back to a heuristic stub built from tag-name tokens.
-- The `tag_answer.json`, when provided, gates merging: two tags merge only if questions look equivalent AND their canonical answers do too. Otherwise keep both and tighten the boundary.
+**Cluster discovery (within a single family run):**
+
+- If `--target-tags` (or `--seed-tag` resolving to ≥2 tags) is supplied, **the user-provided tag set IS the cluster** — Stage 3 skips union-find and authors a policy for exactly those tags. This is the recommended path at corpus scale: union-find on 1394 Bengali NID centroids forms a 488-tag mega-component (vocabulary is heavily shared), which `max_cluster_size=6` then truncates by alphabetical tag-index, dropping the user's actual targets.
+- Otherwise the legacy fallback applies: `find_close_tag_clusters` finds connected components where `cos(centroid_e5) ≥ 0.85 AND cos(centroid_gemma) ≥ 0.85`, capped at 6 members.
+
+**Boundary policy authoring:**
+
+For each cluster, GPT-5.5 authors a `BoundaryPolicyResult`:
+- `one_line_intent` per tag.
+- `must_have_concepts` — 3–7 short cues a clean row should mention.
+- `must_avoid_concepts` — cues that signal a sibling tag instead.
+
+Single pass, fixed tag order, high reasoning — multi-pass self-consistency was tried and rejected because GPT phrases concepts differently across passes for close siblings, making the consistency check too strict. Validation: schema must validate AND the returned tag set must cover the input tags. Else fall back to a heuristic stub built from tag-name tokens. The `tag_answer.json`, when provided, gates merging: two tags merge only if questions look equivalent AND their canonical answers do too. Otherwise keep both and tighten the boundary.
 
 ### Stage 4 — Deterministic ranker
 For each row in target scope, compute:
@@ -108,6 +130,41 @@ Was a per-row second-pass review over the bottom quartile of Stage 6 keeps. Supe
 - **Leave-one-out self-retrieval**: for each row, remove from index, query, check top-1 tag matches. Per-tag and global accuracy.
 - Confusion matrix at top-1 and top-5; surface remaining boundary issues.
 - Report low-support tags (<5 surviving rows).
+
+### Stage 9 — E5-only production-risk audit
+
+Stage 4's ranker is dual (E5+Gemma+features). Production inference uses E5 *alone*. So a row that scored well jointly but E5 alone misroutes is a production failure, not a cleaning failure. Stage 9 is the production-truth gate.
+
+- For each row in the input set, run leave-one-out top-K retrieval over E5 (no Gemma, no features). Default `K=10`.
+- Default policy: drop rows whose top-1 non-self neighbor is a different tag.
+- Severity diagnostics: per-row `own_share_top_K` (fraction of K neighbors with the same tag) and `neighbor_tag_dist` (full distribution).
+- Pure-numpy top-K (`vecs @ vecs.T` → `argpartition`). FAISS+sentence-transformers segfault when both load in the same process on Python 3.14/Mac.
+- Single encode (passages = queries with same E5-instruct prefix); skip the redundant second encode.
+- Standalone — never auto-chains stage0–8. Auto-chain silently overwrote `cleaned.csv` when judge_mode differed across invocations.
+
+Stage 9 takes either the run's own `stage6/cleaned.csv` (per-family diagnostics) or an external CSV via `--e5-audit-input` (the cross-family production union). The latter is the production exit shape.
+
+## Scaling: from 3 hand-picked families to all 1394 tags
+
+The original `--seed-tag` does union-find on tag centroids: connected components above threshold. At Bengali NID corpus scale (1394 tags, heavily shared vocabulary), this collapses into a single 488-tag mega-component — `max_cluster_size=6` then truncates the component by alphabetical tag-index order, returning a useless cluster that doesn't even contain the seed.
+
+Replacement: **`tagclean discover`**, seed-centric reciprocal-NN ego-family expansion.
+
+1. Per tag, compute top-K centroid neighbors by `min(cos_e5, cos_gemma)`.
+2. Edge kept iff reciprocal *and* `min(E5, Gemma) ≥ threshold` (default 0.88).
+3. Per seed, ego-family = seed + reciprocal neighbors, capped at `max_family_size` (default 4), requiring pairwise `min_sim ≥ pair_threshold` (default 0.86) with every existing member.
+4. Score each candidate by `(min_edge_sim, avg_edge_sim, size)`.
+5. Greedy descending selection; mark members covered. Uncovered tags become singletons.
+
+No transitive closure → no mega-components. Output is a hand-editable `families.yaml` with deterministic `family_id` (8-char hash of the sorted tag set) so re-running discover produces stable IDs and `run-families --skip-completed` resumes naturally.
+
+Companion commands:
+
+- **`tagclean run-families --manifest families.yaml`** dispatches `stage8` per approved family. Stage 0–2 are symlinked from the manifest's `centroids_run_id`, so the corpus-wide embeddings are computed once and reused — saving ~30–60 min Mac MPS time per family.
+- **`tagclean compose --manifest families.yaml --compose-source cleaned --out PATH`** unions per-family `stage6/cleaned.csv` (or `top40.csv`) into one production candidate set with `(question, tag)` dedup and deterministic ordering.
+- **`tagclean stage9 --e5-audit-input PATH --run-id production`** does the final cross-family E5 audit.
+
+Production end-state: `runs/<production_run>/stage9/production_filtered.csv`.
 
 ## Decisions deliberately rejected
 
