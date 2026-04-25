@@ -1,0 +1,93 @@
+                                  TAGCLEAN — END-TO-END SYSTEM
+                              (Bengali EC/NID FAQ corpus cleaner)
+
+INPUTS
+==============================================================================================
+  question_tag.csv     -- 79k rows × 1395 tags. Columns: question, tag (UTF-8, BOM-tolerant).
+  tag_answer.json      -- { tag: canonical_answer }. Used as merge-safety gate in Stage 3.
+  config.yaml          -- e5_instruction, thresholds, openai_model, judge_mode, ...
+  CLI flags            -- --target-tags | --seed-tag | (omit for corpus-wide).
+
+MODELS  (roles fixed by design)
+==============================================================================================
+  E5-multilingual-large-instruct (1024d) -- primary geometry. ~50% of ranking weight.
+                                            Same model production uses at inference.
+  EmbeddingGemma-300m            (768d)  -- independent second opinion. ~30% of weight.
+                                            Used for cluster-discovery cross-validation.
+  GPT-5.5 (high reasoning)               -- policy author + buffer auditor only.
+                                            NEVER scores rows directly.
+
+PER-FAMILY PIPELINE  (one invocation per close-tag family)
+==============================================================================================
+  Stage 0  intake/normalize/dedup
+           Bengali NFC + ZWJ/ZWNJ strip + য়/য় canonicalize + digit fold
+           Within-tag dedup; cross-tag duplicates LOGGED (not auto-deleted)
+           -> stage0/intake.parquet, cross_tag_duplicates.jsonl
+  Stage 1  dual embeddings (E5 + Gemma + FAISS IndexFlatIP)
+           -> stage1/{emb_e5, emb_e5_query, emb_gemma}.npy + faiss_*.idx
+  Stage 2  tag profile: outlier-trimmed centroid, medoid, central exemplars,
+           log-odds discriminative bigrams/trigrams
+           -> stage2/{tag_profile.parquet, tag_centroids_*.npy, tag_index.json}
+  Stage 3  tag-boundary policy (GPT-5.5)
+           Cluster: IF --target-tags / --seed-tag has >=2 tags -> cluster = user's tags
+                    ELSE: connected components where min(cos_e5, cos_gemma) >= 0.85
+           For each cluster (1 GPT call): one_line_intent, must_have, must_avoid
+           -> stage3/{tag_merge_map.csv, tag_boundary_policy.jsonl}
+  Stage 4  deterministic ranker (NO GPT)
+           composite_score = 0.30*cos_e5 + 0.20*margin_e5 + 0.15*cos_gemma + 0.10*margin_gemma
+                           + 0.10*rank_agreement + 0.10*token_alignment
+                           - 0.05*near_dup - 0.10*xtag_dup - 0.10*artifact
+           Top-80 per tag -> audit_buffer=true
+           -> stage4/row_features.parquet
+  Stage 5  buffer audit (GPT-5.5, async, concurrency=6)
+           Packets of 24 + tag-profile context. keep|flag with reason_code.
+           Missing-row retry per packet. Policy: prefer_flag_when_unsure.
+           -> stage5/audit_results.jsonl
+  Stage 6  selection + MMR (lambda=0.7 in E5 space) -> top-N=40 per tag
+           -> stage6/{question_tag.cleaned.csv, .top40.csv, jettisoned_rows.csv}
+  Stage 7  optional second-pass review (default OFF; Stage 5 supersedes it)
+  Stage 8  leave-one-out validation (E5-only retrieval)
+           -> stage8/cleaning_report.json
+
+CROSS-FAMILY PRODUCTION COMPOSITION  (production exit shape)
+==============================================================================================
+  family_A/stage6/top40.csv ---+
+  family_B/stage6/top40.csv ---+--> tagclean compose -> composed.csv
+  family_C/stage6/top40.csv ---+    (concat + dedup + deterministic sort)
+                                    |
+                                    v
+                                    tagclean stage9 --e5-audit-input
+                                    (E5 LOO top-K audit; drops top-1 misses)
+                                    |
+                                    v
+                                    PRODUCTION CSV
+                                    stage9/production_filtered.csv
+
+  WHY compose from top40 (not from per-family stage9 production_filtered):
+    A row that fails LOO inside a 3-tag family can be safely separable in
+    the 9+-tag production union -- its in-family rival is no longer a peer.
+    Filter once globally, after composition.
+
+STAGE 9 INTERNALS  (E5-only production-risk audit)
+==============================================================================================
+  Input CSV -> Bengali normalize -> E5 prefix -> encode (passages = queries)
+            -> vecs @ vecs.T (numpy, no FAISS to avoid Py3.14/Mac segfault)
+            -> diag = -inf -> argpartition top-K + sort
+            -> per row: top1_neighbor_tag, top1_correct, own_share_top_K, neighbor_dist
+            -> e5_neighbor_audit.csv, production_filtered.csv,
+               e5_dropped.csv, audit_report.json
+
+  Default: drop rows with top-1 LOO mismatch.  --no-e5-drop = report-only.
+  Stage 9 NEVER chains stage0-8 (auto-chaining clobbered cleaned.csv when
+  judge_mode differed).
+
+VALIDATION RESULTS  (Bengali EC/NID, 3 close-tag families)
+==============================================================================================
+  family             cleaned  top-40  stage8 LOO  stage9 dropped  fragile tag
+  -----------------  -------  ------  ----------  --------------  ---------------------
+  account_locked     194      120     0.974       6  (3.1%)        unlock_request (top1=0.91)
+  name_correction    165      117     0.958       8  (4.8%)        parents (top1=0.86)
+  otp                212      120     0.986       3  (1.4%)        otp_not_received (top1=0.97)
+
+  PRODUCTION (composed top40 -> cross-family stage9):
+    357 rows -> 343 kept -> top1 LOO 0.961  --  0/14 cross-family drops
