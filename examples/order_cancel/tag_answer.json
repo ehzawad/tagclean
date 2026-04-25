@@ -1,5 +1,0 @@
-{
-  "order_cancel_self": "Self-service cancellation: open My Orders, tap the order, then tap Cancel. You can cancel any time before the order is dispatched. After dispatch, use the return flow instead.",
-  "order_cancel_failed": "If your cancellation isn't going through: confirm the order hasn't already shipped (check status), refresh the page, and try a different browser. If you got a confirmation but the package still arrived, refuse delivery or initiate a return — and contact support with your order ID.",
-  "order_cancel_help_request": "We can cancel an order from our side as long as it hasn't shipped. Reply with your order ID and the email on the account; an agent will process the cancellation within one business hour and refund the original payment method."
-}

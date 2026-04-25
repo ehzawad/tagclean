@@ -7,6 +7,18 @@ venv/
 build/
 dist/
 .DS_Store
+# Output roots
 artifacts/
 **/artifacts/
+runs/
+**/runs/
+.tagclean/
+
+# Heavy binary outputs anywhere — ban globally so a stray --artifact-root
+# under the repo can't smuggle them into a commit.
+*.parquet
+*.npy
+*.faiss
+*.idx
+
 *.checksum

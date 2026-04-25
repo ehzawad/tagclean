@@ -10,8 +10,13 @@ e5_model: intfloat/multilingual-e5-large-instruct
 gemma_model: google/embeddinggemma-300m
 gemma_dim: 768
 
-# Optionally override the E5-instruct prompt for your domain.
-# e5_instruction: "You are an expert at matching banking-FAQ questions ..."
+# Override the E5-instruct prompt for your domain. The default is generic; the
+# Bengali NID/voter domain benefits from something like the example below.
+# e5_instruction: |
+#   You are an expert at matching Bangladeshi National Identity Card (NID) and
+#   voter registration queries. Identify the most semantically relevant question
+#   from the document, prioritizing exact phrase matches and context-aware
+#   matching of intent (self-service vs. failed attempt vs. agent request).
 
 # Text normalization. "bn" runs Bengali Unicode normalization;
 # "none" disables language-specific steps.
