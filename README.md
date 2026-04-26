@@ -1,14 +1,19 @@
 # tagclean
 
-LLM-assisted dataset cleaner for tagged FAQ corpora. Built specifically for the
-Bangladesh Election Commission Bengali NID/voter FAQ domain (1395 tags, 79k
-GPT-generated rows), but the harness is language-neutral when you set
-`language: none`.
+LLM-assisted dataset cleaner for tagged FAQ corpora. Built for the Bangladesh
+Election Commission Bengali NID/voter FAQ domain (1395 tags, 79k GPT-generated
+rows), but the harness is language-neutral when you set `language: none`.
 
 You give it `question_tag.csv` (and optionally `tag_answer.json`); it gives back
 a cleaned production subset where ambiguous, duplicated, and synthetic-looking
 rows are jettisoned and the survivors are filtered against the model
 production actually uses at inference (E5).
+
+**This branch (`claude-cli-harness`):** the cleaner shells out to the `claude`
+CLI binary instead of calling the OpenAI Responses API. No API key, no per-call
+billing — calls route through your Claude Code subscription. The second
+embedding model (EmbeddingGemma) was also dropped; cluster discovery now uses
+E5 cosine + row-level kNN-overlap as multi-criteria gates.
 
 ## The problem
 
@@ -28,8 +33,8 @@ other:
 The earlier "ask GPT for each row whether it fits its tag" attempt was
 expensive (one call × 60k rows), unreliable (~50% of packets had missing
 decisions), and made the embedding ranker cosmetic. So the design constraint:
-**GPT is never the per-row scorer.** Embeddings rank, GPT writes policy and
-audits the top-N buffer.
+**the LLM is never the per-row scorer.** Embeddings rank, the LLM writes
+policy and audits the top-N buffer.
 
 A second realization came late: production inference uses E5 alone. Anything
 the dual-embedding ranker scored well but E5 alone misroutes is a *production*
@@ -40,13 +45,12 @@ final filter (Stage 9).
 
 ```
 question_tag.csv  →  Stage 0  intake / Bengali normalize / dedup
-                  →  Stage 1  E5 + Gemma embeddings + FAISS
+                  →  Stage 1  E5 embeddings + FAISS
                   →  Stage 2  per-tag medoid + central rows + discriminative phrases
-                  →  Stage 3  GPT writes per-tag boundary rules for close-tag clusters
+                  →  Stage 3  Claude writes per-tag boundary rules for close-tag clusters
                   →  Stage 4  deterministic ranker → top-N audit buffer per tag
-                  →  Stage 5  GPT audits the buffer (keep / flag with reasons)
+                  →  Stage 5  Claude audits the buffer (keep / flag with reasons)
                   →  Stage 6  walk audited-pass rows, MMR-diversify, take top K
-                  →  Stage 7  optional second-pass review (default OFF)
                   →  Stage 8  leave-one-out validation
                   →  Stage 9  E5-only production-risk audit + filter
 
@@ -57,18 +61,27 @@ For multi-family production composition:
   family_C/stage6/top40.csv ┘
 ```
 
-GPT cost for a 3-tag cluster: ~12 calls (~1 boundary policy + ~10–12 audit
-packets). Embedding cost is GPU/CPU time, not API.
+(Stage 7 was a per-row second-pass review; deleted in this branch — Stage 5's
+buffer audit subsumes it.)
+
+Claude cost for a 3-tag cluster: ~12 calls (~1 boundary policy + ~10–12 audit
+packets) against the user's Claude Code subscription. Embedding cost is GPU/CPU
+time, not API.
 
 ## Roles
 
 | Component | Role | Weight in ranking |
 |---|---|---|
-| **E5-multilingual-large-instruct** (1024d) | Primary geometry. Same model production uses at inference. | 0.30 (cos) + 0.20 (margin) = 0.50 |
-| **EmbeddingGemma-300m** (768d) | Independent second opinion. Catches E5 idiosyncrasies via rank disagreement. | 0.15 (cos) + 0.10 (margin) = 0.25 |
-| Cross-validation features | rank_agreement (E5↔Gemma), token_alignment (must_have/avoid from policy) | 0.10 + 0.10 = 0.20 |
+| **E5-multilingual-large-instruct** (1024d) | The single source of geometry. Same model production uses at inference. | 0.45 (cos) + 0.30 (margin) = 0.75 |
+| Token alignment (must_have/avoid from policy) | Cross-validates LLM-authored boundary rules against row text | 0.15 |
 | Penalties | near_duplicate, cross_tag_duplicate, artifact_score | -0.05, -0.10, -0.10 |
-| **GPT-5.5** (high reasoning) | Boundary-rule author (Stage 3) + buffer auditor (Stage 5). Never scores rows. | 0% direct |
+| **Claude (Opus)** for Stage 3 | Boundary-rule author, 1 call per close-tag cluster, `--effort high` | 0% direct |
+| **Claude (Sonnet)** for Stage 5 | Buffer auditor, ~10 calls per family, `--effort medium` | 0% direct |
+
+The dual-embedding (E5+Gemma) cross-validation that earlier validations
+relied on has been replaced by E5-only multi-criteria gates: cosine threshold
++ row-level kNN-overlap inside Stage 3 (`find_close_tag_clusters`), and
+reciprocal top-K + pair-threshold inside `discover`.
 
 ## Quickstart
 
@@ -77,51 +90,52 @@ git clone <this repo> tagclean
 cd tagclean
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[all]"
-pytest -q                              # 17 unit tests, all offline (no API)
+pytest -q                              # offline tests, no API/CLI
 ```
 
-Real run with GPT-authored boundary policy + audit:
+You also need the Claude Code CLI installed and logged in:
 
 ```bash
-export OPENAI_API_KEY=sk-...
+# Install Claude Code (see https://claude.com/claude-code).
+claude /login                          # one-time browser-flow login
+```
+
+`tagclean` runs a cheap `claude -p` probe at startup to confirm the
+subscription session is healthy before launching a multi-hour pipeline.
+
+Real run with Claude-authored boundary policy + audit:
+
+```bash
 cp configs/example.yaml my-config.yaml
 # edit my-config.yaml: input_csv, tag_answer_json, run_id, e5_instruction
-tagclean stage8 --config my-config.yaml --judge-mode sync --openai-model gpt-5.5
+tagclean stage8 --config my-config.yaml --target-tags T1,T2,T3
 ```
 
 ## End-to-end production recipe
 
 This is the full path from raw `question_tag.csv` to the final production CSV
-that gets indexed by E5 at inference time. We validated this on three
-3-tag close-cluster families on the Bengali EC/NID corpus.
+that gets indexed by E5 at inference time.
 
 ```bash
-export OPENAI_API_KEY=sk-...
 export TOKENIZERS_PARALLELISM=false
 export PYTHONUNBUFFERED=1
 
 # 1. Clean each close-tag family separately. One stage8 invocation per family.
-#    Use --target-tags to specify the cluster explicitly (recommended at corpus
-#    scale — see "known limitations" for why --seed-tag falls short on big
-#    corpora). --judge-mode sync is more reliable than agents for the Stage 3
-#    boundary policy GPT call.
+#    --target-tags is the recommended scoping at corpus scale.
 tagclean stage8 \
     --config configs/bn_full.yaml \
     --target-tags account_locked,account_locked_retrials,account_locked_unlock_request \
-    --run-id bn_account_locked \
-    --judge-mode sync --openai-model gpt-5.5
+    --run-id bn_account_locked
 
 tagclean stage8 \
     --config configs/bn_full.yaml \
     --target-tags name_correction_in_nid_card,parents_name_correction_new,spouse_name_correction_new \
-    --run-id bn_name_correction \
-    --judge-mode sync --openai-model gpt-5.5
+    --run-id bn_name_correction
 
 tagclean stage8 \
     --config configs/bn_full.yaml \
     --target-tags otp_not_received,otp_delivery_time,otp_send_button \
-    --run-id bn_otp \
-    --judge-mode sync --openai-model gpt-5.5
+    --run-id bn_otp
 
 # 2. Compose all family top-40s into a single production candidate CSV.
 #    Compose from top40 (NOT from per-family stage9/production_filtered.csv) —
@@ -163,17 +177,19 @@ For a run with `run_id=foo` under `<artifact_root>/foo/`:
 |---|---|
 | `run_manifest.json` | Top-level run identity (version, file hashes, model names, config) |
 | `stage0/intake.parquet` | Normalized rows + dedup status (binary; not in git) |
-| `stage1/emb_*.npy` + `faiss_*.idx` | E5 + Gemma embeddings + FAISS indices (binary; not in git) |
-| `stage2/tag_profile.parquet`, `tag_centroids_*.npy`, `tag_index.json` | Per-tag profile + centroids |
+| `stage1/emb_e5.npy` + `faiss_e5.idx` | E5 embeddings + FAISS index (binary; not in git) |
+| `stage2/tag_profile.parquet`, `tag_centroids_e5.npy`, `tag_index.json` | Per-tag profile + centroids |
 | `stage3/tag_merge_map.csv` | `old_tag → canonical_tag` if any tags were merged |
-| `stage3/tag_boundary_policy.jsonl` | GPT-authored discriminative rules per close-tag cluster |
+| `stage3/tag_boundary_policy.jsonl` | Claude-authored discriminative rules per close-tag cluster |
 | `stage3/merge_candidates.jsonl` | Pairs that almost merged but didn't |
+| `stage3/llm_calls.jsonl` | Per-call telemetry: subtype, cost, cache tokens, num_turns |
 | `stage4/row_features.parquet` | Per-row composite scores + audit_buffer flag (binary; not in git) |
 | `stage5/audit_results.jsonl` | Per-row keep/flag with reason_code + rationale |
-| `stage5/audit_packets/*.json` | Raw GPT audit packet inputs/outputs |
+| `stage5/audit_packets/*.json` | Raw Claude audit packet inputs/outputs |
+| `stage5/llm_calls.jsonl` | Per-packet telemetry (same fields as Stage 3) |
 | `stage6/question_tag.cleaned.csv` | All audit-pass rows, ranked, with composite score + rationale |
 | `stage6/question_tag.top40.csv` | Top-N per tag (`production_recommended` subset), 2-col `question,tag` |
-| `stage6/jettisoned_rows.csv` | Dropped rows with `status_reason` and GPT rationale |
+| `stage6/jettisoned_rows.csv` | Dropped rows with `status_reason` and Claude rationale |
 | `stage8/cleaning_report.json` | Leave-one-out retrieval accuracy + confusion matrix |
 | `stage9/e5_neighbor_audit.csv` | Per-row E5 top-K neighborhood (top-1 tag, own-share, neighbor distribution) |
 | `stage9/production_filtered.csv` | **The final E5-ready production set.** |
@@ -189,17 +205,24 @@ verbs:
   stage0..stage9    run a specific stage (chains predecessors via cache)
   all               alias for stage8 (full per-family pipeline)
   compose           concatenate per-run top40/cleaned CSVs into one production CSV
-                    (requires --from-runs r1,r2,...)
+                    (requires --from-runs r1,r2,... or --manifest families.yaml)
+  discover          auto-discover close-tag families from cached centroids
+  run-families      run stage8 per approved family from a manifest
 
 selection (per-family stages):
   --target-tags T1,T2,T3        explicit cluster
   --seed-tag X                  resolve X's close-tag cluster (see limitations)
   (omit both = corpus-wide; expensive, see costs)
 
-audit:
-  --judge-mode {sync,agents,heuristic,batch_prepare,batch_submit,batch_collect}
-  --openai-model NAME           default from config
-  --concurrency N               Stage 5 audit parallelism (default 6)
+claude:
+  --judge-mode {claude,heuristic}    default: claude
+  --stage3-model NAME                default: opus     (1 call per cluster)
+  --stage3-effort {low,medium,high,max}  default: high
+  --stage5-model NAME                default: sonnet   (~10 calls per family)
+  --stage5-effort {low,medium,high,max}  default: medium
+  --claude-fallback-model NAME       default: sonnet
+  --claude-call-timeout S            default: 300
+  --concurrency N                    Stage 5 audit parallelism (default 6)
 
 stage 9 (E5-only audit):
   --e5-audit-input PATH         external CSV (question,tag); default = stage6/cleaned.csv
@@ -208,8 +231,10 @@ stage 9 (E5-only audit):
 
 compose:
   --from-runs r1,r2,r3          run_ids to combine
+  --manifest PATH               or pull all approved families from a manifest
   --compose-source top40|cleaned (default: top40)
   --out PATH                    output CSV path
+  --require-complete            hard-fail if any approved manifest family is missing stage6
 
 other:
   --config FILE                 YAML config
@@ -240,13 +265,17 @@ e5_instruction: |
 
 embedding_backend: sentence-transformers
 e5_model: intfloat/multilingual-e5-large-instruct
-gemma_model: google/embeddinggemma-300m
 
-openai_model: gpt-5.5
-openai_reasoning_effort: high
-judge_mode: sync                       # sync more reliable than agents at scale
-concurrency: 6                          # bounded; gpt-5.5 high-reasoning saturates well below 32
+judge_mode: claude
+stage3_model: opus              # 1 call/cluster, careful reasoning
+stage3_effort: high
+stage5_model: sonnet            # ~10 calls/family, simpler keep/flag
+stage5_effort: medium
+claude_fallback_model: sonnet
+claude_call_timeout_s: 300
+audit_circuit_breaker_window: 10
 
+concurrency: 6
 audit_buffer_size: 80
 audit_rows_per_packet: 24
 boundary_policy_threshold: 0.85
@@ -256,41 +285,90 @@ e5_audit_top_k: 10
 e5_audit_drop_on_top1_mismatch: true
 ```
 
-## Validation results (Bengali EC/NID, 3 close-tag families)
+## How the LLM calls work
 
-| family | input rows | cleaned | top-40 | Stage 8 LOO | Stage 9 dropped | weakest tag |
-|---|---|---|---|---|---|---|
-| account_locked × 3 | 539 | 194 | 120 | **0.974** | 6 (3.1%) | unlock_request (top-1=0.91) |
-| name_correction × 3 | 717 | 165 | 117 | **0.958** | 8 (4.8%) | parents (top-1=0.86) |
-| otp × 3 | 301 | 212 | 120 | **0.986** | 3 (1.4%) | otp_not_received (top-1=0.97) |
+Every Stage 3 / Stage 5 call invokes:
 
-**Cross-family production:** 357 composed → **343 kept**, top-1 LOO **0.961**, **0/14 cross-family drops**. The three families are semantically separated in E5 space (no inter-family interference); all 14 drops are within-family boundary paraphrases.
+```
+claude -p \
+    --model <opus|sonnet> --fallback-model sonnet --effort <effort> \
+    --output-format json --no-session-persistence \
+    --json-schema '<pydantic-derived schema>'
+# prompt streamed via stdin
+```
 
-Per-tag retention in the final production CSV (`runs/bn_production/stage9/production_filtered.csv`):
+The subprocess env strips `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, and
+`ANTHROPIC_BASE_URL` so the call always routes through your Claude Code
+subscription (no API key needed; no per-call billing). Output is parsed from
+the envelope's `structured_output` field and validated against the same
+pydantic schema.
 
-| tag | rows | gap to 40 | top-1 acc |
-|---|---|---|---|
-| account_locked | 40 | ✓ | 1.000 |
-| account_locked_retrials | 39 | -1 | 0.975 |
-| account_locked_unlock_request | 37 | -3 | 0.925 |
-| name_correction_in_nid_card | 37 | -3 | 0.925 |
-| otp_delivery_time | 39 | -1 | 0.975 |
-| otp_not_received | 38 | -2 | 0.950 |
-| otp_send_button | 40 | ✓ | 1.000 |
-| parents_name_correction_new | 33 | -7 | 0.892 |
-| spouse_name_correction_new | 40 | ✓ | 1.000 |
+Failures are classified into three buckets:
 
-We chose to ship 343 rows as-is rather than backfill to 40-per-tag with rank-41+ rows. The Stage 9 gate is the production-aligned guarantee — backfilling re-introduces rows production E5 itself routes to the wrong tag, weakening that guarantee. If a tag has 33 clean rows, ship 33.
+- **INFRA** (missing binary, auth failure, perm denied) — don't burn retries.
+- **TRANSIENT** (timeout, claude `subtype != success`) — count against retries.
+- **PARSE** (envelope JSON unreadable) — count against retries.
+
+Per-call telemetry is persisted to `stageN/llm_calls.jsonl` so cost / cache-hit
+drift across runs is visible without grepping logs:
+
+```json
+{"packet_id": "audit_packet:000003", "stage": "stage5",
+ "model": "sonnet", "effort": "medium", "subtype": "success", "ok": true,
+ "total_cost_usd": 0.0042, "cache_creation_input_tokens": 18200,
+ "cache_read_input_tokens": 17900, "num_turns": 1, "duration_ms": 6800}
+```
+
+## Correctness behaviors worth knowing
+
+These are deliberate choices flagged by review:
+
+- **Resume hashes include LLM identity.** Stage 3 and Stage 5 input hashes
+  bake in `judge_mode`, model, effort, prompt-version constant, and schema
+  fingerprint. A model/effort/prompt change forces a re-run rather than
+  silently reusing stale boundary policies or audits.
+- **Stage 5 fails closed.** A buffer row whose audit packet returned no
+  decision is flagged with `reason_code=audit_missing` (not silently kept).
+  At corpus scale silent fail-keeps would otherwise pile up to thousands.
+- **Stage 5 has a circuit breaker.** If the most recent N audit packets all
+  errored (default N=10, configurable via `audit_circuit_breaker_window`), the
+  stage halts with a diagnostic and refuses to write `audit_results.jsonl`.
+  Inspect `llm_calls.jsonl`, fix root cause, then rerun.
+- **Stage 9 is the production-truth gate.** Stage 4 ranking is E5+token-alignment;
+  production inference is E5 alone. Anything that scored well jointly but E5
+  alone misroutes is a production failure, caught here.
+
+## Validation status
+
+The 9-tag, 3-family validation in the prior README (top-1 LOO 0.961 across
+account_locked / name_correction / otp families, 0/14 cross-family drops) was
+done with the **earlier OpenAI gpt-5.5 + Gemma** combination. Those numbers
+do not transfer mechanically to this branch:
+
+- **What still holds:** the deterministic stages (0, 1, 2, 4, 6, 8, 9) are
+  shape-equivalent; the Stage 4 weight rebalancing only redistributed Gemma's
+  ~35% across E5 own/margin and token_alignment.
+- **What needs re-validation:** Stage 3 boundary policies and Stage 5 audit
+  decisions are now Claude-authored, not GPT-authored. Expect different
+  rationales and possibly different keep/flag decisions on borderline rows.
+- **What replaced what:** Gemma cluster discovery was replaced by E5 cosine +
+  row-level kNN-overlap multi-gates. `discover`'s reciprocal-NN ego-family
+  expansion already had multi-criteria robustness (reciprocal top-K +
+  pair-threshold) so the loss is most felt in `find_close_tag_clusters`.
+
+To re-validate end-to-end, run the production recipe above against a 3-family
+test set, compare `stage8/cleaning_report.json` and `stage9/audit_report.json`
+against the OpenAI-era artifacts in `runs/bn_*` directories.
 
 ## Scaling commands (for cleaning all 1394 tags)
 
 ```bash
-# 1. Bootstrap stage0/1/2 once on the full corpus (any small family run does it).
+# 1. Bootstrap stage0/1/2 once on the full corpus.
 tagclean stage8 --config configs/bn_full.yaml \
     --target-tags account_locked,account_locked_retrials,account_locked_unlock_request \
-    --run-id corpus_bootstrap --judge-mode sync --openai-model gpt-5.5
+    --run-id corpus_bootstrap
 
-# 2. Auto-discover close-tag families. No GPT, no spend.
+# 2. Auto-discover close-tag families. No claude calls, no spend.
 tagclean discover --config configs/bn_full.yaml \
     --centroids-from corpus_bootstrap \
     --threshold 0.88 --pair-threshold 0.86 --top-k 8 --max-family-size 4 \
@@ -301,8 +379,7 @@ tagclean discover --config configs/bn_full.yaml \
 
 # 4. Run all approved families. stage0/1/2 are symlinked from corpus_bootstrap.
 tagclean run-families --config configs/bn_full.yaml \
-    --manifest runs/families.yaml \
-    --judge-mode sync --openai-model gpt-5.5
+    --manifest runs/families.yaml
 # add --include-singletons to also clean lone tags
 
 # 5. Compose all family outputs into one production candidate CSV.
@@ -311,7 +388,7 @@ tagclean compose --config configs/bn_full.yaml \
     --compose-source cleaned \
     --out runs/production/composed.csv
 
-# 6. Cross-family Stage 9 audit (E5-only, no GPT).
+# 6. Cross-family Stage 9 audit (E5-only, no claude).
 tagclean stage9 --config configs/bn_full.yaml \
     --e5-audit-input runs/production/composed.csv \
     --run-id production --judge-mode heuristic --device cpu
@@ -321,111 +398,43 @@ Final clean data: `runs/production/stage9/production_filtered.csv`.
 
 ## Adjusting which tags to clean
 
-Three places, depending on whether you've discovered families yet or are running a single family by hand.
+See `docs/run_instructions.md` for the full breakdown. Quick pointer:
 
-**1. Per-family in `families.yaml`** (the manifest produced by `tagclean discover`).
+- **`families.yaml`** is the canonical place once you've run `tagclean discover`. Flip `status: approved` ↔ `rejected`, or edit `target_tags` per family. `run-families --skip-completed` (default) won't re-clean families whose stage8 outputs already exist.
+- **One-off `--target-tags T1,T2,T3`** when you don't want a manifest.
+- **`--production-tags FILE`** to restrict `discover` to a curated subset of the corpus. Unknown tags hard-fail.
 
-Open `runs/families.yaml`. Each family is one block:
+## Known limitations
 
-```yaml
-- family_id: fam_feb20f8e            # stable hash of sorted tag set
-  status: approved                    # approved | singleton | rejected
-  target_tags:
-    - account_locked
-    - account_locked_retrials
-    - account_locked_unlock_request
-  score: { min_edge_sim: 0.906, avg_edge_sim: 0.914 }
-  row_counts: { account_locked: 169, ... }
-  excluded_neighbors: [...]           # diagnostics only
-  notes: ""
-```
-
-To customize:
-
-- **Skip a family** entirely → flip `status: approved` to `status: rejected`. `run-families` ignores it; `compose --manifest` excludes it from the production union.
-- **Add a tag** to a family → append to `target_tags` and change `status` if needed. Note: the `family_id` is no longer the canonical hash of the new tag set, so add a comment in `notes` if you care; `run-families` keys runs by `family_id` regardless.
-- **Remove a tag** from a family → drop it from `target_tags`. Same caveat about the now-stale `family_id`.
-- **Make a singleton clean as part of a multi-tag family** → find the singleton's record, change `status: singleton` to `approved`, and add the sibling tag(s) to `target_tags`. `run-families` will then run it as a multi-tag family.
-- **Re-discover with different thresholds** → `tagclean discover ... --threshold 0.86 --pair-threshold 0.84` (looser, more families) or `0.92` (tighter, fewer / cleaner). Re-runs are deterministic; same tag sets produce the same `family_id` so completed runs survive.
-
-After editing, just rerun:
-
-```bash
-tagclean run-families --config configs/bn_full.yaml --manifest runs/families.yaml --judge-mode sync --openai-model gpt-5.5
-```
-
-`--skip-completed` (default) means previously-clean families are not re-cleaned.
-
-**2. One-off via `--target-tags`** when you know exactly which tags to clean and don't want a manifest:
-
-```bash
-tagclean stage8 --config configs/bn_full.yaml \
-    --target-tags tag1,tag2,tag3 \
-    --run-id my_run \
-    --judge-mode sync --openai-model gpt-5.5
-```
-
-This runs the full per-family pipeline (Stage 0–8) for that exact target set. Stage 3 treats `--target-tags` (≥2 tags) as the cluster directly — no `find_close_tag_clusters` mega-component issue.
-
-**3. Pre-discover allowlist** if you want `discover` to only consider a subset of the corpus:
-
-```bash
-echo "tag1
-tag2
-tag3" > production_tags.txt
-
-tagclean discover --config configs/bn_full.yaml \
-    --centroids-from corpus_bootstrap \
-    --production-tags production_tags.txt \
-    --out runs/families.yaml
-```
-
-Unknown tags in the allowlist hard-fail (no silent typos). Use this when you have a curated production-tag list and want discovery confined to it.
-
-## Validation status
-
-The 9-tag, 3-family validation reported above (account_locked / name_correction / otp) was run end-to-end against gpt-5.5 high-reasoning. Final clean sets in `runs/bn_production/stage9/production_filtered.csv` (343 rows, top-40 path) and `runs/bn_production_max/stage9/production_filtered.csv` (554 rows, max-clean path).
-
-The new scaling commands (`discover`, `run-families`, `compose --manifest`) are unit-tested (19 tests pass: stable-family-id order invariance, symlink geometry-mismatch refusal, compose dedup + schema, Stage 9 audit/drop semantics, etc.). End-to-end validation in `--judge-mode heuristic` confirmed the dispatcher iterates families correctly, stage0/1/2 symlinks resolve and SKIP cache, and Stage 3's singleton path emits an empty boundary policy as designed.
-
-End-to-end validation against real GPT (gpt-5.5 sync) for the discover→run-families pipeline at corpus scale was NOT run — the OpenAI quota was exhausted partway through. To resume:
-
-```bash
-# (assumes API credit is available again)
-tagclean run-families --config configs/bn_full.yaml \
-    --manifest runs/families.yaml \
-    --judge-mode sync --openai-model gpt-5.5
-# --skip-completed (default) means a partial run can resume safely.
-```
-
-The 6 issues codex flagged on the first pass of the scaling commands are fixed in commit `ba4f8d7` (compose-includes-singletons, force-rerun semantics, singleton Stage 3 no-op policy, --production-tags allowlist hard-fail on unknown entries, excluded_neighbors reason classification, symlink geometry-mismatch refusal).
-
-## Known limitations (read before scaling)
-
-1. **Stage 4 ranker scales linearly with full-corpus rows × target families.** It loops every row in target scope but uses the full corpus as KNN-overlap evidence, so each per-family `stage8` invocation walks all 79k rows. We saw a ~20-min Stage 4 in a 2-tag heuristic run. At 264 family runs, this is the new wall-clock bottleneck (the dominant scaling cost was previously Stage 1 embedding, which `run-families` already eliminates via stage0/1/2 symlinks). Future fix: compute the expensive row features only for target-scope rows while still using global centroids/neighbors as evidence — should drop per-family Stage 4 from minutes to seconds.
-
-2. **Stage 9 is chunked but still has a ceiling.** The dense `vecs @ vecs.T` is replaced with row-chunked top-K (default chunk = 4096 rows; peak memory ≈ chunk × N × 4 bytes). At N=40k that's ~640 MB per chunk — fine for 16+ GB machines, tight on smaller. If you hit OOM, drop the `CHUNK` constant in `run_stage9` (currently a magic number; could be made configurable later).
-
-3. **`compose --manifest` skips families whose stage6 output is missing.** Convenient for partial runs but dangerous for the production handoff if a family failed silently. Pass `--require-complete` to compose to make it hard-fail when any approved/singleton family lacks stage6 outputs.
-
-## Other limitations
-
-1. **`--seed-tag` cluster expansion is broken at corpus scale.** With 1395 tags, `find_close_tag_clusters` at the default 0.85 threshold forms a 488-tag mega-component (Bengali NID vocabulary is heavily shared). `max_cluster_size=6` then truncates by alphabetical tag-index order, dropping the seed entirely. Workaround: use `--target-tags` with the explicit list. Stage 3 honors the user's choice directly when `--target-tags` has ≥2 tags (skips union-find). A proper seed-centric expansion (seed + N nearest direct neighbors, no transitive closure) is a planned follow-up.
-
-2. **`--judge-mode agents` can hang indefinitely on Stage 3.** Observed once on a corpus-wide Stage 3 boundary policy call — the openai-agents SDK got stuck in an SSL select for 1+ hour with no timeout. `--judge-mode sync` uses the responses API directly with explicit SDK timeouts and is currently more reliable.
-
-3. **FAISS + sentence-transformers SIGSEGV on Python 3.14 / Mac.** When both libraries are loaded in the same process and the model encode runs first, a subsequent `import faiss` segfaults. Stage 9 uses pure-numpy top-K instead. Affects Stage 1+ if you re-encode in the same process.
-
-4. **OMP duplicate library warning.** Running two `tagclean` processes simultaneously on Mac can trip an OpenMP duplicate-library check. Set `KMP_DUPLICATE_LIB_OK=TRUE` if you need concurrent runs.
+1. **Subscription-auth tension.** The chronicle-style env-stripping forces
+   subscription routing, but if you're not logged in via `claude /login` the
+   first call fails INFRA. The startup `probe_auth()` catches this before
+   launching a long pipeline.
+2. **Subscription rate limits are real.** The Claude Code subscription has
+   per-minute quotas. The Stage 5 circuit breaker halts the run when bursts
+   trip them rather than silently spinning retries; lower `concurrency` (default
+   6) if you see sustained transients in `llm_calls.jsonl`.
+3. **`--seed-tag` cluster expansion is broken at corpus scale** (1394-tag
+   mega-component issue inherited from the prior design). Use `--target-tags`
+   with the explicit list, or use `discover` + `families.yaml`.
+4. **Stage 4 ranker scales linearly with full-corpus rows × target families.**
+   Each per-family `stage8` walks all corpus rows for kNN evidence; at 264
+   family runs this is the wall-clock bottleneck after stage0/1/2 caching.
+5. **Stage 9 is chunked but has a memory ceiling.** Default chunk = 4096 rows;
+   peak memory ≈ chunk × N × 4 bytes (~640 MB at N=40k). Drop the `CHUNK`
+   constant in `run_stage9` if you OOM on smaller machines.
+6. **`compose --manifest` warns on missing families by default.** Pass
+   `--require-complete` to hard-fail before shipping a partial production CSV.
 
 ## Architecture choices
 
-- **Plain Python, no agent framework.** The pipeline is a deterministic DAG of stages with parquet/jsonl artifacts. Each stage is idempotent on its inputs.
-- **GPT only at narrow points.** Stage 3 (cluster boundary policy) and Stage 5 (buffer audit). Per-row LLM judging was tried and discarded.
+- **Plain Python, no agent framework.** The pipeline is a deterministic DAG of stages with parquet/jsonl artifacts. Each stage is idempotent on its inputs (with hashes that include LLM identity).
+- **Claude only at narrow points.** Stage 3 (cluster boundary policy) and Stage 5 (buffer audit). Per-row LLM judging was tried and discarded.
+- **Single embedding model.** E5-multilingual-large-instruct. The prior dual-model (E5+Gemma) was simplified out; the cross-validation gate is replaced by E5 cosine + row-level kNN-overlap multi-criteria.
 - **Default Bengali normalization.** `language: bn` runs `bnunicodenormalizer`. Pass `--language none` for English/multilingual.
-- **Stage 9 is the production-truth gate.** Stage 4 ranking uses E5+Gemma; production inference uses E5 alone. Anything that scored well jointly but E5 alone misroutes is a production failure caught here.
+- **Stage 9 is the production-truth gate.** Stage 4 ranking is E5+token-alignment; production inference is E5 alone. Anything that scored well jointly but E5 alone misroutes is caught here.
 - **Compose from `top40.csv`, not per-family `production_filtered.csv`.** One global Stage 9 audit on the union, not stacked filters.
-- **No backfill in Stage 9.** Hitting a fixed row count by promoting rank-41+ rows defeats the E5-purity guarantee. If you need exactly N per tag, that's a separate, explicit operation.
+- **No backfill in Stage 9.** Hitting a fixed row count by promoting rank-41+ rows defeats the E5-purity guarantee.
 
 ## Tests
 
@@ -433,17 +442,18 @@ The 6 issues codex flagged on the first pass of the scaling commands are fixed i
 pytest -q
 ```
 
-17 unit tests covering helpers (text normalization, MMR ranking, cluster discovery, packet building, audit decisions, Stage 9 audit/drop semantics, compose). End-to-end validation is by running the pipeline against your dataset — `stage8/cleaning_report.json` and `stage9/audit_report.json` are the empirical signals.
+Offline tests covering helpers (text normalization, MMR ranking, cluster discovery, packet building, audit decisions, Stage 9 audit/drop semantics, compose, claude_cli env stripping + subtype parsing). End-to-end validation is by running the pipeline against your dataset — `stage8/cleaning_report.json` and `stage9/audit_report.json` are the empirical signals; `stageN/llm_calls.jsonl` is the cost/quality drift signal.
 
 ## Repo layout
 
 ```
-src/tagclean/cleaner.py     all stages + CLI in one module
+src/tagclean/cleaner.py     all stages + CLI
+src/tagclean/claude_cli.py  headless `claude -p` subprocess wrapper
 configs/example.yaml        starter config
-configs/bn_full.yaml        Bengali NID full-corpus config used for the validation runs
+configs/bn_full.yaml        Bengali NID full-corpus config
 docs/run_instructions.md    operational runbook (recipes, troubleshooting, costs)
 docs/harness_design.md      design rationale (why each stage is shaped this way)
-tests/test_cleaner.py       unit tests (offline, no API)
+tests/test_cleaner.py       unit tests (offline, no API/CLI)
 tools/githooks/pre-commit   refuses staged artifact paths under runs/ or artifacts/
 runs/                       gitignored; per-run-id outputs land here
 ```

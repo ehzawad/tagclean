@@ -1,27 +1,24 @@
-input_csv: /Users/ehz/ec-faq-bot/full_dataset/question_tag.csv
-tag_answer_json: /Users/ehz/ec-faq-bot/full_dataset/tag_answer.json
-artifact_root: /Users/ehz/tagclean/runs
+input_csv: data/question_tag.csv
+tag_answer_json: data/tag_answer.json
+artifact_root: runs
 
 embedding_backend: sentence-transformers
 e5_model: intfloat/multilingual-e5-large-instruct
-gemma_model: google/embeddinggemma-300m
-gemma_dim: 768
 
 language: bn
 
-openai_model: gpt-5.5
-openai_reasoning_effort: high
-judge_mode: agents
-self_consistency_passes: 1
+judge_mode: claude
+stage5_model: sonnet
+stage5_effort: medium
+claude_fallback_model: sonnet
+claude_call_timeout_s: 300
+qa_rows_per_packet: 20
 
-audit_buffer_size: 80
-audit_rows_per_packet: 24
 boundary_policy_threshold: 0.85
 boundary_policy_max_cluster_size: 6
 top_n: 40
 near_duplicate_threshold: 0.98
 e5_merge_threshold: 0.90
-gemma_merge_threshold: 0.88
 knn_overlap_threshold: 0.30
 
 concurrency: 6

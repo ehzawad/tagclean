@@ -22,13 +22,11 @@ dependencies = [
 [project.optional-dependencies]
 embeddings = ["sentence-transformers>=3.0"]
 faiss = ["faiss-cpu>=1.7"]
-openai = ["openai>=1.40", "openai-agents>=0.1"]
 bn = ["bnunicodenormalizer>=0.1"]
-dev = ["pytest>=8.0"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
 all = [
     "tagclean[embeddings]",
     "tagclean[faiss]",
-    "tagclean[openai]",
     "tagclean[bn]",
     "tagclean[dev]",
 ]

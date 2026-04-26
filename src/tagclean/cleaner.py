@@ -28,7 +28,6 @@ import numpy as np
 import pandas as pd
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 # Defaults are relative to the working directory; CLI/config resolves them.
 PROJECT_ROOT = Path.cwd()
@@ -48,6 +47,20 @@ DEFAULT_E5_INSTRUCTION = (
     "intent, and specific details. Use semantic similarity and contextual "
     "understanding; prioritize exact phrase matches and context-aware matching."
 )
+
+
+# Bump these when prompt text or schema shape for a stage changes. They
+# get folded into the per-stage input_hash so a Claude prompt rewrite (or
+# an OpenAI->Claude migration) doesn't silently reuse stale artifacts
+# from a prior config — Codex flagged this as the migration's biggest
+# correctness footgun.
+STAGE_QA_PROMPT_VERSION = "claude-sonnet-qa-v1"
+
+
+def _schema_fingerprint(schema: dict[str, Any]) -> str:
+    """Stable hash of a JSON schema. Sorted keys so dict ordering doesn't
+    perturb the fingerprint across Python versions."""
+    return hashlib.sha256(json.dumps(schema, sort_keys=True).encode("utf-8")).hexdigest()[:16]
 
 
 def coerce_optional_str_list(value: Any) -> list[str]:
@@ -71,19 +84,6 @@ def coerce_optional_str_list(value: Any) -> list[str]:
         return [str(value)]
 
 
-Decision = Literal["keep", "jettison", "merge_candidate"]
-ReasonCode = Literal[
-    "duplicate",
-    "too_generic",
-    "wrong_intent",
-    "sibling_collision",
-    "synthetic_artifact",
-    "context_dependent",
-    "malformed",
-    "clean",
-]
-
-
 @dataclass
 class CleanerConfig:
     input_csv: Path = DEFAULT_INPUT_CSV
@@ -99,8 +99,6 @@ class CleanerConfig:
     # Runtime and model settings.
     embedding_backend: str = "sentence-transformers"  # sentence-transformers | hashing
     e5_model: str = "intfloat/multilingual-e5-large-instruct"
-    gemma_model: str = "google/embeddinggemma-300m"
-    gemma_dim: int = 768
     hashing_dim: int = 384
     batch_size: int = 128
     device: str | None = None
@@ -113,26 +111,26 @@ class CleanerConfig:
     # normalization via bnunicodenormalizer; "none" disables.
     language: str = "bn"
 
-    # GPT settings.
-    openai_model: str = "gpt-5.4"
-    openai_reasoning_effort: str = "high"
-    judge_mode: str = "sync"  # sync | agents | batch_prepare | batch_submit | batch_collect | heuristic
-    openai_batch_endpoint: str = "/v1/responses"
-    openai_completion_window: str = "24h"
-    concurrency: int = 6  # bounded; gpt-5.5 high reasoning saturates well below 32
-    self_consistency_passes: int = 2
-    judge_granularity: str = "tag_batch"  # tag_batch | row
-    tags_per_judge_call: int = 3
-    rows_per_tag_per_judge_call: int = 12
-    # Stage 7 was a per-row second-pass over the bottom quantile of Stage 6
-    # keeps; superseded by Stage 5 buffer audit in the new design. Default OFF.
-    review_enabled: bool = False
-    review_rows_per_tag: int = 8
-    review_low_score_quantile: float = 0.25
+    # Claude CLI settings. Stage 3 is Claude-free (deterministic merge map
+    # only). Stage 5 = Stage QA (post-Stage-6 severity reviewer): Sonnet +
+    # medium effort by default — Codex flagged --effort max as overkill
+    # that invites over-thinking and runaway latency on a hot loop.
+    judge_mode: str = "claude"  # claude | heuristic
+    stage5_model: str = "sonnet"
+    stage5_effort: str = "medium"
+    claude_fallback_model: str = "sonnet"
+    claude_call_timeout_s: float = 300.0
+    concurrency: int = 6  # bounded; subscription quotas don't reward bursting
+
+    # Stage QA: rows per packet shown to Claude in one call (default 20,
+    # bounded so a single packet stays inside Sonnet's careful-reading
+    # window; 40 invites tail slop per Codex).
+    qa_rows_per_packet: int = 20
 
     # Thresholds. "auto" values are calibrated from each run.
+    # E5-only after the Gemma drop — the dual-geometry gate is replaced by
+    # cosine + row-level kNN-overlap (see find_close_tag_clusters).
     e5_merge_threshold: float = 0.90
-    gemma_merge_threshold: float = 0.88
     knn_overlap_threshold: float = 0.30
     near_duplicate_threshold: float = 0.98
     high_margin_quantile: float = 0.75
@@ -143,11 +141,8 @@ class CleanerConfig:
     top_n: int = 40
     outlier_trim_fraction: float = 0.05
 
-    # Redesigned audit pipeline: GPT moves out of per-row scoring.
-    # Stage 3 writes a tag-boundary policy for close-tag clusters; Stage 4
-    # ranks deterministically; Stage 5 audits only the top-N buffer per tag.
-    audit_buffer_size: int = 80
-    audit_rows_per_packet: int = 24
+    # Cluster expansion (used by --seed-tag and `discover` family
+    # discovery, NOT by Stage 3 anymore — Stage 3 became deterministic).
     boundary_policy_threshold: float = 0.85
     boundary_policy_max_cluster_size: int = 6
 
@@ -189,29 +184,6 @@ def resolve_target_tags(rows: pd.DataFrame, config: CleanerConfig, tag_to_canon:
     return set(selected)
 
 
-class JudgeResult(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    decision: Decision
-    quality_score: float = Field(ge=0, le=100)
-    ambiguity_score: float = Field(ge=0, le=100)
-    context_dependent: bool
-    reason_code: ReasonCode
-    rationale: str = Field(min_length=1, max_length=500)
-
-
-class RowJudgeDecision(JudgeResult):
-    row_id: int
-
-
-class JudgePacketResult(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    packet_id: str
-    decisions: list[RowJudgeDecision]
-    packet_rationale: str = Field(min_length=1, max_length=1000)
-
-
 class MergeCheckResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -228,57 +200,33 @@ class AnswerSafetyResult(BaseModel):
     rationale: str = Field(min_length=1, max_length=500)
 
 
-AuditDecisionLiteral = Literal["keep", "flag"]
-AuditReasonCode = Literal[
-    "clean",
-    "wrong_intent",
-    "sibling_collision",
-    "too_generic",
-    "duplicate",
-    "synthetic_artifact",
-    "context_dependent",
-]
+# ---------- Stage QA (the post-selection severity reviewer) ----------
+#
+# Stage QA is the new last-mile Claude pass. It runs AFTER Stage 6 (top-N
+# selection + MMR) and gives Claude one job: read ~20 questions known to
+# share an intent, identify the obvious outliers, drop them. No boundary
+# policy authoring, no per-row keep/flag scoring, no taxonomy of reasons —
+# just a free-text `why` per dropped row. Codex-approved schema shape:
+# the enum was a hangover from the old Stage 5's downstream routing; here
+# every flag does the same thing (drop the row), so the bucket label was
+# decoration. `related_row_id` is required by the schema but nullable in
+# value — needed for Anthropic strict --json-schema mode, which (like
+# OpenAI strict) demands every property appear in `required`.
 
 
-class TagBoundaryRule(BaseModel):
-    """Per-tag distinguishing rule inside a close-tag cluster."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    tag: str
-    one_line_intent: str = Field(min_length=1, max_length=300)
-    # OpenAI strict schemas require every property to also be in `required`.
-    # Keeping these as required (no default_factory) so the GPT call validates;
-    # GPT can supply empty arrays for tags with no specific concepts.
-    must_have_concepts: list[str]
-    must_avoid_concepts: list[str]
-
-
-class BoundaryPolicyResult(BaseModel):
-    """GPT output for a close-tag cluster: per-tag distinguishing rules."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    cluster_id: str
-    rules: list[TagBoundaryRule]
-    cluster_rationale: str = Field(min_length=1, max_length=800)
-
-
-class AuditRowDecision(BaseModel):
+class FlaggedRow(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     row_id: int
-    decision: AuditDecisionLiteral
-    reason_code: AuditReasonCode
-    rationale: str = Field(min_length=1, max_length=400)
+    why: str = Field(min_length=1, max_length=300)
+    related_row_id: int | None  # nullable but required field
 
 
-class AuditPacketResult(BaseModel):
+class StageQAResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    packet_id: str
-    decisions: list[AuditRowDecision]
-    packet_rationale: str = Field(min_length=1, max_length=800)
+    audited_row_ids: list[int]
+    flagged_rows: list[FlaggedRow]
 
 
 def load_config(path: Path | None) -> CleanerConfig:
@@ -584,14 +532,6 @@ def _format_e5_passages(texts: list[str], config: CleanerConfig | None = None) -
     return [prefix + t for t in texts]
 
 
-def _format_e5_queries(texts: list[str], config: CleanerConfig | None = None) -> list[str]:
-    if config is not None and not config.e5_use_prefixes:
-        return texts
-    instruction = (config.e5_instruction if config else DEFAULT_E5_INSTRUCTION)
-    prefix = f"Instruct: {instruction}\n"
-    return [prefix + t for t in texts]
-
-
 def _write_faiss_index(path: Path, vectors: np.ndarray) -> None:
     import faiss
 
@@ -612,32 +552,28 @@ def run_stage1(config: CleanerConfig, resume: bool = True) -> None:
 
     texts = intake["question_norm"].tolist()
     e5_passages = _format_e5_passages(texts, config)
-    e5_queries = _format_e5_queries(texts, config)
 
     if config.embedding_backend == "hashing":
         emb_e5 = _hashing_embeddings(e5_passages, config.hashing_dim)
-        emb_e5_query = _hashing_embeddings(e5_queries, config.hashing_dim)
-        emb_gemma = _hashing_embeddings(texts, min(config.gemma_dim, config.hashing_dim))
     else:
         emb_e5 = _encode_sentence_transformer(config.e5_model, e5_passages, config)
-        emb_e5_query = _encode_sentence_transformer(config.e5_model, e5_queries, config)
-        emb_gemma = _encode_sentence_transformer(config.gemma_model, texts, config)
-        if config.gemma_dim and emb_gemma.shape[1] > config.gemma_dim:
-            emb_gemma = l2_normalize(emb_gemma[:, : config.gemma_dim])
+
+    # emb_e5_query is kept as a separate file for resume/back-compat with
+    # Stage 8 LOO retrieval. The query and passage prefixes are identical
+    # in this codebase (single instruction template), so reuse the encode.
+    emb_e5_query = emb_e5
 
     stage_dir.mkdir(parents=True, exist_ok=True)
     np.save(stage_dir / "emb_e5.npy", emb_e5)
     np.save(stage_dir / "emb_e5_query.npy", emb_e5_query)
-    np.save(stage_dir / "emb_gemma.npy", emb_gemma)
     intake[["row_id", "tag", "question_norm", "question_raw"]].to_parquet(stage_dir / "embedding_rows.parquet", index=False)
 
     try:
         _write_faiss_index(stage_dir / "faiss_e5.idx", emb_e5)
-        _write_faiss_index(stage_dir / "faiss_gemma.idx", emb_gemma)
     except ImportError:
         print("[stage1] faiss not installed; embeddings saved without FAISS indexes")
 
-    finish_stage(stage_dir, config, input_hash, {"rows": len(intake), "e5_dim": emb_e5.shape[1], "gemma_dim": emb_gemma.shape[1]})
+    finish_stage(stage_dir, config, input_hash, {"rows": len(intake), "e5_dim": emb_e5.shape[1]})
     print(f"[stage1] wrote {stage_dir}")
 
 
@@ -754,7 +690,6 @@ def run_stage2(config: CleanerConfig, resume: bool = True) -> None:
     stage_dir = run_dir / "stage2"
     rows = pd.read_parquet(run_dir / "stage1" / "embedding_rows.parquet")
     emb_e5 = np.load(run_dir / "stage1" / "emb_e5.npy")
-    emb_gemma = np.load(run_dir / "stage1" / "emb_gemma.npy")
     input_hash = dataframe_hash(rows, ["row_id", "question_norm", "tag"])
     if resume and stage_done(stage_dir, input_hash):
         print(f"[stage2] skip: {stage_dir}")
@@ -763,7 +698,6 @@ def run_stage2(config: CleanerConfig, resume: bool = True) -> None:
     profiles: list[dict[str, Any]] = []
     tag_order = sorted(rows["tag"].unique())
     e5_centroids: list[np.ndarray] = []
-    gemma_centroids: list[np.ndarray] = []
     row_pos_by_id = {int(row_id): i for i, row_id in enumerate(rows["row_id"])}
 
     rough_centroids: dict[str, np.ndarray] = {}
@@ -781,10 +715,8 @@ def run_stage2(config: CleanerConfig, resume: bool = True) -> None:
             trimmed_local = np.arange(len(idx))
 
         central_ids, e5_c, e5_sims = _central_row_ids(group, emb_e5[idx], trimmed_local, config.central_examples)
-        _, gemma_c, gemma_sims = _central_row_ids(group, emb_gemma[idx], trimmed_local, config.central_examples)
 
         e5_centroids.append(e5_c)
-        gemma_centroids.append(gemma_c)
         outlier_scores = 1.0 - e5_sims
         central_questions = [
             rows.iloc[row_pos_by_id[row_id]]["question_raw"]
@@ -809,7 +741,6 @@ def run_stage2(config: CleanerConfig, resume: bool = True) -> None:
                 "e5_mean_sim_to_centroid": float(np.mean(e5_sims)),
                 "e5_min_sim_to_centroid": float(np.min(e5_sims)),
                 "e5_diversity": float(1.0 - np.mean((emb_e5[idx] @ e5_c))),
-                "gemma_diversity": float(1.0 - np.mean((emb_gemma[idx] @ gemma_c))),
                 "outlier_p95": float(np.quantile(outlier_scores, 0.95)) if len(outlier_scores) else 0.0,
             }
         )
@@ -818,7 +749,6 @@ def run_stage2(config: CleanerConfig, resume: bool = True) -> None:
     pd.DataFrame(profiles).to_parquet(stage_dir / "tag_profile.parquet", index=False)
     write_jsonl(stage_dir / "tag_description.jsonl", profiles)
     np.save(stage_dir / "tag_centroids_e5.npy", np.vstack(e5_centroids).astype(np.float32))
-    np.save(stage_dir / "tag_centroids_gemma.npy", np.vstack(gemma_centroids).astype(np.float32))
     write_json(stage_dir / "tag_index.json", {"tags": tag_order})
     finish_stage(stage_dir, config, input_hash, {"tags": len(tag_order)})
     print(f"[stage2] wrote {stage_dir}")
@@ -844,15 +774,22 @@ def canonical_tag_name(tags: list[str], row_counts: dict[str, int]) -> str:
 def find_close_tag_clusters(
     tags: list[str],
     sim_e5: np.ndarray,
-    sim_gemma: np.ndarray,
     threshold: float,
     max_cluster_size: int,
+    edge_predicate: Any | None = None,
 ) -> list[list[str]]:
-    """Group tags whose centroids are mutually close in BOTH embedding spaces.
+    """Group tags whose centroids are close in E5 space.
 
-    Edge: (i,j) if min(sim_e5[i,j], sim_gemma[i,j]) >= threshold.
-    Returns connected components, sorted by size desc, capped per cluster.
-    Singleton tags are excluded — boundary policy is only useful for >=2 tags.
+    Edge: (i,j) if sim_e5[i,j] >= threshold AND (when supplied)
+    edge_predicate(i, j) returns True. The optional predicate is the
+    place to plug a row-level kNN-overlap gate without leaking corpus
+    rows into this function's signature — at corpus scale we used to
+    pair this with a Gemma-cosine gate; the predicate now serves the
+    same role with an E5-derived signal instead.
+
+    Returns connected components, sorted by size desc, capped per
+    cluster. Singletons are excluded — boundary policy is only useful
+    for >=2 tags.
     """
     n = len(tags)
     parent = list(range(n))
@@ -870,8 +807,11 @@ def find_close_tag_clusters(
 
     for i in range(n):
         for j in range(i + 1, n):
-            if min(float(sim_e5[i, j]), float(sim_gemma[i, j])) >= threshold:
-                union(i, j)
+            if float(sim_e5[i, j]) < threshold:
+                continue
+            if edge_predicate is not None and not edge_predicate(i, j):
+                continue
+            union(i, j)
 
     groups: defaultdict[int, list[str]] = defaultdict(list)
     for i in range(n):
@@ -942,11 +882,14 @@ def run_stage3(config: CleanerConfig, resume: bool = True) -> None:
     tag_index = read_json(run_dir / "stage2" / "tag_index.json")
     tags = tag_index["tags"]
     e5_centroids = np.load(run_dir / "stage2" / "tag_centroids_e5.npy")
-    gemma_centroids = np.load(run_dir / "stage2" / "tag_centroids_gemma.npy")
     emb_e5 = np.load(run_dir / "stage1" / "emb_e5.npy")
     hash_parts = [
         dataframe_hash(profiles, ["tag", "row_count", "description"]),
         file_sha256(config.tag_answer_json),
+        # Stage 3 is now deterministic-only (no Claude); LLM identity
+        # fields are dropped from the hash. Stage QA hash carries them.
+        f"e5_merge_threshold={config.e5_merge_threshold}",
+        f"knn_overlap_threshold={config.knn_overlap_threshold}",
     ]
     if config.target_tags:
         # Scope-aware hash: a target-restricted run is a different artifact
@@ -962,35 +905,58 @@ def run_stage3(config: CleanerConfig, resume: bool = True) -> None:
     profile_map = profiles.set_index("tag").to_dict(orient="index")
 
     sim_e5 = e5_centroids @ e5_centroids.T
-    sim_gemma = gemma_centroids @ gemma_centroids.T
     candidates: list[dict[str, Any]] = []
-    for i, tag_a in enumerate(tags):
-        for j in range(i + 1, len(tags)):
-            if sim_e5[i, j] < config.e5_merge_threshold or sim_gemma[i, j] < config.gemma_merge_threshold:
-                continue
-            tag_b = tags[j]
-            overlap = _knn_overlap(rows, tag_a, tag_b, emb_e5)
-            if overlap < config.knn_overlap_threshold:
-                continue
-            examples_a = coerce_optional_str_list(profile_map[tag_a].get("central_questions"))
-            examples_b = coerce_optional_str_list(profile_map[tag_b].get("central_questions"))
-            intent = heuristic_same_intent(tag_a, tag_b, examples_a, examples_b)
-            if not intent.same_intent:
-                continue
-            safety = heuristic_same_answer(str(answers.get(tag_a, "")), str(answers.get(tag_b, "")))
-            candidates.append(
-                {
-                    "tag_a": tag_a,
-                    "tag_b": tag_b,
-                    "e5_centroid_sim": float(sim_e5[i, j]),
-                    "gemma_centroid_sim": float(sim_gemma[i, j]),
-                    "knn_overlap": float(overlap),
-                    "question_equivalence": intent.model_dump(),
-                    "answer_safety": safety.model_dump(),
-                    "merge": bool(intent.same_intent and safety.same_answer),
-                    "boundary_confusion": bool(intent.same_intent and not safety.same_answer),
-                }
-            )
+
+    # When --target-tags is explicit, scope the merge-candidate scan to
+    # pairs involving at least one target tag. Without this, the
+    # corpus-wide O(N²) pair loop on 1394 tags runs ~971k iterations and
+    # _knn_overlap fires on every pair above e5_merge_threshold — which
+    # at corpus scale on Bengali NID's shared vocabulary is the new wall-
+    # clock bottleneck (was 16+ min on a 3-tag run). Scoped scan: ~3 × N
+    # = ~4k pairs, completes in seconds. Tags outside the candidate scope
+    # default to canonical = self in the merge_map.
+    if config.target_tags:
+        target_set = set(config.target_tags)
+        target_idx = {i for i, t in enumerate(tags) if t in target_set}
+        pair_iter = (
+            (i, j)
+            for i in range(len(tags))
+            for j in range(i + 1, len(tags))
+            if (i in target_idx) or (j in target_idx)
+        )
+    else:
+        pair_iter = (
+            (i, j)
+            for i in range(len(tags))
+            for j in range(i + 1, len(tags))
+        )
+
+    for i, j in pair_iter:
+        if sim_e5[i, j] < config.e5_merge_threshold:
+            continue
+        tag_a, tag_b = tags[i], tags[j]
+        overlap = _knn_overlap(rows, tag_a, tag_b, emb_e5)
+        # E5-only multi-gate: cosine threshold + row-level kNN overlap.
+        if overlap < config.knn_overlap_threshold:
+            continue
+        examples_a = coerce_optional_str_list(profile_map[tag_a].get("central_questions"))
+        examples_b = coerce_optional_str_list(profile_map[tag_b].get("central_questions"))
+        intent = heuristic_same_intent(tag_a, tag_b, examples_a, examples_b)
+        if not intent.same_intent:
+            continue
+        safety = heuristic_same_answer(str(answers.get(tag_a, "")), str(answers.get(tag_b, "")))
+        candidates.append(
+            {
+                "tag_a": tag_a,
+                "tag_b": tag_b,
+                "e5_centroid_sim": float(sim_e5[i, j]),
+                "knn_overlap": float(overlap),
+                "question_equivalence": intent.model_dump(),
+                "answer_safety": safety.model_dump(),
+                "merge": bool(intent.same_intent and safety.same_answer),
+                "boundary_confusion": bool(intent.same_intent and not safety.same_answer),
+            }
+        )
 
     parent = {tag: tag for tag in tags}
 
@@ -1035,59 +1001,12 @@ def run_stage3(config: CleanerConfig, resume: bool = True) -> None:
     pd.DataFrame(remap).to_csv(stage_dir / "tag_merge_map.csv", index=False)
     pd.DataFrame(candidates).to_json(stage_dir / "merge_candidates.jsonl", orient="records", lines=True, force_ascii=False)
 
-    # --- Boundary-policy authoring for close-tag clusters that did NOT merge.
-    # The merge gates are tighter than the boundary threshold; clusters that
-    # hover near each other but stayed separate are exactly where Stage 5
-    # audit needs explicit discriminative rules.
-    canon_for_tag = {row["old_tag"]: row["canonical_tag"] for row in remap}
-    raw_clusters = find_close_tag_clusters(
-        list(tags),
-        np.asarray(sim_e5, dtype=np.float32),
-        np.asarray(sim_gemma, dtype=np.float32),
-        threshold=config.boundary_policy_threshold,
-        max_cluster_size=config.boundary_policy_max_cluster_size,
-    )
-    distinct_clusters: list[list[str]] = []
-    target_canon = (
-        [canon_for_tag.get(t, t) for t in config.target_tags]
-        if config.target_tags
-        else None
-    )
-    if target_canon is not None and len(set(target_canon)) == 1:
-        # Singleton target — no sibling cluster to disambiguate against.
-        # Emit no boundary policy; Stage 5 audits the lone tag's buffer with
-        # central exemplars + discriminative phrases only.
-        distinct_clusters = []
-    elif target_canon is not None and len(set(target_canon)) >= 2:
-        # User-provided cluster: --target-tags or --seed-tag's resolved set
-        # IS the cluster Stage 3 should author a policy for. Skipping the
-        # union-find avoids two failure modes at corpus scale:
-        # (1) target tags landing in a 400+-tag mega-component that gets
-        #     truncated to alphabetically-first 6 by max_cluster_size,
-        #     dropping the targets entirely;
-        # (2) burning ~100+ GPT calls authoring policies for irrelevant
-        #     clusters Stage 5 will never use.
-        distinct_clusters = [list(dict.fromkeys(target_canon))]
-    else:
-        for members in raw_clusters:
-            canonicals = {canon_for_tag.get(t, t) for t in members}
-            if len(canonicals) < 2:
-                continue
-            if target_canon is not None and not (set(target_canon) & canonicals):
-                continue
-            distinct_clusters.append(members)
-
-    policy_records: list[dict[str, Any]] = []
-    for cluster_idx, cluster_tags in enumerate(distinct_clusters):
-        cluster_id = f"cluster_{cluster_idx:04d}"
-        policy = compute_boundary_policy(cluster_id, cluster_tags, profile_map, config)
-        policy_records.append({
-            "cluster_id": cluster_id,
-            "tags": cluster_tags,
-            "rules": [r.model_dump() for r in policy.rules],
-            "rationale": policy.cluster_rationale,
-        })
-    write_jsonl(stage_dir / "tag_boundary_policy.jsonl", policy_records)
+    # Stage 3 used to author per-cluster boundary policy via Claude; in
+    # the Stage QA architecture that step is gone (the policy artifact
+    # was contaminated by tag-name anchoring per Codex's review). Emit
+    # an empty policy file for back-compat with anything that still
+    # opens it. The merge_map.csv is the actual load-bearing output.
+    write_jsonl(stage_dir / "tag_boundary_policy.jsonl", [])
 
     finish_stage(
         stage_dir,
@@ -1096,7 +1015,6 @@ def run_stage3(config: CleanerConfig, resume: bool = True) -> None:
         {
             "merge_candidates": len(candidates),
             "merged_tags": sum(1 for r in remap if r["merged"]),
-            "boundary_clusters": len(policy_records),
         },
     )
     print(f"[stage3] wrote {stage_dir}")
@@ -1122,58 +1040,12 @@ def _calibrated_threshold(values: np.ndarray, quantile: float) -> float:
     return float(np.quantile(finite, quantile))
 
 
-def _neighbor_evidence(
-    pos: int,
-    query_vector: np.ndarray,
-    corpus_vectors: np.ndarray,
-    rows: pd.DataFrame,
-    top_k: int,
-) -> list[dict[str, Any]]:
-    sims = corpus_vectors @ query_vector
-    sims[pos] = -np.inf
-    top = np.argsort(-sims)[: min(top_k, max(0, len(rows) - 1))]
-    evidence = []
-    for rank, idx in enumerate(top, start=1):
-        if not np.isfinite(sims[idx]):
-            continue
-        evidence.append(
-            {
-                "rank": rank,
-                "row_id": int(rows.iloc[idx]["row_id"]),
-                "tag": rows.iloc[idx]["canonical_tag"],
-                "original_tag": rows.iloc[idx]["tag"],
-                "similarity": round(float(sims[idx]), 6),
-                "question": rows.iloc[idx]["question_raw"],
-            }
-        )
-    return evidence
-
-
-def _evidence_summary(e5_evidence: list[dict[str, Any]], gemma_evidence: list[dict[str, Any]], current_tag: str) -> dict[str, Any]:
-    e5_tags = [item["tag"] for item in e5_evidence]
-    gemma_tags = [item["tag"] for item in gemma_evidence]
-    e5_counts = Counter(e5_tags)
-    gemma_counts = Counter(gemma_tags)
-    e5_ids = {item["row_id"] for item in e5_evidence}
-    gemma_ids = {item["row_id"] for item in gemma_evidence}
-
-    def first_rank(items: list[dict[str, Any]], tag: str) -> int | None:
-        for item in items:
-            if item["tag"] == tag:
-                return int(item["rank"])
-        return None
-
-    return {
-        "e5_tag_counts": dict(e5_counts.most_common()),
-        "gemma_tag_counts": dict(gemma_counts.most_common()),
-        "e5_current_tag_first_rank": first_rank(e5_evidence, current_tag),
-        "gemma_current_tag_first_rank": first_rank(gemma_evidence, current_tag),
-        "top_neighbor_overlap_count": len(e5_ids & gemma_ids),
-        "top_neighbor_overlap_row_ids": sorted(e5_ids & gemma_ids),
-        "e5_top_tag": e5_tags[0] if e5_tags else None,
-        "gemma_top_tag": gemma_tags[0] if gemma_tags else None,
-        "embedding_top_tag_agreement": bool(e5_tags and gemma_tags and e5_tags[0] == gemma_tags[0]),
-    }
+# _neighbor_evidence + _evidence_summary deleted: full-corpus per-row
+# kNN was the Stage 4 bottleneck and Codex/user concluded its only
+# Stage QA consumer (the risky-row gate for rival_context injection)
+# is itself unnecessary — Claude's majority-theme framing handles the
+# off-intent calls without sibling exemplars. Centroid-only scoring
+# reduces Stage 4 from ~25 min to seconds at corpus scale.
 
 
 def run_stage4(config: CleanerConfig, resume: bool = True) -> None:
@@ -1182,7 +1054,6 @@ def run_stage4(config: CleanerConfig, resume: bool = True) -> None:
     stage_dir = run_dir / "stage4"
     rows = pd.read_parquet(run_dir / "stage1" / "embedding_rows.parquet").reset_index(drop=True)
     emb_e5 = np.load(run_dir / "stage1" / "emb_e5.npy")
-    emb_gemma = np.load(run_dir / "stage1" / "emb_gemma.npy")
     merge_map = pd.read_csv(run_dir / "stage3" / "tag_merge_map.csv")
     tag_to_canon = dict(zip(merge_map["old_tag"], merge_map["canonical_tag"]))
     rows["canonical_tag"] = rows["tag"].map(tag_to_canon).fillna(rows["tag"])
@@ -1194,133 +1065,87 @@ def run_stage4(config: CleanerConfig, resume: bool = True) -> None:
         return
 
     tags, e5_cents = _recompute_canonical_centroids(rows, emb_e5)
-    _, gemma_cents = _recompute_canonical_centroids(rows, emb_gemma)
     tag_to_idx = {tag: i for i, tag in enumerate(tags)}
-    e5_scores = _tag_scores(emb_e5, e5_cents)
-    gemma_scores = _tag_scores(emb_gemma, gemma_cents)
+    e5_scores = _tag_scores(emb_e5, e5_cents)  # (N, T) cos to centroids
 
     cross_dups = read_jsonl(run_dir / "stage0" / "cross_tag_duplicates.jsonl")
     cross_dup_ids = {int(row_id) for item in cross_dups for row_id in item.get("row_ids", [])}
 
-    features = []
-    e5_margins = []
-    gemma_margins = []
-    for pos, row in rows.iterrows():
-        e5_evidence = _neighbor_evidence(pos, emb_e5[pos], emb_e5, rows, config.evidence_top_k)
-        gemma_evidence = _neighbor_evidence(pos, emb_gemma[pos], emb_gemma, rows, config.evidence_top_k)
-        evidence_summary = _evidence_summary(e5_evidence, gemma_evidence, row["canonical_tag"])
-        own_idx = tag_to_idx[row["canonical_tag"]]
-        e5_row = e5_scores[pos].copy()
-        gemma_row = gemma_scores[pos].copy()
-        e5_own = float(e5_row[own_idx])
-        gemma_own = float(gemma_row[own_idx])
-        e5_row[own_idx] = -np.inf
-        gemma_row[own_idx] = -np.inf
-        e5_comp_idx = int(np.argmax(e5_row))
-        gemma_comp_idx = int(np.argmax(gemma_row))
-        e5_comp = float(e5_row[e5_comp_idx])
-        gemma_comp = float(gemma_row[gemma_comp_idx])
-        e5_margin = e5_own - e5_comp
-        gemma_margin = gemma_own - gemma_comp
-        e5_margins.append(e5_margin)
-        gemma_margins.append(gemma_margin)
-        features.append(
-            {
-                "row_id": int(row["row_id"]),
-                "question_raw": row["question_raw"],
-                "question_norm": row["question_norm"],
-                "tag": row["tag"],
-                "canonical_tag": row["canonical_tag"],
-                "target_scope": bool(row["target_scope"]),
-                "e5_own_sim": e5_own,
-                "e5_top1_competing_tag": tags[e5_comp_idx],
-                "e5_top1_competing_sim": e5_comp,
-                "e5_margin": e5_margin,
-                "gemma_own_sim": gemma_own,
-                "gemma_top1_competing_tag": tags[gemma_comp_idx],
-                "gemma_top1_competing_sim": gemma_comp,
-                "gemma_margin": gemma_margin,
-                "rank_agreement": tags[e5_comp_idx] == tags[gemma_comp_idx],
-                "e5_top10_evidence": json.dumps(e5_evidence, ensure_ascii=False),
-                "gemma_top10_evidence": json.dumps(gemma_evidence, ensure_ascii=False),
-                "embedding_reconciliation": json.dumps(evidence_summary, ensure_ascii=False),
-                "cross_tag_duplicate": int(row["row_id"]) in cross_dup_ids,
-            }
-        )
+    # Vectorized per-row scoring. Codex called the prior per-row Python
+    # loop dead weight in the new architecture: it computed full-corpus
+    # row-level kNN evidence (`e5_top10_evidence`) for every row in the
+    # 79k-row corpus when the only consumer was Stage QA's risky-row
+    # gate — itself dropped because Claude's majority-theme framing
+    # makes rival-context injection unnecessary. What Stage QA actually
+    # needs is e5_own_sim, e5_margin, near_dup_count, artifact_score,
+    # cross_tag_duplicate. All vectorizable.
+    own_idx = rows["canonical_tag"].map(tag_to_idx).to_numpy(dtype=np.int64)
+    n_rows = len(rows)
+    row_indices = np.arange(n_rows)
+    e5_own = e5_scores[row_indices, own_idx]
+    # Mask the own-tag column so argmax finds the best COMPETING centroid.
+    masked = e5_scores.copy()
+    masked[row_indices, own_idx] = -np.inf
+    e5_comp_idx = np.argmax(masked, axis=1)
+    e5_comp = masked[row_indices, e5_comp_idx]
+    e5_margin = e5_own - e5_comp
+    competing_tags = [tags[i] for i in e5_comp_idx.tolist()]
+    row_ids_arr = rows["row_id"].astype(int).to_numpy()
 
-    feature_df = pd.DataFrame(features)
-    near_dup_counts = []
+    feature_df = pd.DataFrame({
+        "row_id": row_ids_arr,
+        "question_raw": rows["question_raw"].to_numpy(),
+        "question_norm": rows["question_norm"].to_numpy(),
+        "tag": rows["tag"].to_numpy(),
+        "canonical_tag": rows["canonical_tag"].to_numpy(),
+        "target_scope": rows["target_scope"].to_numpy(dtype=bool),
+        "e5_own_sim": e5_own.astype(float),
+        "e5_top1_competing_tag": competing_tags,
+        "e5_top1_competing_sim": e5_comp.astype(float),
+        "e5_margin": e5_margin.astype(float),
+        "cross_tag_duplicate": np.isin(row_ids_arr, list(cross_dup_ids)),
+    })
+
+    # near_dup_count: per-tag pairwise above near_duplicate_threshold.
+    # Vectorized within tag (the per-tag matmul is small enough to be
+    # fast); replaces a Python iterrows merge.
+    near_dup = np.zeros(n_rows, dtype=np.int64)
     for tag, group in feature_df.groupby("canonical_tag"):
         idx = group.index.to_numpy()
         sims = emb_e5[idx] @ emb_e5[idx].T
         counts = (sims > config.near_duplicate_threshold).sum(axis=1) - 1
-        near_dup_counts.extend(zip(idx, counts.tolist()))
-    feature_df["near_dup_count"] = 0
-    for idx, count in near_dup_counts:
-        feature_df.loc[idx, "near_dup_count"] = int(count)
+        near_dup[idx] = counts
+    feature_df["near_dup_count"] = near_dup
 
-    # Load boundary policy authored in Stage 3 (may be empty for non-clustered tags).
-    policy_records = read_jsonl(run_dir / "stage3" / "tag_boundary_policy.jsonl")
-    tag_to_rule: dict[str, dict[str, list[str]]] = {}
-    for cluster in policy_records:
-        for rule in cluster.get("rules", []) or []:
-            tag = rule.get("tag")
-            if not tag:
-                continue
-            tag_to_rule[tag] = {
-                "must_have": [str(c) for c in rule.get("must_have_concepts") or []],
-                "must_avoid": [str(c) for c in rule.get("must_avoid_concepts") or []],
-            }
+    # artifact_score: cheap per-row Python (regex + token count). Vectorize
+    # via list comp + assign rather than iterrows + .loc per cell.
+    feature_df["artifact_score"] = [
+        artifact_score(q) for q in feature_df["question_raw"].tolist()
+    ]
 
-    feature_df["token_alignment"] = 0.0
-    feature_df["artifact_score"] = 0.0
-    for idx, row in feature_df.iterrows():
-        rule = tag_to_rule.get(row["canonical_tag"])
-        if rule is not None:
-            feature_df.loc[idx, "token_alignment"] = token_alignment_score(
-                row["question_norm"], rule["must_have"], rule["must_avoid"],
-            )
-        feature_df.loc[idx, "artifact_score"] = artifact_score(row["question_raw"])
-
-    # Deterministic composite score. Weights chosen so a typical clean row lands
-    # near 1.0; problematic rows fall well below. No GPT signal here.
+    # Deterministic composite score, E5-only. token_alignment was 0.15 of
+    # the score in the prior design; with Stage 3's policy authoring
+    # gone, the only honest move is to redistribute its weight back into
+    # the geometry signals. Stage QA (post-Stage 6) absorbs the role
+    # token_alignment was playing.
+    #   e5_own 0.45 -> 0.55,  e5_margin 0.30 -> 0.35.
+    # Positive weights still sum to 0.90; a typical clean row lands ~1.0.
     e5_own_n = _normalize_series(feature_df["e5_own_sim"])
     e5_margin_n = _normalize_series(feature_df["e5_margin"])
-    gemma_own_n = _normalize_series(feature_df["gemma_own_sim"])
-    gemma_margin_n = _normalize_series(feature_df["gemma_margin"])
     near_dup_n = _normalize_series(feature_df["near_dup_count"].astype(float))
-    rank_bonus = feature_df["rank_agreement"].astype(float)
     cross_dup_pen = feature_df["cross_tag_duplicate"].astype(float)
 
     feature_df["composite_score"] = (
-        0.30 * e5_own_n
-        + 0.20 * e5_margin_n
-        + 0.15 * gemma_own_n
-        + 0.10 * gemma_margin_n
-        + 0.10 * rank_bonus
-        + 0.10 * feature_df["token_alignment"].clip(lower=-1.0, upper=1.0)
+        0.55 * e5_own_n
+        + 0.35 * e5_margin_n
         - 0.05 * near_dup_n
         - 0.10 * cross_dup_pen
         - 0.10 * feature_df["artifact_score"]
     )
 
-    # Audit buffer: top N per canonical tag (within target scope) by composite_score.
-    feature_df["audit_buffer"] = False
-    in_scope = feature_df[feature_df["target_scope"]].copy()
-    if not in_scope.empty:
-        in_scope = in_scope.sort_values(
-            ["canonical_tag", "composite_score", "row_id"], ascending=[True, False, True]
-        )
-        buffer_idx = (
-            in_scope.groupby("canonical_tag", sort=False)
-            .head(config.audit_buffer_size)
-            .index
-        )
-        feature_df.loc[buffer_idx, "audit_buffer"] = True
-
     stage_dir.mkdir(parents=True, exist_ok=True)
     feature_df.to_parquet(stage_dir / "row_features.parquet", index=False)
-    feature_df[["row_id", "canonical_tag", "composite_score", "audit_buffer", "target_scope"]].to_json(
+    feature_df[["row_id", "canonical_tag", "composite_score", "target_scope"]].to_json(
         stage_dir / "row_score.jsonl", orient="records", lines=True, force_ascii=False,
     )
     finish_stage(
@@ -1328,10 +1153,9 @@ def run_stage4(config: CleanerConfig, resume: bool = True) -> None:
         config,
         input_hash,
         {
-            "audit_buffer_rows": int(feature_df["audit_buffer"].sum()),
+            "in_scope_rows": int(feature_df["target_scope"].sum()),
             "out_of_scope": int((~feature_df["target_scope"]).sum()),
             "target_tags": sorted(target_canonical_tags),
-            "boundary_policy_tags_covered": len(tag_to_rule),
         },
     )
     print(f"[stage4] wrote {stage_dir}")
@@ -1364,1010 +1188,549 @@ def _json_cell(value: Any, default: Any) -> Any:
     return value
 
 
-def _candidate_tags_from_embedding_evidence(
-    row: pd.Series,
-    profiles: dict[str, dict[str, Any]],
-    exclude_tags: set[str],
-    limit: int,
-) -> list[str]:
-    """Rank candidate tags from concrete E5/Gemma top-k evidence.
+# ============================================================================
+# Stage QA — single Claude pass per tag, post-Stage-6, anonymized + free-text
+#
+# Runs AFTER Stage 6 (top-N selection + MMR). Shows Claude ~20 rows from the
+# selected top-N for one tag at a time. The tag NAME is never in the prompt;
+# Claude infers the majority theme of the packet and flags rows that don't
+# fit. Output is free-text `why` per dropped row — Codex's recommendation
+# after we considered a 4-category enum and rejected it: every flag does the
+# same thing here (drop the row), so the bucket label was decoration.
+#
+# Optional `RIVAL_A`/`RIVAL_B` rival exemplars are injected only when a row
+# in the packet is "risky" (e5_margin in the bottom 15% of its tag AND a
+# single sibling tag dominates ≥2 of its top-5 evidence neighbors).
+# ============================================================================
 
-    The centroid competitors are useful, but the strongest GPT context should
-    come from the tags that actually dominate the two retrieval top-10 lists.
+
+def build_stage_qa_packets(top_df: pd.DataFrame, packet_size: int) -> list[pd.DataFrame]:
+    """Split each tag's top-N rows into packets of `packet_size`.
+
+    Sorted by composite_score desc within each tag so the strongest rows
+    come first in each packet — easier for Claude to spot the pattern.
     """
-    counts: Counter[str] = Counter()
-    for source_name in ("e5_top10_evidence", "gemma_top10_evidence"):
-        for item in _json_cell(row.get(source_name), []):
-            tag = item.get("tag")
-            rank = int(item.get("rank") or 999)
-            if tag and tag in profiles and tag not in exclude_tags:
-                # Weight earlier neighbors more, but still let repeated tags win.
-                counts[tag] += max(1.0, 11.0 - min(rank, 10))
-
-    for tag in (row.get("e5_top1_competing_tag"), row.get("gemma_top1_competing_tag")):
-        if tag and tag in profiles and tag not in exclude_tags:
-            counts[tag] += 0.5
-
-    return [tag for tag, _ in counts.most_common(limit)]
-
-
-def build_judge_prompt(row: pd.Series, profiles: dict[str, dict[str, Any]], config: CleanerConfig) -> str:
-    current = profiles.get(row["canonical_tag"], {})
-    competing_tags = _candidate_tags_from_embedding_evidence(
-        row,
-        profiles,
-        exclude_tags={row["canonical_tag"]},
-        limit=config.top_k_competing_tags,
-    )
-
-    payload = {
-        "task": "Decide whether the target question is a clean example for its current tag. Do not relabel. If uncertain, jettison.",
-        "target_question_raw": row["question_raw"],
-        "target_question_normalized": row["question_norm"],
-        "current_tag": row["canonical_tag"],
-        "current_tag_description": current.get("description"),
-        "current_tag_central_examples": _compact_examples(current.get("central_questions"), config.central_examples),
-        "current_tag_discriminative_phrases": _compact_examples(current.get("discriminative_phrases"), 12),
-        "embedding_reconciliation": _json_cell(row.get("embedding_reconciliation"), {}),
-        "e5_top10_neighbors": _json_cell(row.get("e5_top10_evidence"), []),
-        "gemma_top10_neighbors": _json_cell(row.get("gemma_top10_evidence"), []),
-        "competing_tags": [
-            {
-                "tag": tag,
-                "description": profiles[tag].get("description"),
-                "central_examples": _compact_examples(profiles[tag].get("central_questions"), config.central_examples),
-                "discriminative_phrases": _compact_examples(profiles[tag].get("discriminative_phrases"), 12),
-            }
-            for tag in competing_tags
-        ],
-        "decision_policy": {
-            "keep": "The question is clear, self-contained, natural enough, and belongs to the current tag more than competitors.",
-            "jettison": "Use for ambiguous, generic, context-dependent, wrong-intent, duplicate-like, or synthetic-artifact rows.",
-            "merge_candidate": "Use only when this row suggests current and competing tags may be indistinguishable.",
-        },
-        "required_json_schema": JudgeResult.model_json_schema(),
-    }
-    return json.dumps(payload, ensure_ascii=False, indent=2)
-
-
-def build_judge_packets(feature_df: pd.DataFrame, config: CleanerConfig) -> list[pd.DataFrame]:
-    """Create stable, bounded judge packets grouped by canonical tag.
-
-    Each packet contains up to `tags_per_judge_call` tags and up to
-    `rows_per_tag_per_judge_call` rows per tag. This keeps context localized
-    and prevents a single prompt from becoming a dumping ground for the whole
-    dataset.
-    """
-    judge_rows = feature_df[(feature_df["route"] == "judge") & (feature_df.get("target_scope", True))].copy()
-    if judge_rows.empty:
+    if top_df.empty:
         return []
-
-    packets: list[pd.DataFrame] = []
-    chunks_by_tag: dict[str, list[pd.DataFrame]] = {}
-    for tag, group in judge_rows.sort_values(["canonical_tag", "e5_margin", "gemma_margin"]).groupby("canonical_tag", sort=True):
-        group = group.sort_values(["e5_margin", "gemma_margin", "row_id"], ascending=[True, True, True])
-        chunks_by_tag[tag] = []
-        for start in range(0, len(group), config.rows_per_tag_per_judge_call):
-            chunks_by_tag[tag].append(group.iloc[start : start + config.rows_per_tag_per_judge_call])
-
-    tags = sorted(chunks_by_tag)
-    while any(chunks_by_tag[tag] for tag in tags):
-        active_tags = [tag for tag in tags if chunks_by_tag[tag]][: config.tags_per_judge_call]
-        chunks = [chunks_by_tag[tag].pop(0) for tag in active_tags]
-        packets.append(pd.concat(chunks, ignore_index=True))
-    return packets
-
-
-def packet_result_path(stage_dir: Path, packet_id: str, pass_idx: int) -> Path:
-    safe_id = packet_id.replace(":", "_")
-    return stage_dir / "packet_results" / f"{safe_id}_pass_{pass_idx}.json"
-
-
-def row_result_path(stage_dir: Path, row_id: int, pass_idx: int) -> Path:
-    return stage_dir / "row_results" / f"row_{row_id}_pass_{pass_idx}.json"
-
-
-def _decision_to_judge(decision: RowJudgeDecision) -> JudgeResult:
-    return JudgeResult(
-        decision=decision.decision,
-        quality_score=decision.quality_score,
-        ambiguity_score=decision.ambiguity_score,
-        context_dependent=decision.context_dependent,
-        reason_code=decision.reason_code,
-        rationale=decision.rationale,
-    )
-
-
-def aggregate_incremental_judge_results(stage_dir: Path, expected_row_ids: Iterable[int]) -> None:
-    grouped: defaultdict[int, list[JudgeResult]] = defaultdict(list)
-    expected = {int(row_id) for row_id in expected_row_ids}
-
-    for path in sorted((stage_dir / "row_results").glob("row_*_pass_*.json")):
-        payload = read_json(path)
-        if not payload:
-            continue
-        row_id = int(payload["row_id"])
-        if row_id in expected:
-            grouped[row_id].append(JudgeResult.model_validate(payload["result"]))
-
-    for path in sorted((stage_dir / "packet_results").glob("packet_*_pass_*.json")):
-        payload = read_json(path)
-        if not payload:
-            continue
-        packet = JudgePacketResult.model_validate(payload["result"])
-        for decision in packet.decisions:
-            if decision.row_id in expected:
-                grouped[decision.row_id].append(_decision_to_judge(decision))
-
-    rows = [_resolve_consistency(row_id, grouped.get(row_id, [])) for row_id in sorted(expected)]
-    write_jsonl(stage_dir / "judge_results.jsonl", rows)
-
-
-def missing_row_ids_in_packet_result(packet: pd.DataFrame, result: JudgePacketResult) -> list[int]:
-    expected = {int(v) for v in packet["row_id"].tolist()}
-    received = {int(d.row_id) for d in result.decisions}
-    return sorted(expected - received)
-
-
-async def _fill_packet_misses(
-    config: CleanerConfig,
-    stage_dir: Path,
-    packet: pd.DataFrame,
-    packet_result: JudgePacketResult,
-    pass_idx: int,
-    profiles: dict[str, dict[str, Any]],
-    judge_one: Any,
-) -> int:
-    """Run a row-level fallback for any expected row_id the packet response omitted.
-
-    Per-row results land in row_results/ and the existing aggregator picks them up.
-    Skips rows that already have a row-level result on disk so resumes are cheap.
-    """
-    misses = missing_row_ids_in_packet_result(packet, packet_result)
-    if not misses:
-        return 0
-    print(f"[stage5] packet missing {len(misses)} decision(s); filling per-row")
-    filled = 0
-    for row_id in misses:
-        out_path = row_result_path(stage_dir, row_id, pass_idx)
-        if out_path.exists():
-            continue
-        row = packet[packet["row_id"] == row_id].iloc[0]
-        prompt = build_judge_prompt(row, profiles, config)
-        try:
-            result = await judge_one(prompt)
-        except Exception as exc:
-            print(f"[stage5] row {row_id} fill failed after retries: {exc}")
-            continue
-        write_json(out_path, {"row_id": row_id, "pass_idx": pass_idx, "result": result.model_dump()})
-        filled += 1
-    return filled
-
-
-def build_boundary_policy_prompt(
-    cluster_id: str,
-    cluster_tags: list[str],
-    profiles: dict[str, dict[str, Any]],
-    config: CleanerConfig,
-) -> str:
-    """Prompt GPT to author the distinguishing rules for a close-tag cluster."""
-
-    def tag_context(tag: str) -> dict[str, Any]:
-        profile = profiles.get(tag, {})
-        return {
-            "tag": tag,
-            "row_count": int(profile.get("row_count", 0) or 0),
-            "central_examples": _compact_examples(profile.get("central_questions"), config.central_examples),
-            "discriminative_phrases": _compact_examples(profile.get("discriminative_phrases"), 10),
-        }
-
-    # Structured spec following the GPT-5 prompting guide: explicit task,
-    # concrete rules without redundant emphasis, examples grounded in evidence.
-    payload = {
-        "task": (
-            "Author distinguishing rules for each tag in this close-tag cluster. "
-            "The downstream audit will use these rules to decide whether a question "
-            "belongs to its current tag, without relabeling. For each tag produce: "
-            "one_line_intent, must_have_concepts, must_avoid_concepts."
-        ),
-        "cluster_id": cluster_id,
-        "tags_in_cluster": [tag_context(tag) for tag in cluster_tags],
-        "concept_spec": {
-            "language": "Use the natural language of the central_examples. Concepts "
-                "may be words, short phrases, or short patterns (e.g. 'agent imperative').",
-            "must_have_concepts": "3 to 7 concrete cues a clean question for THIS tag "
-                "would mention or imply. Empty list is valid for the most generic tag "
-                "in a cluster — do not invent forced cues.",
-            "must_avoid_concepts": "0 to 5 cues that signal a SIBLING tag instead.",
-            "no_generic_concepts": "Skip concepts that fit every tag in the cluster.",
-            "prefer_concrete_phrases": True,
-            "evidence_only": "Base concepts on the supplied central_examples and "
-                "discriminative_phrases; do not invent.",
-        },
-        "required_json_schema": BoundaryPolicyResult.model_json_schema(),
-    }
-    return json.dumps(payload, ensure_ascii=False, indent=2)
-
-
-def _heuristic_boundary_policy(cluster_id: str, cluster_tags: list[str]) -> BoundaryPolicyResult:
-    """Stub policy used when GPT is disabled or unreachable.
-
-    Builds must_have_concepts from tag-name tokens (minus the shared prefix) so the
-    Stage 4 token-alignment feature still has a small useful signal.
-    """
-    common_tokens: set[str] | None = None
-    tokenized = []
-    for tag in cluster_tags:
-        toks = [t for t in tag.split("_") if t]
-        tokenized.append(toks)
-        common_tokens = set(toks) if common_tokens is None else common_tokens & set(toks)
-    common = common_tokens or set()
-    rules = []
-    for tag, toks in zip(cluster_tags, tokenized):
-        distinctive = [t for t in toks if t not in common][:6]
-        rules.append(
-            TagBoundaryRule(
-                tag=tag,
-                one_line_intent=f"Heuristic stub for {tag}.",
-                must_have_concepts=distinctive,
-                must_avoid_concepts=[],
-            )
-        )
-    return BoundaryPolicyResult(
-        cluster_id=cluster_id,
-        rules=rules,
-        cluster_rationale="Heuristic fallback (no GPT available); concepts derived from tag-name tokens.",
-    )
-
-
-def compute_boundary_policy(
-    cluster_id: str,
-    cluster_tags: list[str],
-    profiles: dict[str, dict[str, Any]],
-    config: CleanerConfig,
-) -> BoundaryPolicyResult:
-    """Run GPT (or heuristic fallback) to produce a boundary policy for the cluster.
-
-    Single pass, fixed tag order, high reasoning. Structural validation only:
-    schema must validate AND the returned rule set must cover the input tags.
-    Empty must_have_concepts is accepted (correct for a cluster's generic tag).
-    Fallback to heuristic only on real failure.
-    """
-    if config.judge_mode == "heuristic":
-        return _heuristic_boundary_policy(cluster_id, cluster_tags)
-
-    try:
-        from openai import OpenAI
-    except Exception as exc:
-        print(f"[stage3] OpenAI client unavailable for boundary policy ({exc}); falling back to heuristic")
-        return _heuristic_boundary_policy(cluster_id, cluster_tags)
-
-    client = OpenAI()
-    prompt = build_boundary_policy_prompt(cluster_id, list(cluster_tags), profiles, config)
-    body = _responses_request_body(config, prompt, BoundaryPolicyResult.model_json_schema())
-    try:
-        response = client.responses.create(**body)
-        policy = BoundaryPolicyResult.model_validate(json.loads(response.output_text))
-    except Exception as exc:
-        print(f"[stage3] boundary policy GPT call failed for cluster {cluster_id}: {exc}")
-        return _heuristic_boundary_policy(cluster_id, cluster_tags)
-
-    returned_tags = {r.tag for r in policy.rules}
-    expected_tags = set(cluster_tags)
-    if returned_tags != expected_tags:
-        missing = expected_tags - returned_tags
-        extra = returned_tags - expected_tags
-        print(
-            f"[stage3] boundary policy tag-set mismatch for {cluster_id} "
-            f"(missing={sorted(missing)} extra={sorted(extra)}); falling back to heuristic"
-        )
-        return _heuristic_boundary_policy(cluster_id, cluster_tags)
-    return policy
-
-
-def build_packet_prompt(packet_id: str, packet: pd.DataFrame, profiles: dict[str, dict[str, Any]], config: CleanerConfig) -> str:
-    tags_in_packet = list(dict.fromkeys(packet["canonical_tag"].tolist()))
-    competing: list[str] = []
-    for _, row in packet.iterrows():
-        competing.extend(
-            _candidate_tags_from_embedding_evidence(
-                row,
-                profiles,
-                exclude_tags=set(tags_in_packet),
-                limit=config.top_k_competing_tags,
-            )
-        )
-        competing.extend([row["e5_top1_competing_tag"], row["gemma_top1_competing_tag"]])
-    competing_tags = [t for t in dict.fromkeys(competing) if t in profiles and t not in tags_in_packet]
-
-    def tag_context(tag: str) -> dict[str, Any]:
-        profile = profiles.get(tag, {})
-        return {
-            "tag": tag,
-            "description": profile.get("description"),
-            "central_examples": _compact_examples(profile.get("central_questions"), config.central_examples),
-            "discriminative_phrases": _compact_examples(profile.get("discriminative_phrases"), 12),
-        }
-
-    payload = {
-        "task": (
-            "Judge each target question independently. Decide whether it is a clean, self-contained "
-            "example for its current tag. Do not relabel rows. If uncertain, jettison."
-        ),
-        "packet_id": packet_id,
-        "policy": {
-            "keep": "Question clearly belongs to its current tag more than competitors.",
-            "jettison": "Use for ambiguous, generic, context-dependent, wrong-intent, sibling-collision, duplicate-like, or synthetic rows.",
-            "merge_candidate": "Use only if the row strongly suggests two tag clusters may be indistinguishable.",
-            "no_row_swaps": True,
-        },
-        "current_tag_contexts": [tag_context(tag) for tag in tags_in_packet],
-        "competing_tag_contexts": [tag_context(tag) for tag in competing_tags[: max(config.top_k_competing_tags * len(tags_in_packet), 3)]],
-        "target_rows": [
-            {
-                "row_id": int(row["row_id"]),
-                "question_raw": row["question_raw"],
-                "question_normalized": row["question_norm"],
-                "current_tag": row["canonical_tag"],
-                "e5_competing_tag": row["e5_top1_competing_tag"],
-                "gemma_competing_tag": row["gemma_top1_competing_tag"],
-                "embedding_reconciliation": _json_cell(row.get("embedding_reconciliation"), {}),
-                "e5_top10_neighbors": _json_cell(row.get("e5_top10_evidence"), []),
-                "gemma_top10_neighbors": _json_cell(row.get("gemma_top10_evidence"), []),
-            }
-            for _, row in packet.iterrows()
-        ],
-        "required_json_schema": JudgePacketResult.model_json_schema(),
-    }
-    return json.dumps(payload, ensure_ascii=False, indent=2)
-
-
-def _responses_request_body(config: CleanerConfig, prompt: str, schema: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "model": config.openai_model,
-        "reasoning": {"effort": config.openai_reasoning_effort},
-        "input": [
-            {
-                "role": "system",
-                "content": "You are a strict dataset cleaning judge. Return only schema-valid JSON.",
-            },
-            {"role": "user", "content": prompt},
-        ],
-        "text": {
-            "format": {
-                "type": "json_schema",
-                "name": "dataset_cleaning_judge",
-                "strict": True,
-                "schema": schema,
-            },
-        },
-    }
-
-
-def prepare_row_judge_batch(config: CleanerConfig, feature_df: pd.DataFrame, profiles: dict[str, dict[str, Any]], stage_dir: Path) -> Path:
-    rows = []
-    for _, row in feature_df[feature_df["route"] == "judge"].iterrows():
-        for pass_idx in range(config.self_consistency_passes):
-            prompt = build_judge_prompt(row, profiles, config)
-            rows.append(
-                {
-                    "custom_id": f"judge:{int(row['row_id'])}:pass:{pass_idx}",
-                    "method": "POST",
-                    "url": config.openai_batch_endpoint,
-                    "body": _responses_request_body(config, prompt, JudgeResult.model_json_schema()),
-                }
-            )
-    path = stage_dir / "judge_requests.jsonl"
-    write_jsonl(path, rows)
-    return path
-
-
-def prepare_packet_judge_batch(config: CleanerConfig, feature_df: pd.DataFrame, profiles: dict[str, dict[str, Any]], stage_dir: Path) -> Path:
-    rows = []
-    packets = build_judge_packets(feature_df, config)
-    manifest_rows = []
-    for packet_idx, packet in enumerate(packets):
-        packet_id = f"packet:{packet_idx:06d}"
-        row_ids = [int(v) for v in packet["row_id"].tolist()]
-        manifest_rows.append(
-            {
-                "packet_id": packet_id,
-                "row_ids": row_ids,
-                "tags": list(dict.fromkeys(packet["canonical_tag"].tolist())),
-            }
-        )
-        for pass_idx in range(config.self_consistency_passes):
-            prompt = build_packet_prompt(packet_id, packet, profiles, config)
-            rows.append(
-                {
-                    "custom_id": f"{packet_id}:pass:{pass_idx}",
-                    "method": "POST",
-                    "url": config.openai_batch_endpoint,
-                    "body": _responses_request_body(config, prompt, JudgePacketResult.model_json_schema()),
-                }
-            )
-    write_jsonl(stage_dir / "judge_packet_manifest.jsonl", manifest_rows)
-    path = stage_dir / "judge_requests.jsonl"
-    write_jsonl(path, rows)
-    return path
-
-
-def prepare_judge_batch(config: CleanerConfig, feature_df: pd.DataFrame, profiles: dict[str, dict[str, Any]], stage_dir: Path) -> Path:
-    if config.judge_granularity == "row":
-        return prepare_row_judge_batch(config, feature_df, profiles, stage_dir)
-    if config.judge_granularity != "tag_batch":
-        raise ValueError(f"Unsupported judge_granularity: {config.judge_granularity}")
-    return prepare_packet_judge_batch(config, feature_df, profiles, stage_dir)
-
-
-def parse_responses_json_response(body: dict[str, Any]) -> dict[str, Any]:
-    if body.get("output_text"):
-        return json.loads(body["output_text"])
-    if "output" in body:
-        for item in body["output"]:
-            if item.get("type") == "message":
-                parts = item.get("content") or []
-                for part in parts:
-                    if part.get("type") in {"output_text", "text"}:
-                        return json.loads(part.get("text", ""))
-    if "choices" in body:
-        # Backward compatibility for any older chat-completions batch output.
-        content = body["choices"][0]["message"]["content"]
-        return json.loads(content)
-    raise ValueError("Could not parse OpenAI response JSON")
-
-
-@retry(
-    retry=retry_if_exception_type(Exception),
-    wait=wait_exponential(multiplier=1, min=1, max=60),
-    stop=stop_after_attempt(5),
-)
-async def _responses_judge_one(client: Any, config: CleanerConfig, prompt: str) -> JudgeResult:
-    body = _responses_request_body(config, prompt, JudgeResult.model_json_schema())
-    response = await asyncio.to_thread(client.responses.create, **body)
-    payload = json.loads(response.output_text)
-    return JudgeResult.model_validate(payload)
-
-
-async def run_responses_judge(config: CleanerConfig, feature_df: pd.DataFrame, profiles: dict[str, dict[str, Any]], stage_dir: Path) -> None:
-    from openai import OpenAI
-
-    client = OpenAI()
-    judge_rows = feature_df[feature_df["route"] == "judge"].copy()
-    expected_row_ids = [int(v) for v in judge_rows["row_id"].tolist()]
-    if config.judge_granularity == "row":
-        for _, row in judge_rows.iterrows():
-            row_id = int(row["row_id"])
-            for pass_idx in range(config.self_consistency_passes):
-                out_path = row_result_path(stage_dir, row_id, pass_idx)
-                if not out_path.exists():
-                    prompt = build_judge_prompt(row, profiles, config)
-                    result = await _responses_judge_one(client, config, prompt)
-                    write_json(out_path, {"row_id": row_id, "pass_idx": pass_idx, "result": result.model_dump()})
-                aggregate_incremental_judge_results(stage_dir, expected_row_ids)
-    elif config.judge_granularity == "tag_batch":
-        async def _judge_one(prompt: str) -> JudgeResult:
-            return await _responses_judge_one(client, config, prompt)
-
-        for packet_idx, packet in enumerate(build_judge_packets(feature_df, config)):
-            packet_id = f"packet:{packet_idx:06d}"
-            for pass_idx in range(config.self_consistency_passes):
-                out_path = packet_result_path(stage_dir, packet_id, pass_idx)
-                if not out_path.exists():
-                    prompt = build_packet_prompt(packet_id, packet, profiles, config)
-                    body = _responses_request_body(config, prompt, JudgePacketResult.model_json_schema())
-                    response = await asyncio.to_thread(client.responses.create, **body)
-                    packet_result = JudgePacketResult.model_validate(json.loads(response.output_text))
-                    write_json(
-                        out_path,
-                        {
-                            "packet_id": packet_id,
-                            "pass_idx": pass_idx,
-                            "row_ids": [int(v) for v in packet["row_id"].tolist()],
-                            "result": packet_result.model_dump(),
-                        },
-                    )
-                else:
-                    payload = read_json(out_path)
-                    packet_result = JudgePacketResult.model_validate(payload["result"])
-                await _fill_packet_misses(config, stage_dir, packet, packet_result, pass_idx, profiles, _judge_one)
-                aggregate_incremental_judge_results(stage_dir, expected_row_ids)
-    else:
-        raise ValueError(f"Unsupported judge_granularity: {config.judge_granularity}")
-    aggregate_incremental_judge_results(stage_dir, expected_row_ids)
-
-
-@retry(
-    retry=retry_if_exception_type(Exception),
-    wait=wait_exponential(multiplier=1, min=1, max=60),
-    stop=stop_after_attempt(5),
-)
-async def _agents_judge_one(config: CleanerConfig, prompt: str) -> JudgeResult:
-    from agents import Agent, ModelSettings, Runner
-    from openai.types.shared import Reasoning
-
-    agent = Agent(
-        name="dataset cleaning judge",
-        instructions="You are a strict dataset cleaning judge. Return only the structured result.",
-        model=config.openai_model,
-        model_settings=ModelSettings(
-            reasoning=Reasoning(effort=config.openai_reasoning_effort),
-            verbosity="low",
-        ),
-        output_type=JudgeResult,
-    )
-    result = await asyncio.to_thread(Runner.run_sync, agent, prompt)
-    return result.final_output
-
-
-async def run_agents_judge(config: CleanerConfig, feature_df: pd.DataFrame, profiles: dict[str, dict[str, Any]], stage_dir: Path) -> None:
-    judge_rows = feature_df[feature_df["route"] == "judge"].copy()
-    expected_row_ids = [int(v) for v in judge_rows["row_id"].tolist()]
-    if config.judge_granularity == "row":
-        for _, row in judge_rows.iterrows():
-            row_id = int(row["row_id"])
-            for pass_idx in range(config.self_consistency_passes):
-                out_path = row_result_path(stage_dir, row_id, pass_idx)
-                if not out_path.exists():
-                    prompt = build_judge_prompt(row, profiles, config)
-                    result = await _agents_judge_one(config, prompt)
-                    write_json(out_path, {"row_id": row_id, "pass_idx": pass_idx, "result": result.model_dump()})
-                aggregate_incremental_judge_results(stage_dir, expected_row_ids)
-    elif config.judge_granularity == "tag_batch":
-        async def _judge_one(prompt: str) -> JudgeResult:
-            return await _agents_judge_one(config, prompt)
-
-        for packet_idx, packet in enumerate(build_judge_packets(feature_df, config)):
-            packet_id = f"packet:{packet_idx:06d}"
-            for pass_idx in range(config.self_consistency_passes):
-                out_path = packet_result_path(stage_dir, packet_id, pass_idx)
-                if not out_path.exists():
-                    from agents import Agent, ModelSettings, Runner
-                    from openai.types.shared import Reasoning
-
-                    prompt = build_packet_prompt(packet_id, packet, profiles, config)
-                    agent = Agent(
-                        name="dataset packet cleaning judge",
-                        instructions="You are a strict dataset cleaning judge. Return only the structured packet result.",
-                        model=config.openai_model,
-                        model_settings=ModelSettings(
-                            reasoning=Reasoning(effort=config.openai_reasoning_effort),
-                            verbosity="low",
-                        ),
-                        output_type=JudgePacketResult,
-                    )
-                    packet_result = await asyncio.to_thread(Runner.run_sync, agent, prompt)
-                    parsed: JudgePacketResult = packet_result.final_output
-                    write_json(
-                        out_path,
-                        {
-                            "packet_id": packet_id,
-                            "pass_idx": pass_idx,
-                            "row_ids": [int(v) for v in packet["row_id"].tolist()],
-                            "result": parsed.model_dump(),
-                        },
-                    )
-                else:
-                    payload = read_json(out_path)
-                    parsed = JudgePacketResult.model_validate(payload["result"])
-                await _fill_packet_misses(config, stage_dir, packet, parsed, pass_idx, profiles, _judge_one)
-                aggregate_incremental_judge_results(stage_dir, expected_row_ids)
-    else:
-        raise ValueError(f"Unsupported judge_granularity: {config.judge_granularity}")
-    aggregate_incremental_judge_results(stage_dir, expected_row_ids)
-
-
-def _resolve_consistency(row_id: int, passes: list[JudgeResult]) -> dict[str, Any]:
-    if not passes:
-        return {
-            "row_id": row_id,
-            "decision": "jettison",
-            "quality_score": 0,
-            "ambiguity_score": 100,
-            "context_dependent": False,
-            "reason_code": "synthetic_artifact",
-            "rationale": "No judge result was available.",
-            "consistent": False,
-        }
-    first = passes[0]
-    consistent = all(
-        p.decision == first.decision
-        and p.context_dependent == first.context_dependent
-        and p.reason_code == first.reason_code
-        for p in passes[1:]
-    )
-    if not consistent:
-        return {
-            "row_id": row_id,
-            "decision": "jettison",
-            "quality_score": 0,
-            "ambiguity_score": 100,
-            "context_dependent": any(p.context_dependent for p in passes),
-            "reason_code": "sibling_collision",
-            "rationale": "Judge passes disagreed; strict automation jettisoned the row.",
-            "consistent": False,
-        }
-    payload = first.model_dump()
-    payload["row_id"] = row_id
-    payload["consistent"] = True
-    return payload
-
-
-def collect_batch_results(batch_output_path: Path, stage_dir: Path) -> None:
-    grouped: defaultdict[int, list[JudgeResult]] = defaultdict(list)
-    for line in read_jsonl(batch_output_path):
-        custom_id = line.get("custom_id", "")
-        if line.get("error"):
-            continue
-        body = (line.get("response") or {}).get("body") or {}
-        try:
-            payload = parse_responses_json_response(body)
-            row_match = re.match(r"judge:(\d+):pass:(\d+)", custom_id)
-            packet_match = re.match(r"packet:\d+:pass:(\d+)", custom_id)
-            if row_match:
-                row_id = int(row_match.group(1))
-                grouped[row_id].append(JudgeResult.model_validate(payload))
-            elif packet_match:
-                parsed = JudgePacketResult.model_validate(payload)
-                for decision in parsed.decisions:
-                    grouped[decision.row_id].append(
-                        JudgeResult(
-                            decision=decision.decision,
-                            quality_score=decision.quality_score,
-                            ambiguity_score=decision.ambiguity_score,
-                            context_dependent=decision.context_dependent,
-                            reason_code=decision.reason_code,
-                            rationale=decision.rationale,
-                        )
-                    )
-        except (ValidationError, ValueError, json.JSONDecodeError):
-            continue
-    write_jsonl(stage_dir / "judge_results.jsonl", [_resolve_consistency(row_id, passes) for row_id, passes in grouped.items()])
-
-
-def fetch_batch_output(stage_dir: Path) -> Path:
-    """Fetch completed OpenAI Batch output recorded by a previous batch_submit run."""
-    from openai import OpenAI
-
-    batch_info = read_json(stage_dir / "batch.json")
-    if not batch_info or not batch_info.get("id"):
-        raise ValueError("No batch.json found. Provide --batch-output or run stage5 with judge_mode=batch_submit first.")
-
-    client = OpenAI()
-    batch = client.batches.retrieve(batch_info["id"])
-    status = getattr(batch, "status", None)
-    if status != "completed":
-        raise RuntimeError(f"OpenAI batch {batch_info['id']} is not completed yet (status={status}).")
-    output_file_id = getattr(batch, "output_file_id", None)
-    if not output_file_id:
-        raise RuntimeError(f"OpenAI batch {batch_info['id']} completed without output_file_id.")
-
-    content = client.files.content(output_file_id)
-    raw = content.read()
-    if isinstance(raw, str):
-        raw_bytes = raw.encode("utf-8")
-    else:
-        raw_bytes = raw
-    output_path = stage_dir / "judge_batch_output.jsonl"
-    output_path.write_bytes(raw_bytes)
-    return output_path
-
-
-def build_audit_packets(feature_df: pd.DataFrame, config: CleanerConfig) -> list[pd.DataFrame]:
-    """Group audit_buffer rows into per-tag packets of `audit_rows_per_packet`."""
-    audit = feature_df[feature_df["audit_buffer"]].copy()
-    if audit.empty:
-        return []
-    audit = audit.sort_values(
+    sorted_df = top_df.sort_values(
         ["canonical_tag", "composite_score", "row_id"], ascending=[True, False, True]
     )
     packets: list[pd.DataFrame] = []
-    for _, group in audit.groupby("canonical_tag", sort=True):
-        for start in range(0, len(group), config.audit_rows_per_packet):
-            packets.append(group.iloc[start : start + config.audit_rows_per_packet].reset_index(drop=True))
+    for _, group in sorted_df.groupby("canonical_tag", sort=True):
+        for start in range(0, len(group), packet_size):
+            packets.append(group.iloc[start : start + packet_size].reset_index(drop=True))
     return packets
 
 
-def build_audit_packet_prompt(
-    packet_id: str,
-    packet: pd.DataFrame,
-    tag_to_rule: dict[str, dict[str, Any]],
-    profiles: dict[str, dict[str, Any]],
-    config: CleanerConfig,
-) -> str:
-    tag = packet["canonical_tag"].iloc[0]
-    rule = tag_to_rule.get(tag, {})
-    profile = profiles.get(tag, {})
+# _is_risky_row + _build_rival_context deleted: rival-context injection
+# was a hedge against Claude conflating "wrong intent" with "ugly wording
+# for the right intent." The user and Codex agreed that with majority-
+# theme framing + precision-bias instruction, Claude doesn't need sibling
+# exemplars to make that call. Dropping the gate also drops the only
+# consumer of the row-level kNN evidence in Stage 4 (now centroid-only).
+
+
+def build_stage_qa_prompt(packet: pd.DataFrame) -> str:
+    """Anonymized Stage QA prompt — no tag name leaks into the prompt.
+
+    The harness knows which tag this packet is for; Claude does not need
+    that to identify intra-packet outliers, and removing it eliminates
+    the dominant anchoring vector Codex flagged.
+    """
     payload = {
         "task": (
-            "For each target_row, return one decision: 'keep' if the row is a clean "
-            "example of THIS tag, or 'flag' if it should be dropped from this tag. "
-            "Do not relabel — this is a single-tag pass/reject audit."
+            "You are a quality reviewer for a Bengali NID/voter FAQ "
+            "dataset. You will see ~20 questions all assigned to the SAME "
+            "(unnamed) intent. Identify questions that obviously don't "
+            "belong with the rest of the packet."
         ),
-        "decision_spec": {
-            "keep": "Question is self-contained and clearly fits the tag's intent; "
-                "no sibling-tag collision; not too generic; not synthetic.",
-            "flag_reasons": {
-                "wrong_intent": "Row's intent doesn't match this tag at all.",
-                "sibling_collision": "Row fits a sibling/competing tag better.",
-                "too_generic": "Row is generic enough to fit several tags.",
-                "duplicate": "Row is a near-paraphrase of another row in the set.",
-                "synthetic_artifact": "Awkward repetition, malformed, looks GPT-generated.",
-                "context_dependent": "Row needs prior conversation context to make sense.",
-            },
-            "if_unsure": "Prefer flag.",
+        "reference_frame": (
+            "Read every question first. Identify the MAJORITY THEME of the "
+            "packet — the dominant intent across these ~20 questions. "
+            "Judge each row against that theme. Do not invent a theme to "
+            "make outliers fit; do not anchor on the weirdest row. If the "
+            "packet contains two coherent sub-themes (say 60/40), respect "
+            "both — flag only rows that belong to NEITHER."
+        ),
+        "flag_when": [
+            "different intent from the packet's majority theme",
+            "grammatically broken Bengali, garbled, or half-sentence",
+            (
+                "needs prior conversation, or is a fragment / single-word "
+                "reply / meta-question that can't stand alone as an FAQ row"
+            ),
+            (
+                "near-paraphrase of another row in THIS same packet "
+                "(populate `related_row_id` with the duplicate's row_id)"
+            ),
+        ],
+        "do_not_flag": [
+            (
+                "borderline cases — flag only when confident a human "
+                "reviewer would agree immediately. Aggressive recall is "
+                "the deterministic ranker's job, not yours."
+            ),
+            (
+                "stylistic / register variation; valid alternate phrasings; "
+                "rare vocabulary if the intent is clear"
+            ),
+            "rows that fit a coherent secondary sub-theme",
+        ],
+        "output_contract": {
+            "audited_row_ids": (
+                "MUST contain every row_id sent in target_rows. If you "
+                "read a row and decided not to flag, list it in "
+                "audited_row_ids anyway."
+            ),
+            "flagged_rows": (
+                "Each entry: {row_id, why (one English sentence), "
+                "related_row_id (the row_id of the duplicate, only when "
+                "the flag is for near-paraphrase; null otherwise)}."
+            ),
+            "primary_field": (
+                "question_raw is primary; question_norm is the normalized "
+                "backup if you suspect raw is mis-encoded."
+            ),
         },
-        "packet_id": packet_id,
-        "tag": tag,
-        "tag_one_line_intent": rule.get("one_line_intent", ""),
-        "must_have_concepts": rule.get("must_have", []),
-        "must_avoid_concepts": rule.get("must_avoid", []),
-        "tag_description": profile.get("description"),
-        "tag_central_examples": _compact_examples(profile.get("central_questions"), config.central_examples),
         "target_rows": [
             {
                 "row_id": int(row["row_id"]),
                 "question_raw": row["question_raw"],
-                "question_normalized": row["question_norm"],
+                "question_norm": row["question_norm"],
             }
             for _, row in packet.iterrows()
         ],
-        "output_contract": "Return ONE AuditRowDecision per target_row, in any order. "
-            "Every target row_id must appear exactly once in decisions.",
-        "required_json_schema": AuditPacketResult.model_json_schema(),
+        "required_json_schema": StageQAResult.model_json_schema(),
     }
     return json.dumps(payload, ensure_ascii=False, indent=2)
 
 
-@retry(
-    retry=retry_if_exception_type(Exception),
-    wait=wait_exponential(multiplier=1, min=1, max=60),
-    stop=stop_after_attempt(5),
-)
-async def _responses_audit_one(client: Any, config: CleanerConfig, prompt: str) -> AuditPacketResult:
-    body = _responses_request_body(config, prompt, AuditPacketResult.model_json_schema())
-    response = await asyncio.to_thread(client.responses.create, **body)
-    return AuditPacketResult.model_validate(json.loads(response.output_text))
+def aggregate_qa_results(
+    stage_dir: Path,
+) -> tuple[dict[int, dict[str, Any]], dict[str, Any]]:
+    """Merge per-packet QA results into a row-level dict + summary stats.
 
-
-def _build_audit_agent(config: CleanerConfig) -> Any:
-    """Construct the audit Agent once per Stage 5 run; reuse across packets."""
-    from agents import Agent, ModelSettings
-    from openai.types.shared import Reasoning
-
-    return Agent(
-        name="tag-audit agent",
-        instructions=(
-            "You audit candidate rows for a single tag using its boundary "
-            "rules. Return only schema-valid AuditPacketResult JSON."
-        ),
-        model=config.openai_model,
-        model_settings=ModelSettings(
-            reasoning=Reasoning(effort=config.openai_reasoning_effort),
-            verbosity="low",
-        ),
-        output_type=AuditPacketResult,
-    )
-
-
-@retry(
-    retry=retry_if_exception_type(Exception),
-    wait=wait_exponential(multiplier=1, min=1, max=60),
-    stop=stop_after_attempt(5),
-)
-async def _agents_audit_one(agent: Any, prompt: str) -> AuditPacketResult:
-    """Native async Runner.run; no asyncio.to_thread wrapper.
-
-    Lets `asyncio.gather` actually run packets concurrently.
+    Returns (per_row, summary). per_row[row_id] is one of:
+      {flagged: True,  why: "...", related_row_id: int|None, packet_id: ...}
+      {flagged: False, audit_status: "audited",            packet_id: ...}
+      {flagged: False, audit_status: "audit_incomplete",   packet_id: ...}
     """
-    from agents import Runner
+    per_row: dict[int, dict[str, Any]] = {}
+    flagged_count = 0
+    incomplete_packets = 0
+    rationale_lengths: list[int] = []
+    rationale_strings: list[str] = []
+    empty_packets = 0
+    total_packets = 0
 
-    result = await Runner.run(agent, prompt)
-    return result.final_output
-
-
-def aggregate_audit_results(stage_dir: Path, expected_row_ids: Iterable[int]) -> None:
-    """Merge per-packet audit results into a flat per-row JSONL.
-
-    Rows missing from any packet response default to keep with audit_status=missing —
-    the deterministic ranker already endorsed them; absent audit signal is not evidence
-    against the row.
-    """
-    expected = {int(r) for r in expected_row_ids}
-    decisions: dict[int, dict[str, Any]] = {}
-    for path in sorted((stage_dir / "audit_packets").glob("packet_*_pass_*.json")):
+    for path in sorted((stage_dir / "qa_packets").glob("packet_*.json")):
         payload = read_json(path)
         if not payload:
             continue
-        result = AuditPacketResult.model_validate(payload["result"])
-        for d in result.decisions:
-            if d.row_id in expected and d.row_id not in decisions:
-                decisions[d.row_id] = {**d.model_dump(), "audit_status": "audited"}
-    rows = []
-    for row_id in sorted(expected):
-        if row_id in decisions:
-            rows.append(decisions[row_id])
-        else:
-            rows.append({
-                "row_id": row_id,
-                "decision": "keep",
-                "reason_code": "clean",
-                "rationale": "No audit response; ranker-trusted default.",
-                "audit_status": "missing",
+        total_packets += 1
+        packet_id = payload.get("packet_id", path.stem)
+        sent_ids = set(int(v) for v in payload.get("row_ids", []))
+        status = payload.get("audit_status", "audited")
+        if status == "audit_incomplete":
+            incomplete_packets += 1
+            for rid in sent_ids:
+                per_row.setdefault(int(rid), {
+                    "flagged": False, "audit_status": "audit_incomplete",
+                    "packet_id": packet_id,
+                })
+            continue
+        result = StageQAResult.model_validate(payload["result"])
+        flagged_ids = {f.row_id for f in result.flagged_rows}
+        if not result.flagged_rows:
+            empty_packets += 1
+        for f in result.flagged_rows:
+            per_row[int(f.row_id)] = {
+                "flagged": True,
+                "why": f.why,
+                "related_row_id": f.related_row_id,
+                "packet_id": packet_id,
+            }
+            flagged_count += 1
+            rationale_lengths.append(len(f.why))
+            rationale_strings.append(f.why.strip().lower())
+        for rid in sent_ids:
+            if int(rid) in flagged_ids:
+                continue
+            per_row.setdefault(int(rid), {
+                "flagged": False, "audit_status": "audited",
+                "packet_id": packet_id,
             })
-    write_jsonl(stage_dir / "audit_results.jsonl", rows)
+
+    repeated = Counter(rationale_strings)
+    repeated_top = [
+        {"rationale": r, "count": c}
+        for r, c in repeated.most_common(5)
+        if c > 1
+    ]
+    summary = {
+        "total_packets": total_packets,
+        "incomplete_packets": incomplete_packets,
+        "empty_flagged_packets": empty_packets,
+        "empty_flagged_rate": (empty_packets / total_packets) if total_packets else 0.0,
+        "flagged_rows": flagged_count,
+        "mean_rationale_length": (
+            sum(rationale_lengths) / len(rationale_lengths)
+        ) if rationale_lengths else 0.0,
+        "repeated_rationales_top5": repeated_top,
+    }
+    return per_row, summary
 
 
-async def _run_audit_loop(
+async def _run_stage_qa_loop(
     config: CleanerConfig,
-    feature_df: pd.DataFrame,
-    tag_to_rule: dict[str, dict[str, Any]],
-    profiles: dict[str, dict[str, Any]],
+    top_df: pd.DataFrame,
     stage_dir: Path,
-    audit_one: Any,
-    trace_label: str | None = None,
 ) -> None:
-    """Run audit packets concurrently with bounded semaphore.
+    """Run Stage QA packets concurrently with bounded `claude -p` subprocesses.
 
-    `audit_one` is an async callable taking a prompt and returning
-    AuditPacketResult. `trace_label`, when set, wraps the gather in
-    `agents.trace(label, group_id=run_id)` for observability.
-
-    Cached packets (out_path exists) are skipped without an API call.
-    Atomic write: tmp-file + rename.
+    Resilience layers per Codex's hostile review:
+    - Per-packet retry: if `audited_row_ids` doesn't cover the sent set,
+      retry the FULL packet once (preserves the packet-as-reference
+      property). If still incomplete, mark `audit_incomplete`, keep the
+      rows by default, surface in summary.
+    - Rolling-window breaker: failure rate over last 50 calls > 60% halts
+      the run; OR no successful call in last 5 minutes halts.
+    - Exponential backoff with jitter on TRANSIENT/PARSE retries.
+    - Per-call telemetry to llm_calls.jsonl.
     """
-    audit = feature_df[feature_df["audit_buffer"]].copy()
-    expected_row_ids = [int(v) for v in audit["row_id"].tolist()]
-    packets = build_audit_packets(feature_df, config)
-    (stage_dir / "audit_packets").mkdir(parents=True, exist_ok=True)
+    from .claude_cli import ErrorKind, spawn_claude
+    import random
+    from collections import deque
+
+    packet_size = max(1, int(config.qa_rows_per_packet))
+    packets = build_stage_qa_packets(top_df, packet_size)
+    (stage_dir / "qa_packets").mkdir(parents=True, exist_ok=True)
 
     semaphore = asyncio.Semaphore(max(1, int(config.concurrency)))
-    state: dict[str, int] = {"ok": 0, "skipped": 0, "failed": 0}
+    state: dict[str, Any] = {"ok": 0, "skipped": 0, "failed": 0, "incomplete": 0}
+    telemetry: list[dict[str, Any]] = []
+    window_size = 50
+    recent: "deque[str]" = deque(maxlen=window_size)
+    last_success_time = [time.monotonic()]
+    breaker_tripped = asyncio.Event()
+    schema = StageQAResult.model_json_schema()
+
+    async def call_with_backoff(prompt: str) -> Any:
+        """Single-call loop with exp backoff + jitter on TRANSIENT/PARSE."""
+        max_attempts = 3
+        last_res = None
+        for attempt in range(max_attempts):
+            res = await spawn_claude(
+                prompt=prompt,
+                model=config.stage5_model,
+                fallback_model=config.claude_fallback_model,
+                effort=config.stage5_effort,
+                json_schema=schema,
+                timeout=config.claude_call_timeout_s,
+            )
+            last_res = res
+            if res.ok or res.error_kind == ErrorKind.INFRA:
+                return res
+            await asyncio.sleep((2 ** attempt) + random.uniform(0, 1))
+        return last_res
+
+    def record_telemetry(packet_id: str, attempt_label: str, res: Any) -> None:
+        telemetry.append({
+            "packet_id": packet_id,
+            "attempt": attempt_label,
+            "stage": "stage_qa",
+            "model": config.stage5_model,
+            "effort": config.stage5_effort,
+            "subtype": res.subtype,
+            "ok": res.ok,
+            "error_kind": res.error_kind.value if res.error_kind else None,
+            "error_message": res.error_message,
+            "total_cost_usd": res.total_cost_usd,
+            "cache_creation_input_tokens": res.cache_creation_input_tokens,
+            "cache_read_input_tokens": res.cache_read_input_tokens,
+            "num_turns": res.num_turns,
+            "duration_ms": res.duration_ms,
+        })
+
+    def check_breaker() -> bool:
+        """Trip if rolling failure rate > 60% over a full window OR no
+        successful call in last 5 minutes. Codex's sizing for ~1800-call
+        corpus runs (the toy 'N-consecutive-failures' rule it replaced
+        was prone to single-burst false trips)."""
+        if breaker_tripped.is_set():
+            return True
+        if len(recent) >= window_size:
+            failures = sum(1 for o in recent if o == "failed")
+            if failures / window_size > 0.6:
+                breaker_tripped.set()
+                print(
+                    f"[stage_qa] CIRCUIT BREAKER: failure rate "
+                    f"{failures}/{window_size} > 60% over recent window; halting."
+                )
+                return True
+        if time.monotonic() - last_success_time[0] > 300.0:
+            breaker_tripped.set()
+            print(
+                "[stage_qa] CIRCUIT BREAKER: no successful call in last 5 min; halting."
+            )
+            return True
+        return False
 
     async def process_packet(packet_idx: int, packet: pd.DataFrame) -> None:
-        packet_id = f"audit_packet:{packet_idx:06d}"
-        out_path = stage_dir / "audit_packets" / f"packet_{packet_idx:06d}_pass_0.json"
+        if check_breaker():
+            return
+        packet_id = f"qa_packet:{packet_idx:06d}"
+        out_path = stage_dir / "qa_packets" / f"packet_{packet_idx:06d}.json"
+        sent_ids = [int(v) for v in packet["row_id"].tolist()]
         if out_path.exists():
             state["skipped"] += 1
             return
-        prompt = build_audit_packet_prompt(packet_id, packet, tag_to_rule, profiles, config)
+
+        prompt = build_stage_qa_prompt(packet)
+
         async with semaphore:
-            try:
-                result = await audit_one(prompt)
-            except Exception as exc:
-                print(f"[stage5] audit packet {packet_id} failed after retries: {exc}")
-                state["failed"] += 1
+            if check_breaker():
                 return
-        # Atomic write: tmp + rename so concurrent readers never see a partial file.
+            res = await call_with_backoff(prompt)
+        record_telemetry(packet_id, "first", res)
+
+        if not res.ok or not res.structured_output:
+            state["failed"] += 1
+            recent.append("failed")
+            kind = res.error_kind.value if res.error_kind else "no-structured-output"
+            print(f"[stage_qa] {packet_id} failed [{kind}]: {res.error_message[:200]}")
+            check_breaker()
+            return
+
+        try:
+            parsed = StageQAResult.model_validate(res.structured_output)
+        except ValidationError as exc:
+            state["failed"] += 1
+            recent.append("failed")
+            print(f"[stage_qa] {packet_id} schema mismatch: {str(exc)[:200]}")
+            check_breaker()
+            return
+
+        # Coverage check: did Claude audit every row we sent?
+        sent_set = set(sent_ids)
+        audited_set = set(int(rid) for rid in parsed.audited_row_ids)
+        audit_status = "audited"
+        if sent_set - audited_set:
+            print(
+                f"[stage_qa] {packet_id} coverage miss: "
+                f"{len(sent_set - audited_set)} rows; retrying full packet"
+            )
+            async with semaphore:
+                retry_res = await call_with_backoff(prompt)
+            record_telemetry(packet_id, "retry", retry_res)
+            if retry_res.ok and retry_res.structured_output:
+                try:
+                    retry_parsed = StageQAResult.model_validate(retry_res.structured_output)
+                    retry_audited = set(int(rid) for rid in retry_parsed.audited_row_ids)
+                    if sent_set - retry_audited:
+                        audit_status = "audit_incomplete"
+                        state["incomplete"] += 1
+                    else:
+                        parsed = retry_parsed
+                except ValidationError:
+                    audit_status = "audit_incomplete"
+                    state["incomplete"] += 1
+            else:
+                audit_status = "audit_incomplete"
+                state["incomplete"] += 1
+
         tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
         write_json(
             tmp_path,
             {
                 "packet_id": packet_id,
-                "pass_idx": 0,
-                "row_ids": [int(v) for v in packet["row_id"].tolist()],
-                "result": result.model_dump(),
+                "row_ids": sent_ids,
+                "audit_status": audit_status,
+                "result": parsed.model_dump(),
             },
         )
         tmp_path.replace(out_path)
         state["ok"] += 1
-        # Show progress as packets land (order arbitrary under concurrency).
+        recent.append("ok")
+        last_success_time[0] = time.monotonic()
         completed = state["ok"] + state["skipped"] + state["failed"]
-        print(f"[stage5] audit progress: {completed}/{len(packets)} packets")
+        print(
+            f"[stage_qa] progress: {completed}/{len(packets)} packets "
+            f"(ok={state['ok']} cached={state['skipped']} "
+            f"failed={state['failed']} incomplete={state['incomplete']})"
+        )
 
-    cm: Any = None
-    if trace_label:
-        try:
-            from agents import trace  # type: ignore
+    await asyncio.gather(*(process_packet(i, p) for i, p in enumerate(packets)))
 
-            cm = trace(trace_label, group_id=config.resolved_run_id())
-        except Exception:
-            cm = None
-
-    if cm is not None:
-        with cm:
-            await asyncio.gather(*(process_packet(i, p) for i, p in enumerate(packets)))
-    else:
-        await asyncio.gather(*(process_packet(i, p) for i, p in enumerate(packets)))
+    if telemetry:
+        write_jsonl(stage_dir / "llm_calls.jsonl", telemetry)
 
     print(
-        f"[stage5] audit done: {state['ok']} ok, {state['skipped']} cached, "
-        f"{state['failed']} failed; concurrency={config.concurrency}"
+        f"[stage_qa] done: {state['ok']} ok, {state['skipped']} cached, "
+        f"{state['failed']} failed, {state['incomplete']} incomplete; "
+        f"concurrency={config.concurrency}"
     )
-    aggregate_audit_results(stage_dir, expected_row_ids)
+
+    if breaker_tripped.is_set():
+        raise RuntimeError(
+            "stage_qa circuit breaker tripped: refusing to finalize a partial QA. "
+            f"See {stage_dir / 'llm_calls.jsonl'} for failure pattern."
+        )
 
 
-def _heuristic_audit(feature_df: pd.DataFrame, stage_dir: Path) -> None:
-    audit = feature_df[feature_df["audit_buffer"]].copy()
-    rows = []
-    for _, row in audit.iterrows():
-        decision = "flag" if (row["cross_tag_duplicate"] or row["near_dup_count"] > 0 or row["artifact_score"] > 0.5) else "keep"
-        rows.append({
-            "row_id": int(row["row_id"]),
-            "decision": decision,
-            "reason_code": "clean" if decision == "keep" else ("duplicate" if row["near_dup_count"] > 0 else "synthetic_artifact"),
-            "rationale": "Heuristic audit fallback (no GPT).",
-            "audit_status": "heuristic",
+def _heuristic_qa(top_df: pd.DataFrame, stage_dir: Path) -> None:
+    """Heuristic-mode QA: flag rows whose features already say they're suspect.
+
+    Used when --judge-mode heuristic. Emits the same per-packet artifact
+    shape as the Claude path so Stage 5's downstream aggregation +
+    summary code is identical for both modes.
+    """
+    (stage_dir / "qa_packets").mkdir(parents=True, exist_ok=True)
+    if top_df.empty:
+        return
+    sorted_df = top_df.sort_values(
+        ["canonical_tag", "composite_score", "row_id"], ascending=[True, False, True]
+    )
+    for packet_idx, (_tag, group) in enumerate(sorted_df.groupby("canonical_tag", sort=True)):
+        sent_ids = [int(v) for v in group["row_id"].tolist()]
+        flagged = []
+        for _, row in group.iterrows():
+            reasons = []
+            if bool(row.get("cross_tag_duplicate", False)):
+                reasons.append("cross-tag duplicate (heuristic)")
+            if float(row.get("near_dup_count", 0)) > 0:
+                reasons.append("near-duplicate within tag (heuristic)")
+            if float(row.get("artifact_score", 0.0)) > 0.5:
+                reasons.append("synthetic-artifact features (heuristic)")
+            if reasons:
+                flagged.append({
+                    "row_id": int(row["row_id"]),
+                    "why": "; ".join(reasons),
+                    "related_row_id": None,
+                })
+        result = StageQAResult(
+            audited_row_ids=sent_ids,
+            flagged_rows=[FlaggedRow(**f) for f in flagged],
+        )
+        out_path = stage_dir / "qa_packets" / f"packet_{packet_idx:06d}.json"
+        tmp = out_path.with_suffix(out_path.suffix + ".tmp")
+        write_json(tmp, {
+            "packet_id": f"qa_packet:{packet_idx:06d}",
+            "row_ids": sent_ids,
+            "audit_status": "audited",
+            "result": result.model_dump(),
         })
-    write_jsonl(stage_dir / "audit_results.jsonl", rows)
+        tmp.replace(out_path)
 
 
-def run_stage5(config: CleanerConfig, resume: bool = True, batch_output: Path | None = None) -> None:
-    run_stage4(config, resume=resume)
+def run_stage5(config: CleanerConfig, resume: bool = True) -> None:
+    """Stage QA — the post-selection severity reviewer.
+
+    NEW pipeline ordering: Stage 5 runs AFTER Stage 6 (the dispatch chain
+    is stage4 -> stage6 -> stage5 -> stage8). Stage 5 reads stage6's
+    top-N per tag, asks Claude "which of these obviously don't belong?",
+    and drops the flagged rows. Stage 8 prefers stage5 outputs when
+    present and falls back to stage6 otherwise.
+    """
+    run_stage6(config, resume=resume)
     run_dir = config.run_dir()
     stage_dir = run_dir / "stage5"
-    feature_df = pd.read_parquet(run_dir / "stage4" / "row_features.parquet")
-    profiles = {
-        row["tag"]: row
-        for row in pd.read_parquet(run_dir / "stage2" / "tag_profile.parquet").to_dict(orient="records")
-    }
-    policy_records = read_jsonl(run_dir / "stage3" / "tag_boundary_policy.jsonl")
-    tag_to_rule: dict[str, dict[str, Any]] = {}
-    for cluster in policy_records:
-        for rule in cluster.get("rules", []) or []:
-            tag = rule.get("tag")
-            if not tag:
-                continue
-            tag_to_rule[tag] = {
-                "one_line_intent": rule.get("one_line_intent", ""),
-                "must_have": [str(c) for c in rule.get("must_have_concepts") or []],
-                "must_avoid": [str(c) for c in rule.get("must_avoid_concepts") or []],
-            }
 
-    input_hash = dataframe_hash(
-        feature_df, ["row_id", "audit_buffer", "canonical_tag", "target_scope", "composite_score"],
-    )
-    if resume and stage_done(stage_dir, input_hash) and (stage_dir / "audit_results.jsonl").exists():
+    top_path = run_dir / "stage6" / "question_tag.top40.csv"
+    cleaned_path = run_dir / "stage6" / "question_tag.cleaned.csv"
+    feature_df = pd.read_parquet(run_dir / "stage4" / "row_features.parquet")
+
+    # top40 is just (question, tag) — recover row_id by joining against
+    # the full cleaned.csv from Stage 6, then grab features for each.
+    top40 = pd.read_csv(top_path)
+    if "tag_clean" in top40.columns and "tag" not in top40.columns:
+        top40 = top40.rename(columns={"tag_clean": "tag"})
+    if "row_id" not in top40.columns:
+        cleaned_full = pd.read_csv(cleaned_path)
+        if "tag_clean" in cleaned_full.columns and "tag" not in cleaned_full.columns:
+            cleaned_full = cleaned_full.rename(columns={"tag_clean": "tag"})
+        if "row_id" in cleaned_full.columns:
+            top40 = top40.merge(
+                cleaned_full[["question", "tag", "row_id"]],
+                on=["question", "tag"], how="left",
+            )
+    top40 = top40.dropna(subset=["row_id"]).copy()
+    if not top40.empty:
+        top40["row_id"] = top40["row_id"].astype(int)
+    top_df = feature_df.merge(top40[["row_id"]], on="row_id", how="inner")
+
+    hash_parts = [
+        file_sha256(top_path),
+        file_sha256(cleaned_path),
+        f"judge={config.judge_mode}",
+        f"qa_model={config.stage5_model}",
+        f"qa_effort={config.stage5_effort}",
+        f"prompt_v={STAGE_QA_PROMPT_VERSION}",
+        f"schema_fp={_schema_fingerprint(StageQAResult.model_json_schema())}",
+        f"packet_size={config.qa_rows_per_packet}",
+    ]
+    input_hash = hashlib.sha256("|".join(hash_parts).encode("utf-8")).hexdigest()
+    if (
+        resume
+        and stage_done(stage_dir, input_hash)
+        and (stage_dir / "question_tag.cleaned.csv").exists()
+    ):
         print(f"[stage5] skip: {stage_dir}")
         return
 
     stage_dir.mkdir(parents=True, exist_ok=True)
     if config.judge_mode == "heuristic":
-        _heuristic_audit(feature_df, stage_dir)
-    elif config.judge_mode == "sync":
-        from openai import OpenAI
-
-        client = OpenAI()
-
-        async def _audit_one(prompt: str) -> AuditPacketResult:
-            return await _responses_audit_one(client, config, prompt)
-
-        asyncio.run(_run_audit_loop(config, feature_df, tag_to_rule, profiles, stage_dir, _audit_one))
-    elif config.judge_mode == "agents":
-        agent = _build_audit_agent(config)
-
-        async def _audit_one(prompt: str) -> AuditPacketResult:
-            return await _agents_audit_one(agent, prompt)
-
-        asyncio.run(
-            _run_audit_loop(
-                config, feature_df, tag_to_rule, profiles, stage_dir, _audit_one,
-                trace_label="tagclean.audit",
-            )
-        )
-    elif config.judge_mode in {"batch_prepare", "batch_submit", "batch_collect"}:
-        raise NotImplementedError(
-            "Audit-mode batch path is not yet wired. Use judge_mode=sync or agents for now."
-        )
+        _heuristic_qa(top_df, stage_dir)
+    elif config.judge_mode == "claude":
+        asyncio.run(_run_stage_qa_loop(config, top_df, stage_dir))
     else:
-        raise ValueError(f"Unsupported judge_mode: {config.judge_mode}")
+        raise ValueError(
+            f"Unsupported judge_mode: {config.judge_mode!r}. "
+            "Expected one of: claude, heuristic."
+        )
 
-    finish_stage(stage_dir, config, input_hash, {"judge_mode": config.judge_mode, "audit_buffer_rows": int(feature_df["audit_buffer"].sum())})
-    print(f"[stage5] wrote {stage_dir}")
+    per_row, summary = aggregate_qa_results(stage_dir)
+    write_jsonl(
+        stage_dir / "qa_results.jsonl",
+        [{"row_id": rid, **info} for rid, info in sorted(per_row.items())],
+    )
+    write_json(stage_dir / "qa_summary.json", summary)
 
+    # Apply drops to produce the post-QA cleaned + top40 CSVs.
+    drop_ids = {rid for rid, info in per_row.items() if info.get("flagged")}
+    cleaned_full = pd.read_csv(cleaned_path)
+    if "tag_clean" in cleaned_full.columns and "tag" not in cleaned_full.columns:
+        cleaned_full = cleaned_full.rename(columns={"tag_clean": "tag"})
+    if "row_id" in cleaned_full.columns:
+        kept_cleaned = cleaned_full[~cleaned_full["row_id"].astype(int).isin(drop_ids)].copy()
+    else:
+        kept_cleaned = cleaned_full
+    kept_cleaned.to_csv(stage_dir / "question_tag.cleaned.csv", index=False)
+    if not top40.empty:
+        kept_top40 = top40[~top40["row_id"].isin(drop_ids)].copy()
+        kept_top40[["question", "tag"]].to_csv(stage_dir / "question_tag.top40.csv", index=False)
+    else:
+        pd.DataFrame(columns=["question", "tag"]).to_csv(
+            stage_dir / "question_tag.top40.csv", index=False,
+        )
 
-def _load_judge_results(run_dir: Path) -> pd.DataFrame:
-    rows = read_jsonl(run_dir / "stage5" / "judge_results.jsonl")
-    if not rows:
-        return pd.DataFrame(columns=["row_id", "decision", "quality_score", "ambiguity_score", "reason_code", "rationale"])
-    return pd.DataFrame(rows)
-
-
-def _load_stage_judge_results(stage_dir: Path) -> pd.DataFrame:
-    rows = read_jsonl(stage_dir / "judge_results.jsonl")
-    if not rows:
-        return pd.DataFrame(columns=["row_id", "decision", "quality_score", "ambiguity_score", "reason_code", "rationale"])
-    return pd.DataFrame(rows)
+    finish_stage(
+        stage_dir,
+        config,
+        input_hash,
+        {
+            "judge_mode": config.judge_mode,
+            "input_top40_rows": int(len(top40)),
+            "drops": int(len(drop_ids)),
+            "audit_incomplete_packets": int(summary.get("incomplete_packets", 0)),
+            "empty_flagged_rate": float(summary.get("empty_flagged_rate", 0.0)),
+        },
+    )
+    print(
+        f"[stage5] wrote {stage_dir}  in={len(top40)}  drops={len(drop_ids)}  "
+        f"empty_flagged_packets={summary.get('empty_flagged_packets', 0)}/"
+        f"{summary.get('total_packets', 0)}"
+    )
 
 
 def _normalize_series(s: pd.Series) -> pd.Series:
@@ -2409,230 +1772,96 @@ def _mmr_order(group: pd.DataFrame, vectors: np.ndarray, lambda_: float = 0.7) -
 
 
 def run_stage6(config: CleanerConfig, resume: bool = True) -> None:
-    run_stage5(config, resume=resume)
+    """Selection: top-N per tag from the deterministic ranker.
+
+    NEW pipeline ordering: Stage 6 chains directly to Stage 4 (no audit
+    buffer concept anymore). It picks top-N by composite_score + MMR
+    over ALL in-scope rows, with no LLM input. Stage 5 (Stage QA) runs
+    AFTER this and can drop rows from the top-N.
+    """
+    run_stage4(config, resume=resume)
     run_dir = config.run_dir()
     stage_dir = run_dir / "stage6"
     feature_df = pd.read_parquet(run_dir / "stage4" / "row_features.parquet")
-    audit_rows = read_jsonl(run_dir / "stage5" / "audit_results.jsonl")
-    audit_df = pd.DataFrame(audit_rows) if audit_rows else pd.DataFrame(
-        columns=["row_id", "decision", "reason_code", "rationale", "audit_status"],
-    )
     input_hash = dataframe_hash(
-        feature_df, ["row_id", "audit_buffer", "canonical_tag", "target_scope", "composite_score"],
+        feature_df, ["row_id", "canonical_tag", "target_scope", "composite_score"],
     )
     if resume and stage_done(stage_dir, input_hash):
         print(f"[stage6] skip: {stage_dir}")
         return
 
-    df = feature_df.merge(
-        audit_df[["row_id", "decision", "reason_code", "rationale", "audit_status"]] if not audit_df.empty else audit_df,
-        on="row_id",
-        how="left",
-    )
-    df = df[df["target_scope"]].copy()
-    if "decision" not in df.columns:
-        df["decision"] = pd.Series([None] * len(df), index=df.index, dtype="object")
-        df["reason_code"] = ""
-        df["rationale"] = ""
-        df["audit_status"] = ""
+    df = feature_df[feature_df["target_scope"]].copy()
 
-    # Status: keep iff in audit buffer AND audit decision == "keep". Below-buffer
-    # rows and audit-flagged rows are jettisoned.
-    df["status"] = "jettison"
-    df["status_reason"] = ""
-    in_buffer = df["audit_buffer"]
-    df.loc[in_buffer & (df["decision"] == "keep"), "status"] = "keep"
-    df.loc[in_buffer & (df["decision"] == "keep"), "status_reason"] = "audited_pass"
-    df.loc[in_buffer & (df["decision"] == "flag"), "status_reason"] = "audited_flag"
-    df.loc[~in_buffer, "status_reason"] = "below_audit_buffer"
-
-    kept = df[df["status"] == "keep"].copy()
-    jettisoned = df[df["status"] == "jettison"].copy()
-
-    # MMR-adjusted ranking inside each tag's kept set so 40 rows cover phrasing
-    # diversity, not 40 near-paraphrases of the medoid.
-    if not kept.empty:
-        kept["base_score"] = kept["composite_score"]
+    # Rank by composite_score + MMR within each tag. No audit filter — the
+    # whole in-scope set is candidate; the top-N is what we ship to Stage QA.
+    if not df.empty:
+        df["base_score"] = df["composite_score"]
         emb_e5 = np.load(run_dir / "stage1" / "emb_e5.npy")
         emb_rows = pd.read_parquet(run_dir / "stage1" / "embedding_rows.parquet")
         row_pos = {int(rid): i for i, rid in enumerate(emb_rows["row_id"])}
-        kept["_emb_pos"] = kept["row_id"].astype(int).map(row_pos)
+        df["_emb_pos"] = df["row_id"].astype(int).map(row_pos)
         mmr_scores: dict[int, float] = {}
-        for _, group in kept.groupby("canonical_tag"):
+        for _, group in df.groupby("canonical_tag"):
             indexed = group.set_index("_emb_pos")
             mmr_scores.update(_mmr_order(indexed, emb_e5, lambda_=0.7))
-        kept["mmr_score"] = kept["_emb_pos"].map(mmr_scores).fillna(0.0)
-        kept["final_score"] = 0.85 * kept["composite_score"] + 0.15 * kept["mmr_score"]
-        kept = kept.drop(columns=["_emb_pos"]).sort_values(
+        df["mmr_score"] = df["_emb_pos"].map(mmr_scores).fillna(0.0)
+        df["final_score"] = 0.85 * df["composite_score"] + 0.15 * df["mmr_score"]
+        df = df.drop(columns=["_emb_pos"]).sort_values(
             ["canonical_tag", "final_score"], ascending=[True, False]
         )
-        kept["rank"] = kept.groupby("canonical_tag").cumcount() + 1
-        kept["production_recommended"] = kept["rank"] <= config.top_n
+        df["rank"] = df.groupby("canonical_tag").cumcount() + 1
+        df["production_recommended"] = df["rank"] <= config.top_n
     else:
-        kept["final_score"] = []
-        kept["rank"] = []
-        kept["production_recommended"] = []
+        df["final_score"] = []
+        df["rank"] = []
+        df["production_recommended"] = []
+
+    kept = df.copy()  # all in-scope rows; Stage QA will subset later
+    jettisoned_below_top_n = df[~df["production_recommended"]] if "production_recommended" in df.columns else df.iloc[0:0]
 
     stage_dir.mkdir(parents=True, exist_ok=True)
     cleaned_out_cols = [
         "question_raw", "canonical_tag", "rank", "final_score", "composite_score",
-        "production_recommended", "audit_status", "reason_code", "row_id", "tag",
-        "e5_margin", "gemma_margin", "token_alignment", "artifact_score", "rationale",
+        "production_recommended", "row_id", "tag",
+        "e5_margin", "artifact_score",
     ]
     cleaned_out_cols = [c for c in cleaned_out_cols if c in kept.columns]
     kept[cleaned_out_cols].rename(
         columns={"question_raw": "question", "canonical_tag": "tag_clean", "tag": "original_tag"}
     ).to_csv(stage_dir / "question_tag.cleaned.csv", index=False)
 
-    top = kept[kept["production_recommended"]] if "production_recommended" in kept.columns else kept.iloc[0:0]
-    top[["question_raw", "canonical_tag"]].rename(
-        columns={"question_raw": "question", "canonical_tag": "tag"}
-    ).to_csv(stage_dir / "question_tag.top40.csv", index=False)
+    if (
+        "production_recommended" in kept.columns
+        and "question_raw" in kept.columns
+        and "canonical_tag" in kept.columns
+        and not kept.empty
+    ):
+        top = kept[kept["production_recommended"]]
+        top[["question_raw", "canonical_tag"]].rename(
+            columns={"question_raw": "question", "canonical_tag": "tag"}
+        ).to_csv(stage_dir / "question_tag.top40.csv", index=False)
+    else:
+        pd.DataFrame(columns=["question", "tag"]).to_csv(
+            stage_dir / "question_tag.top40.csv", index=False,
+        )
 
     jett_cols = [
-        "question_raw", "canonical_tag", "row_id", "tag", "status_reason",
-        "audit_status", "reason_code", "rationale", "composite_score",
-        "audit_buffer", "e5_margin", "gemma_margin", "token_alignment", "artifact_score",
+        "question_raw", "canonical_tag", "row_id", "tag", "rank",
+        "composite_score", "e5_margin", "artifact_score",
     ]
-    jett_cols = [c for c in jett_cols if c in jettisoned.columns]
-    jettisoned[jett_cols].to_csv(stage_dir / "jettisoned_rows.csv", index=False)
+    jett_cols = [c for c in jett_cols if c in jettisoned_below_top_n.columns]
+    jettisoned_below_top_n[jett_cols].to_csv(stage_dir / "jettisoned_rows.csv", index=False)
+
     finish_stage(
         stage_dir,
         config,
         input_hash,
         {
-            "kept": len(kept),
-            "jettisoned": len(jettisoned),
+            "in_scope_rows": int(len(df)),
             "production_recommended": int(kept["production_recommended"].sum()) if "production_recommended" in kept.columns else 0,
         },
     )
     print(f"[stage6] wrote {stage_dir}")
-
-
-def select_review_candidates(cleaned: pd.DataFrame, config: CleanerConfig) -> list[int]:
-    if cleaned.empty or not config.review_enabled:
-        return []
-    selected: set[int] = set()
-    for _, group in cleaned.groupby("tag_clean"):
-        threshold = group["composite_score"].quantile(config.review_low_score_quantile)
-        tail = group[group["composite_score"] <= threshold]
-        tail = tail.nsmallest(config.review_rows_per_tag, "composite_score")
-        selected.update(int(v) for v in tail["row_id"].tolist())
-    return sorted(selected)
-
-
-def apply_review_results(cleaned: pd.DataFrame, review_results: pd.DataFrame, config: CleanerConfig) -> tuple[pd.DataFrame, pd.DataFrame]:
-    if review_results.empty:
-        reviewed = cleaned.copy()
-        reviewed["review_decision"] = "not_reviewed"
-        reviewed["review_reason_code"] = ""
-        reviewed["review_rationale"] = ""
-        return reviewed, cleaned.iloc[0:0].copy()
-
-    results = review_results[["row_id", "decision", "reason_code", "rationale", "quality_score", "ambiguity_score"]].rename(
-        columns={
-            "decision": "review_decision",
-            "reason_code": "review_reason_code",
-            "rationale": "review_rationale",
-            "quality_score": "review_quality_score",
-            "ambiguity_score": "review_ambiguity_score",
-        }
-    )
-    merged = cleaned.merge(results, on="row_id", how="left")
-    merged["review_decision"] = merged["review_decision"].fillna("not_reviewed")
-    reviewed_keep = merged[merged["review_decision"].isin(["keep", "not_reviewed"])].copy()
-    reviewed_drop = merged[~merged["review_decision"].isin(["keep", "not_reviewed"])].copy()
-
-    reviewed_keep = reviewed_keep.sort_values(["tag_clean", "composite_score"], ascending=[True, False])
-    reviewed_keep["rank"] = reviewed_keep.groupby("tag_clean").cumcount() + 1
-    reviewed_keep["production_recommended"] = reviewed_keep["rank"] <= config.top_n
-    return reviewed_keep, reviewed_drop
-
-
-def run_stage7(config: CleanerConfig, resume: bool = True) -> None:
-    """Second automated review pass over low-confidence kept rows."""
-    run_stage6(config, resume=resume)
-    run_dir = config.run_dir()
-    stage_dir = run_dir / "stage7"
-    cleaned_path = run_dir / "stage6" / "question_tag.cleaned.csv"
-    input_hash = hashlib.sha256(
-        file_sha256(cleaned_path).encode("utf-8")
-        + json.dumps(
-            {
-                "review_enabled": config.review_enabled,
-                "review_rows_per_tag": config.review_rows_per_tag,
-                "review_low_score_quantile": config.review_low_score_quantile,
-                "judge_mode": config.judge_mode,
-                "judge_granularity": config.judge_granularity,
-                "passes": config.self_consistency_passes,
-            },
-            sort_keys=True,
-        ).encode("utf-8")
-    ).hexdigest()
-    if resume and stage_done(stage_dir, input_hash):
-        print(f"[stage7] skip: {stage_dir}")
-        return
-
-    stage_dir.mkdir(parents=True, exist_ok=True)
-    cleaned = pd.read_csv(cleaned_path)
-    candidate_ids = select_review_candidates(cleaned, config)
-    write_json(stage_dir / "review_candidates.json", {"row_ids": candidate_ids, "count": len(candidate_ids)})
-
-    if not candidate_ids:
-        reviewed = cleaned.copy()
-        reviewed["review_decision"] = "not_reviewed"
-        reviewed["review_reason_code"] = ""
-        reviewed["review_rationale"] = ""
-        reviewed_drop = cleaned.iloc[0:0].copy()
-    else:
-        feature_df = pd.read_parquet(run_dir / "stage4" / "row_features.parquet")
-        review_features = feature_df[feature_df["row_id"].isin(candidate_ids)].copy()
-        review_features["route"] = "judge"
-        profiles = {
-            row["tag"]: row
-            for row in pd.read_parquet(run_dir / "stage2" / "tag_profile.parquet").to_dict(orient="records")
-        }
-
-        if config.judge_mode == "heuristic":
-            rows = []
-            for _, row in review_features.iterrows():
-                decision = "jettison" if row["cross_tag_duplicate"] or row["e5_margin"] < 0 or row["gemma_margin"] < 0 else "keep"
-                rows.append(
-                    {
-                        "row_id": int(row["row_id"]),
-                        "decision": decision,
-                        "quality_score": 70 if decision == "keep" else 0,
-                        "ambiguity_score": 35 if decision == "keep" else 100,
-                        "context_dependent": False,
-                        "reason_code": "clean" if decision == "keep" else "sibling_collision",
-                        "rationale": "Heuristic second-pass review fallback.",
-                        "consistent": True,
-                    }
-                )
-                write_jsonl(stage_dir / "judge_results.jsonl", rows)
-        elif config.judge_mode == "sync":
-            asyncio.run(run_responses_judge(config, review_features, profiles, stage_dir))
-        elif config.judge_mode == "agents":
-            asyncio.run(run_agents_judge(config, review_features, profiles, stage_dir))
-        elif config.judge_mode in {"batch_prepare", "batch_submit", "batch_collect"}:
-            request_path = prepare_judge_batch(config, review_features, profiles, stage_dir)
-            raise RuntimeError(
-                f"Second-pass review is configured for async batch mode. Prepared {request_path}; "
-                "collect it, then rerun stage7 with judge_mode=batch_collect or switch to sync/agents for sequential execution."
-            )
-        else:
-            raise ValueError(f"Unsupported judge_mode: {config.judge_mode}")
-
-        review_df = _load_stage_judge_results(stage_dir)
-        reviewed, reviewed_drop = apply_review_results(cleaned, review_df, config)
-
-    reviewed.to_csv(stage_dir / "question_tag.reviewed.csv", index=False)
-    reviewed[reviewed["production_recommended"]][["question", "tag_clean"]].rename(columns={"tag_clean": "tag"}).to_csv(
-        stage_dir / "question_tag.top40.reviewed.csv", index=False
-    )
-    reviewed_drop.to_csv(stage_dir / "jettisoned_review_rows.csv", index=False)
-    finish_stage(stage_dir, config, input_hash, {"reviewed": len(reviewed), "review_jettisoned": len(reviewed_drop)})
-    print(f"[stage7] wrote {stage_dir}")
 
 
 def _faiss_search(vectors: np.ndarray, query_vectors: np.ndarray, top_k: int) -> tuple[np.ndarray, np.ndarray]:
@@ -2676,13 +1905,25 @@ def _loo_metrics(df: pd.DataFrame, vectors: np.ndarray, query_vectors: np.ndarra
 
 
 def run_stage8(config: CleanerConfig, resume: bool = True) -> None:
-    run_stage7(config, resume=resume)
+    # New pipeline ordering: stage4 -> stage6 -> stage5 (Stage QA) -> stage8.
+    # Validation prefers post-QA outputs from stage5/ when present and
+    # falls back to stage6/ outputs (the deterministic top-N before any
+    # Claude review). Legacy stage7/ paths are honored for back-compat
+    # with pre-migration runs.
+    run_stage5(config, resume=resume)
     run_dir = config.run_dir()
     stage_dir = run_dir / "stage8"
-    reviewed_path = run_dir / "stage7" / "question_tag.reviewed.csv"
-    reviewed_top40_path = run_dir / "stage7" / "question_tag.top40.reviewed.csv"
-    cleaned_path = reviewed_path if reviewed_path.exists() else run_dir / "stage6" / "question_tag.cleaned.csv"
-    top40_path = reviewed_top40_path if reviewed_top40_path.exists() else run_dir / "stage6" / "question_tag.top40.csv"
+    qa_cleaned = run_dir / "stage5" / "question_tag.cleaned.csv"
+    qa_top40 = run_dir / "stage5" / "question_tag.top40.csv"
+    legacy_reviewed = run_dir / "stage7" / "question_tag.reviewed.csv"
+    legacy_top40 = run_dir / "stage7" / "question_tag.top40.reviewed.csv"
+    if qa_cleaned.exists() and qa_top40.exists():
+        cleaned_path, top40_path = qa_cleaned, qa_top40
+    elif legacy_reviewed.exists() and legacy_top40.exists():
+        cleaned_path, top40_path = legacy_reviewed, legacy_top40
+    else:
+        cleaned_path = run_dir / "stage6" / "question_tag.cleaned.csv"
+        top40_path = run_dir / "stage6" / "question_tag.top40.csv"
     input_hash = hashlib.sha256(file_sha256(cleaned_path).encode("utf-8") + file_sha256(top40_path).encode("utf-8")).hexdigest()
     if resume and stage_done(stage_dir, input_hash):
         print(f"[stage8] skip: {stage_dir}")
@@ -2733,9 +1974,11 @@ def run_stage9(config: CleanerConfig, resume: bool = True) -> None:
     inference is E5-only. Reports per-row neighborhood and, by default, drops
     rows whose nearest non-self neighbor belongs to a different tag.
 
-    Input is by default `stage6/question_tag.cleaned.csv`. Pass
-    `config.stage9_input_csv` to audit an external CSV — typically the
-    concatenation of top-40 sets across multiple family runs (the actual
+    Input default: prefer `stage5/question_tag.cleaned.csv` (post-Stage QA)
+    when present; fall back to `stage6/question_tag.cleaned.csv` (pre-QA top-N)
+    otherwise. Pass `config.stage9_input_csv` to audit an external CSV —
+    typically the concatenation of top-40 sets across multiple family
+    runs (the actual
     production candidate set).
 
     Stage 9 NEVER chains Stage 0–8: chaining would silently overwrite the
@@ -2749,11 +1992,12 @@ def run_stage9(config: CleanerConfig, resume: bool = True) -> None:
     if config.stage9_input_csv:
         input_csv = Path(config.stage9_input_csv).expanduser().resolve()
     else:
-        input_csv = run_dir / "stage6" / "question_tag.cleaned.csv"
+        qa_cleaned = run_dir / "stage5" / "question_tag.cleaned.csv"
+        input_csv = qa_cleaned if qa_cleaned.exists() else run_dir / "stage6" / "question_tag.cleaned.csv"
     if not input_csv.exists():
         raise FileNotFoundError(
             f"Stage 9 input not found: {input_csv}\n"
-            f"Run `tagclean stage6` (or stage8) first, or pass --e5-audit-input <csv>."
+            f"Run `tagclean stage6` (or stage5/stage8) first, or pass --e5-audit-input <csv>."
         )
 
     knobs = f"{config.e5_audit_top_k}|{int(config.e5_audit_drop_on_top1_mismatch)}|{config.e5_model}|{int(config.e5_use_prefixes)}"
@@ -2885,7 +2129,6 @@ STAGES = {
     "stage4": run_stage4,
     "stage5": run_stage5,
     "stage6": run_stage6,
-    "stage7": run_stage7,
     "stage8": run_stage8,
     "stage9": run_stage9,
 }
@@ -2913,12 +2156,12 @@ def run_discover(
     report_path: Path | None = None,
     production_tags: set[str] | None = None,
 ) -> None:
-    """Seed-centric reciprocal-NN family discovery for the close-tag scope.
+    """Seed-centric reciprocal-NN family discovery, E5-only.
 
     Replaces the broken union-find in `find_close_tag_clusters` for the
-    scaling case. Algorithm (Codex-approved):
-      1. Per tag, top-K neighbors by min(cos_e5, cos_gemma).
-      2. Edge kept iff reciprocal AND min(E5,Gemma) >= threshold.
+    scaling case. Algorithm:
+      1. Per tag, top-K neighbors by E5 cosine.
+      2. Edge kept iff reciprocal AND cos_e5 >= threshold.
       3. Per seed, ego-family = seed + reciprocal neighbors, capped at
          max_family_size, requiring pairwise min_sim >= pair_threshold with
          every existing member.
@@ -2927,6 +2170,10 @@ def run_discover(
       6. Uncovered tags become singletons.
     Writes a hand-editable `families.yaml` and an optional human-readable
     report. No transitive closure -> no mega-components at corpus scale.
+
+    Discover uses E5-only similarity. The reciprocal top-K + pair-threshold
+    gates supply the multi-criteria robustness the prior dual-geometry
+    (Gemma) gate added.
     """
     centroids_dir = config.artifact_root / centroids_from / "stage2"
     if not (centroids_dir / "tag_index.json").exists():
@@ -2937,15 +2184,14 @@ def run_discover(
     tag_index = read_json(centroids_dir / "tag_index.json")
     tags: list[str] = list(tag_index.get("tags", []))
     e5 = np.load(centroids_dir / "tag_centroids_e5.npy")
-    gemma = np.load(centroids_dir / "tag_centroids_gemma.npy")
 
     # Renormalize defensively — Stage 2 centroids are means, not unit norm.
     e5 = e5 / np.clip(np.linalg.norm(e5, axis=1, keepdims=True), 1e-12, None)
-    gemma = gemma / np.clip(np.linalg.norm(gemma, axis=1, keepdims=True), 1e-12, None)
 
-    sim_e5 = (e5 @ e5.T).astype(np.float32)
-    sim_gem = (gemma @ gemma.T).astype(np.float32)
-    sim = np.minimum(sim_e5, sim_gem)
+    # E5-only similarity. The reciprocal top-K + pair-threshold gates
+    # below provide the multi-criteria robustness Gemma's cosine used
+    # to add at this layer.
+    sim = (e5 @ e5.T).astype(np.float32)
     np.fill_diagonal(sim, -np.inf)
 
     n = len(tags)
@@ -3112,7 +2358,6 @@ def run_discover(
             "centroids_run_id": centroids_from,
             "tag_index": str(centroids_dir / "tag_index.json"),
             "e5_centroids": str(centroids_dir / "tag_centroids_e5.npy"),
-            "gemma_centroids": str(centroids_dir / "tag_centroids_gemma.npy"),
         },
         "discover_config": {
             "threshold": float(threshold),
@@ -3308,9 +2553,18 @@ def run_compose(
     duplicates = 0
     per_run: dict[str, tuple[int, int]] = {}
     for run_id in from_runs:
-        src = config.artifact_root / run_id / "stage6" / file_name
+        # Codex correctness fix: prefer post-Stage-QA outputs from stage5/
+        # when present (the Claude-flagged drops are baked in there), fall
+        # back to stage6/ for back-compat with pre-Stage-QA runs.
+        # Without this, compose silently throws away every Claude QA flag.
+        qa_src = config.artifact_root / run_id / "stage5" / file_name
+        legacy_src = config.artifact_root / run_id / "stage6" / file_name
+        src = qa_src if qa_src.exists() else legacy_src
         if not src.exists():
-            raise FileNotFoundError(f"Source CSV not found for run {run_id!r}: {src}")
+            raise FileNotFoundError(
+                f"Source CSV not found for run {run_id!r}: tried "
+                f"{qa_src} then {legacy_src}"
+            )
         frame = pd.read_csv(src)
         if "tag" not in frame.columns and "tag_clean" in frame.columns:
             frame = frame.rename(columns={"tag_clean": "tag"})
@@ -3358,8 +2612,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--run-id", default=None)
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--no-resume", action="store_true")
-    parser.add_argument("--judge-mode", choices=["batch_prepare", "batch_submit", "batch_collect", "sync", "agents", "heuristic"], default=None)
-    parser.add_argument("--openai-model", default=None, help="Override config.openai_model (e.g. gpt-5.4, gpt-5.5)")
+    parser.add_argument(
+        "--judge-mode",
+        choices=["claude", "heuristic"],
+        default=None,
+        help="LLM mode for Stage 3 + Stage 5 (default: claude). 'heuristic' "
+        "skips claude entirely and uses tag-name token alignment + duplicate "
+        "flags — useful for offline smoke tests.",
+    )
+    parser.add_argument("--stage5-model", default=None, help="Claude model for Stage QA (default: sonnet)")
+    parser.add_argument("--stage5-effort", default=None, help="Claude effort for Stage QA (default: medium)")
+    parser.add_argument("--claude-fallback-model", default=None, help="Fallback model when primary is overloaded (default: sonnet)")
+    parser.add_argument("--claude-call-timeout", type=float, default=None, help="Per-call timeout in seconds (default: 300)")
     parser.add_argument("--language", choices=["bn", "none"], default=None, help="Text-normalization language (default: bn)")
     parser.add_argument("--embedding-backend", choices=["sentence-transformers", "hashing"], default=None)
     parser.add_argument("--device", choices=["auto", "cpu", "cuda", "mps"], default=None)
@@ -3369,10 +2633,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--target-tags", default=None, help="Comma-separated tags to clean while using the full corpus as evidence")
     parser.add_argument("--target-max-tags", type=int, default=None, help="Clean only the first N tags while keeping full corpus evidence")
     parser.add_argument("--seed-tag", default=None, help="Resolve the close-tag cluster containing this tag and clean its members")
-    parser.add_argument("--self-consistency-passes", type=int, default=None)
-    parser.add_argument("--tags-per-judge-call", type=int, default=None)
-    parser.add_argument("--rows-per-tag-per-judge-call", type=int, default=None)
-    parser.add_argument("--batch-output", type=Path, default=None)
     parser.add_argument(
         "--e5-audit-input",
         type=Path,
@@ -3423,7 +2683,7 @@ def parse_args() -> argparse.Namespace:
         "--threshold",
         type=float,
         default=0.88,
-        help="discover: min(cos_e5, cos_gemma) edge threshold (default 0.88).",
+        help="discover: cos_e5 edge threshold (default 0.88).",
     )
     parser.add_argument(
         "--pair-threshold",
@@ -3504,13 +2764,10 @@ def resolve_seed_cluster(config: CleanerConfig, seed_tag: str) -> list[str]:
             f"Sample: {tags[:5]}"
         )
     e5_cents = np.load(run_dir / "stage2" / "tag_centroids_e5.npy")
-    gemma_cents = np.load(run_dir / "stage2" / "tag_centroids_gemma.npy")
     sim_e5 = e5_cents @ e5_cents.T
-    sim_gemma = gemma_cents @ gemma_cents.T
     clusters = find_close_tag_clusters(
         tags,
         np.asarray(sim_e5, dtype=np.float32),
-        np.asarray(sim_gemma, dtype=np.float32),
         threshold=config.boundary_policy_threshold,
         max_cluster_size=config.boundary_policy_max_cluster_size,
     )
@@ -3520,30 +2777,25 @@ def resolve_seed_cluster(config: CleanerConfig, seed_tag: str) -> list[str]:
             cluster_for_seed = list(cluster)
             break
 
-    # Diagnostics: top-5 nearest tags NOT in the cluster so the user sees why
-    # siblings didn't make the cut and can lower the threshold or pass
-    # --target-tags explicitly.
+    # Diagnostics: top-5 nearest tags NOT in the cluster so the user sees
+    # why siblings didn't make the cut and can lower the threshold or
+    # pass --target-tags explicitly.
     seed_idx = tags.index(seed_tag)
     in_cluster = set(cluster_for_seed)
     excluded = [
-        (
-            tags[j],
-            float(sim_e5[seed_idx, j]),
-            float(sim_gemma[seed_idx, j]),
-            min(float(sim_e5[seed_idx, j]), float(sim_gemma[seed_idx, j])),
-        )
+        (tags[j], float(sim_e5[seed_idx, j]))
         for j in range(len(tags))
         if tags[j] != seed_tag and tags[j] not in in_cluster
     ]
-    excluded.sort(key=lambda r: r[3], reverse=True)
+    excluded.sort(key=lambda r: r[1], reverse=True)
     if excluded:
         print(
             f"[seed] threshold={config.boundary_policy_threshold:.2f} "
-            f"(min of E5/Gemma must clear). Nearest excluded tags:"
+            f"(E5 cosine must clear). Nearest excluded tags:"
         )
-        for tag, e5, gemma, mn in excluded[:5]:
-            hint = " ← sibling, just below threshold" if mn >= 0.75 else ""
-            print(f"        {tag:<40s}  E5={e5:.3f}  Gemma={gemma:.3f}  min={mn:.3f}{hint}")
+        for tag, e5 in excluded[:5]:
+            hint = " ← sibling, just below threshold" if e5 >= 0.75 else ""
+            print(f"        {tag:<40s}  E5={e5:.3f}{hint}")
     return cluster_for_seed
 
 
@@ -3569,8 +2821,7 @@ def write_run_manifest(config: CleanerConfig, stage: str) -> Path:
         "tag_answer_sha256": file_sha256(config.tag_answer_json) if config.tag_answer_json.exists() else None,
         "models": {
             "e5": config.e5_model,
-            "gemma": config.gemma_model,
-            "openai": config.openai_model,
+            "claude_qa": config.stage5_model,
         },
         "judge_mode": config.judge_mode,
         "language": config.language,
@@ -3598,8 +2849,14 @@ def main() -> None:
         config.run_id = args.run_id
     if args.judge_mode:
         config.judge_mode = args.judge_mode
-    if args.openai_model:
-        config.openai_model = args.openai_model
+    if args.stage5_model:
+        config.stage5_model = args.stage5_model
+    if args.stage5_effort:
+        config.stage5_effort = args.stage5_effort
+    if args.claude_fallback_model:
+        config.claude_fallback_model = args.claude_fallback_model
+    if args.claude_call_timeout is not None:
+        config.claude_call_timeout_s = args.claude_call_timeout
     if args.language:
         config.language = args.language
     if args.embedding_backend:
@@ -3623,12 +2880,6 @@ def main() -> None:
         print(f"[seed] resolved cluster from '{args.seed_tag}': {cluster}")
         config.target_tags = cluster
         config._seed_tag = args.seed_tag  # surfaced in run_manifest.json
-    if args.self_consistency_passes is not None:
-        config.self_consistency_passes = args.self_consistency_passes
-    if args.tags_per_judge_call is not None:
-        config.tags_per_judge_call = args.tags_per_judge_call
-    if args.rows_per_tag_per_judge_call is not None:
-        config.rows_per_tag_per_judge_call = args.rows_per_tag_per_judge_call
     if args.e5_audit_input is not None:
         config.stage9_input_csv = str(args.e5_audit_input.resolve())
     if args.e5_audit_k is not None:
@@ -3637,6 +2888,23 @@ def main() -> None:
         config.e5_audit_drop_on_top1_mismatch = False
 
     _NORMALIZATION_LANGUAGE = config.language
+
+    # Cheap startup probe: confirm `claude -p` works under the stripped-env
+    # subprocess (subscription routing) before launching a multi-hour run.
+    # Only when we'll actually call Claude — heuristic / discover / compose
+    # paths don't need it.
+    if (
+        config.judge_mode == "claude"
+        and args.stage in {"stage5", "stage8", "all", "run-families"}
+    ):
+        from .claude_cli import probe_auth
+        ok, msg = asyncio.run(probe_auth())
+        print(f"[claude-cli] {msg}")
+        if not ok:
+            raise SystemExit(
+                "Aborting: claude CLI auth probe failed. Run `claude /login` "
+                "(or `claude auth login`) and try again."
+            )
 
     resume = args.resume or not args.no_resume
     if args.stage == "discover":
@@ -3697,10 +2965,15 @@ def main() -> None:
                 if args.compose_source == "top40"
                 else "question_tag.cleaned.csv"
             )
+            # Stage QA outputs live in stage5/ (post-Claude); stage6/ is the
+            # pre-QA fallback for back-compat with old runs.
             present = [
                 fam
                 for fam in wanted
-                if (config.artifact_root / fam["family_id"] / "stage6" / file_name).exists()
+                if (
+                    (config.artifact_root / fam["family_id"] / "stage5" / file_name).exists()
+                    or (config.artifact_root / fam["family_id"] / "stage6" / file_name).exists()
+                )
             ]
             missing = [fam for fam in wanted if fam not in present]
             if missing and args.require_complete:
@@ -3744,16 +3017,7 @@ def main() -> None:
         run_compose(config, from_runs, args.compose_source, out_path)
         return
     if args.stage == "all":
-        if config.judge_mode in {"batch_prepare", "batch_submit"}:
-            run_stage5(config, resume=resume, batch_output=args.batch_output)
-            print(
-                "[all] stopped after stage5 because judge_mode is asynchronous. "
-                "Collect the batch output, then rerun with judge_mode=batch_collect, sync, or agents."
-            )
-            return
         run_stage8(config, resume=resume)
-    elif args.stage == "stage5":
-        run_stage5(config, resume=resume, batch_output=args.batch_output)
     else:
         STAGES[args.stage](config, resume=resume)
 

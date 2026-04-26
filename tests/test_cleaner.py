@@ -1,35 +1,40 @@
 from __future__ import annotations
 
+import asyncio
 import csv
 import json
+import os
+import stat
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 
+from tagclean import claude_cli
 from tagclean.cleaner import (
     CleanerConfig,
-    JudgePacketResult,
-    JudgeResult,
-    RowJudgeDecision,
+    FlaggedRow,
+    STAGE_QA_PROMPT_VERSION,
+    StageQAResult,
+    _schema_fingerprint,
+    _stable_family_id,
+    _symlink_shared_stages,
+    aggregate_qa_results,
     artifact_score,
-    build_audit_packets,
-    build_judge_packets,
-    build_judge_prompt,
+    build_stage_qa_packets,
+    build_stage_qa_prompt,
     canonical_tag_name,
     coerce_optional_str_list,
     comparison_key,
     find_close_tag_clusters,
-    missing_row_ids_in_packet_result,
     normalize_question,
     resolve_target_tags,
     run_compose,
     run_stage0,
     run_stage9,
     token_alignment_score,
-    _resolve_consistency,
-    _stable_family_id,
-    _symlink_shared_stages,
+    write_jsonl,
 )
 
 
@@ -40,45 +45,12 @@ def _write_question_tag(path: Path, rows: list[tuple[str, str]]) -> None:
         writer.writerows(rows)
 
 
+# ----------------------------- helpers -----------------------------
+
 def test_coerce_optional_str_list_avoids_numpy_truthiness() -> None:
     assert coerce_optional_str_list(None) == []
     assert coerce_optional_str_list(["a", "b"]) == ["a", "b"]
     assert coerce_optional_str_list(np.array(["x", "y"])) == ["x", "y"]
-
-
-def test_build_judge_prompt_serializes_with_ndarray_profile_cells() -> None:
-    cfg = CleanerConfig()
-    profiles = {
-        "primary": {
-            "description": "Primary tag",
-            "central_questions": np.array(["central one", "central two"]),
-            "discriminative_phrases": np.array(["unique phrase"]),
-        },
-        "competing": {
-            "description": "Competing tag",
-            "central_questions": np.array(["other one"]),
-            "discriminative_phrases": np.array(["other phrase"]),
-        },
-    }
-    row = pd.Series(
-        {
-            "canonical_tag": "primary",
-            "question_raw": "raw question",
-            "question_norm": "norm question",
-            "e5_top1_competing_tag": "competing",
-            "gemma_top1_competing_tag": "competing",
-            "e5_top10_evidence": json.dumps([{"rank": 1, "tag": "competing", "row_id": 9}]),
-            "gemma_top10_evidence": json.dumps([{"rank": 1, "tag": "competing", "row_id": 9}]),
-            "embedding_reconciliation": json.dumps({}),
-        }
-    )
-
-    prompt = build_judge_prompt(row, profiles, cfg)
-    payload = json.loads(prompt)
-    assert payload["current_tag"] == "primary"
-    assert payload["current_tag_central_examples"] == ["central one", "central two"]
-    assert payload["current_tag_discriminative_phrases"] == ["unique phrase"]
-    assert any(c["tag"] == "competing" for c in payload["competing_tags"])
 
 
 def test_normalize_question_folds_digits_quotes_and_whitespace() -> None:
@@ -87,13 +59,42 @@ def test_normalize_question_folds_digits_quotes_and_whitespace() -> None:
     assert comparison_key(text) == "nid পোর্টালে লকড 123"
 
 
+def test_canonical_tag_name_prefers_base_semantic_tag() -> None:
+    counts = {
+        "nid_fee_01_followup_a": 100,
+        "nid_fee": 10,
+        "nid_fee_01": 20,
+    }
+    assert canonical_tag_name(list(counts), counts) == "nid_fee"
+
+
+def test_token_alignment_scores_must_have_and_must_avoid() -> None:
+    text_with = "তথ্য ঠিক দিলেও সমাধান হচ্ছে না। কখন আবার চেষ্টা করব?"
+    text_without = "অ্যাকাউন্ট লক, কীভাবে আনলক করব?"
+    must_have = ["তথ্য ঠিক", "আবার"]
+    must_avoid = ["আনলক করব"]
+
+    assert token_alignment_score(text_with, must_have, must_avoid) == 1.0
+    assert token_alignment_score(text_without, must_have, must_avoid) == -1.0
+    assert token_alignment_score("", [], []) == 0.0
+
+
+def test_artifact_score_flags_short_and_repetitive_text() -> None:
+    assert artifact_score("ok") >= 0.5
+    assert artifact_score("aaaaa repeated") > 0.0
+    long_clean = "এনআইডি অ্যাকাউন্ট লক হলে কীভাবে আনলক করতে হয়?"
+    assert artifact_score(long_clean) < 0.25
+
+
+# ----------------------------- stage 0 -----------------------------
+
 def test_stage0_jettisons_duplicates_context_and_artifacts(tmp_path: Path) -> None:
     csv_path = tmp_path / "question_tag.csv"
     _write_question_tag(
         csv_path,
         [
-            ("NID কার্ড হারিয়েছে কী করব?", "lost_card"),
-            ("NID কার্ড হারিয়েছে কী করব?", "lost_card"),
+            ("NID কার্ড হারিয়েছে কী করব?", "lost_card"),
+            ("NID কার্ড হারিয়েছে কী করব?", "lost_card"),
             ("হ্যাঁ", "lost_card"),
             ("What format? Might go beyond. But answer only says full address required.", "process_requirements"),
             ("ভোটার এলাকা ট্রান্সফারের ফর্ম নং কত?", "transfer_form"),
@@ -124,153 +125,29 @@ def test_stage0_jettisons_duplicates_context_and_artifacts(tmp_path: Path) -> No
     assert set(conflicts.iloc[0]["tags"]) == {"transfer_form", "transfer_form_followup_a"}
 
 
-def test_canonical_tag_name_prefers_base_semantic_tag() -> None:
-    counts = {
-        "nid_fee_01_followup_a": 100,
-        "nid_fee": 10,
-        "nid_fee_01": 20,
-    }
-    assert canonical_tag_name(list(counts), counts) == "nid_fee"
+# --------------------------- packet shaping ------------------------
 
-
-def test_missing_row_ids_in_packet_result_finds_omitted_rows() -> None:
-    packet = pd.DataFrame({"row_id": [10, 11, 12, 13]})
-    decision = RowJudgeDecision(
-        row_id=11,
-        decision="keep",
-        quality_score=80,
-        ambiguity_score=20,
-        context_dependent=False,
-        reason_code="clean",
-        rationale="ok",
-    )
-    result = JudgePacketResult(
-        packet_id="packet:000000",
-        decisions=[decision],
-        packet_rationale="partial",
-    )
-
-    assert missing_row_ids_in_packet_result(packet, result) == [10, 12, 13]
-
-
-def test_inconsistent_judge_passes_jettison_row() -> None:
-    keep = JudgeResult(
-        decision="keep",
-        quality_score=90,
-        ambiguity_score=5,
-        context_dependent=False,
-        reason_code="clean",
-        rationale="clean",
-    )
-    drop = JudgeResult(
-        decision="jettison",
-        quality_score=0,
-        ambiguity_score=100,
-        context_dependent=False,
-        reason_code="sibling_collision",
-        rationale="ambiguous",
-    )
-
-    resolved = _resolve_consistency(123, [keep, drop])
-
-    assert resolved["decision"] == "jettison"
-    assert resolved["consistent"] is False
-    assert resolved["reason_code"] == "sibling_collision"
-
-
-def test_build_judge_packets_groups_three_tags_with_bounded_rows() -> None:
-    rows = []
-    for tag in ["a", "b", "c", "d"]:
-        for idx in range(5):
-            rows.append(
-                {
-                    "row_id": len(rows) + 1,
-                    "route": "judge",
-                    "canonical_tag": tag,
-                    "e5_margin": idx / 10,
-                    "gemma_margin": idx / 10,
-                }
-            )
-    cfg = CleanerConfig(tags_per_judge_call=3, rows_per_tag_per_judge_call=2)
-
-    packets = build_judge_packets(pd.DataFrame(rows), cfg)
-
-    assert packets
-    assert all(packet["canonical_tag"].nunique() <= 3 for packet in packets)
-    for packet in packets:
-        counts = packet.groupby("canonical_tag").size()
-        assert int(counts.max()) <= 2
-
-
-def test_token_alignment_scores_must_have_and_must_avoid() -> None:
-    text_with = "তথ্য ঠিক দিলেও সমাধান হচ্ছে না। কখন আবার চেষ্টা করব?"
-    text_without = "অ্যাকাউন্ট লক, কীভাবে আনলক করব?"
-    must_have = ["তথ্য ঠিক", "আবার"]
-    must_avoid = ["আনলক করব"]
-
-    assert token_alignment_score(text_with, must_have, must_avoid) == 1.0
-    assert token_alignment_score(text_without, must_have, must_avoid) == -1.0
-    assert token_alignment_score("", [], []) == 0.0
-
-
-def test_artifact_score_flags_short_and_repetitive_text() -> None:
-    assert artifact_score("ok") >= 0.5
-    assert artifact_score("aaaaa repeated") > 0.0
-    long_clean = "এনআইডি অ্যাকাউন্ট লক হলে কীভাবে আনলক করতে হয়?"
-    assert artifact_score(long_clean) < 0.25
-
-
-def test_find_close_tag_clusters_groups_above_threshold() -> None:
-    tags = ["a", "b", "c", "d"]
-    sim_e5 = np.array(
-        [
-            [1.0, 0.92, 0.10, 0.10],
-            [0.92, 1.0, 0.10, 0.10],
-            [0.10, 0.10, 1.0, 0.10],
-            [0.10, 0.10, 0.10, 1.0],
-        ],
-        dtype=np.float32,
-    )
-    sim_gemma = sim_e5.copy()
-
-    clusters = find_close_tag_clusters(tags, sim_e5, sim_gemma, threshold=0.85, max_cluster_size=10)
-    assert clusters == [["a", "b"]]
-
-    none = find_close_tag_clusters(tags, sim_e5, sim_gemma, threshold=0.99, max_cluster_size=10)
-    assert none == []
-
-
-def test_build_audit_packets_groups_by_tag_and_caps_size() -> None:
+def test_build_stage_qa_packets_groups_by_tag_and_caps_size() -> None:
+    """Stage QA packets are per-tag, packet-size-capped, sorted by
+    composite_score desc within each tag (strongest rows first)."""
     rows = []
     for tag in ["x", "y"]:
         for idx in range(30):
-            rows.append(
-                {
-                    "row_id": len(rows) + 1,
-                    "canonical_tag": tag,
-                    "audit_buffer": True,
-                    "composite_score": (30 - idx) / 30.0,
-                    "question_raw": f"Q{idx}",
-                    "question_norm": f"q{idx}",
-                }
-            )
-    rows.append(
-        {
-            "row_id": 999,
-            "canonical_tag": "x",
-            "audit_buffer": False,
-            "composite_score": 0.0,
-            "question_raw": "below buffer",
-            "question_norm": "below buffer",
-        }
-    )
-    cfg = CleanerConfig(audit_rows_per_packet=8)
-
-    packets = build_audit_packets(pd.DataFrame(rows), cfg)
+            rows.append({
+                "row_id": len(rows) + 1,
+                "canonical_tag": tag,
+                "composite_score": (30 - idx) / 30.0,
+                "question_raw": f"Q{idx}",
+                "question_norm": f"q{idx}",
+            })
+    packets = build_stage_qa_packets(pd.DataFrame(rows), packet_size=8)
 
     assert all(packet["canonical_tag"].nunique() == 1 for packet in packets)
-    assert all(len(packet) <= cfg.audit_rows_per_packet for packet in packets)
+    assert all(len(packet) <= 8 for packet in packets)
     assert sum(len(p) for p in packets) == 60
+    # First row in any packet has the highest composite_score within that packet
+    for p in packets:
+        assert p["composite_score"].iloc[0] == p["composite_score"].max()
 
 
 def test_resolve_target_tags_keeps_corpus_scope_separate() -> None:
@@ -286,13 +163,51 @@ def test_resolve_target_tags_keeps_corpus_scope_separate() -> None:
     assert resolve_target_tags(rows, cfg, tag_to_canon) == {"a", "b_canon"}
 
 
+# ----------------------- E5-only cluster discovery -----------------
+
+def test_find_close_tag_clusters_groups_above_threshold_e5_only() -> None:
+    """E5-only signature after the Gemma drop. The optional edge_predicate
+    is the kNN-overlap multi-gate; tested separately."""
+    tags = ["a", "b", "c", "d"]
+    sim_e5 = np.array(
+        [
+            [1.0, 0.92, 0.10, 0.10],
+            [0.92, 1.0, 0.10, 0.10],
+            [0.10, 0.10, 1.0, 0.10],
+            [0.10, 0.10, 0.10, 1.0],
+        ],
+        dtype=np.float32,
+    )
+
+    clusters = find_close_tag_clusters(tags, sim_e5, threshold=0.85, max_cluster_size=10)
+    assert clusters == [["a", "b"]]
+
+    none = find_close_tag_clusters(tags, sim_e5, threshold=0.99, max_cluster_size=10)
+    assert none == []
+
+
+def test_find_close_tag_clusters_edge_predicate_can_veto_pair() -> None:
+    """Cosine alone passes; the kNN-overlap predicate vetoes the edge.
+    Replaces the prior dual-cosine min(E5, Gemma) gate."""
+    tags = ["a", "b"]
+    sim_e5 = np.array([[1.0, 0.95], [0.95, 1.0]], dtype=np.float32)
+
+    veto = find_close_tag_clusters(
+        tags, sim_e5, threshold=0.85, max_cluster_size=10,
+        edge_predicate=lambda i, j: False,
+    )
+    assert veto == []
+
+    ok = find_close_tag_clusters(
+        tags, sim_e5, threshold=0.85, max_cluster_size=10,
+        edge_predicate=lambda i, j: True,
+    )
+    assert ok == [["a", "b"]]
+
+
+# --------------------------- Stage 9 -------------------------------
+
 def test_stage9_audits_emit_expected_artifacts(tmp_path: Path) -> None:
-    """Stage 9 produces audit/kept/dropped CSVs and a report whose counts
-    are internally consistent. Hashing backend is too noisy to assert
-    on which specific rows get dropped; structure invariants are enough.
-    Drop semantics (top1 mismatch) are validated end-to-end on a real
-    Bengali run, not in unit tests.
-    """
     cleaned_csv = tmp_path / "cleaned.csv"
     rows = [
         ("the cat sat on the mat", "feline"),
@@ -313,7 +228,7 @@ def test_stage9_audits_emit_expected_artifacts(tmp_path: Path) -> None:
     tag_answer = tmp_path / "tag_answer.json"
     tag_answer.write_text("{}", encoding="utf-8")
     cfg = CleanerConfig(
-        input_csv=cleaned_csv,  # ignored when stage9_input_csv is set
+        input_csv=cleaned_csv,
         tag_answer_json=tag_answer,
         artifact_root=tmp_path / "artifacts",
         run_id="stage9_test",
@@ -342,7 +257,6 @@ def test_stage9_audits_emit_expected_artifacts(tmp_path: Path) -> None:
         "neighbor_tag_dist",
     }
     assert audit["audit_top_k"].iloc[0] == 3
-    # kept ∪ dropped == audit, and top1_correct flag aligns with drop set.
     assert len(kept) + len(dropped) == len(audit)
     assert (audit["top1_correct"]).sum() == len(kept)
     assert ((~audit["top1_correct"]).sum()) == len(dropped)
@@ -351,91 +265,7 @@ def test_stage9_audits_emit_expected_artifacts(tmp_path: Path) -> None:
     assert 0.0 <= report["top1_accuracy_in"] <= 1.0
 
 
-def test_compose_concats_and_dedupes_top40s(tmp_path: Path) -> None:
-    """compose merges per-run top40s, dedupes (question, tag), validates schema,
-    and emits a deterministic 2-column CSV."""
-    artifact_root = tmp_path / "artifacts"
-    # family A: 2 rows, tags {a, b}
-    a_dir = artifact_root / "family_a" / "stage6"
-    a_dir.mkdir(parents=True)
-    (a_dir / "question_tag.top40.csv").write_text(
-        "question,tag\nq1,a\nq2,b\n", encoding="utf-8"
-    )
-    # family B: 2 rows; q1/a duplicates family_a's row; q3/c is new
-    b_dir = artifact_root / "family_b" / "stage6"
-    b_dir.mkdir(parents=True)
-    (b_dir / "question_tag.top40.csv").write_text(
-        "question,tag\nq1,a\nq3,c\n", encoding="utf-8"
-    )
-    cfg = CleanerConfig(artifact_root=artifact_root)
-    out = artifact_root / "production" / "composed.csv"
-
-    run_compose(cfg, ["family_a", "family_b"], "top40", out)
-
-    df = pd.read_csv(out)
-    assert list(df.columns) == ["question", "tag"]
-    # 3 unique (q,t) pairs after dedup
-    assert len(df) == 3
-    assert sorted(zip(df.question, df.tag)) == [("q1", "a"), ("q2", "b"), ("q3", "c")]
-    # deterministic sort by (tag, question)
-    assert list(df.tag) == ["a", "b", "c"]
-
-
-def test_compose_errors_on_missing_source(tmp_path: Path) -> None:
-    cfg = CleanerConfig(artifact_root=tmp_path / "artifacts")
-    out = tmp_path / "out.csv"
-    try:
-        run_compose(cfg, ["nope"], "top40", out)
-    except FileNotFoundError as e:
-        assert "nope" in str(e)
-    else:
-        raise AssertionError("compose should raise when a source run is missing")
-
-
-def test_stable_family_id_is_order_invariant() -> None:
-    """family_id must depend only on the SET of tags, not their input order —
-    the manifest uses these IDs as the persistence key, so re-running discover
-    must hit the same dirs whether the seed enters first or last.
-    """
-    a = _stable_family_id(["alpha", "beta", "gamma"])
-    b = _stable_family_id(["gamma", "alpha", "beta"])
-    c = _stable_family_id(["alpha", "beta", "gamma"])
-    assert a == b == c
-    assert a.startswith("fam_")
-    # different tag set -> different id
-    assert _stable_family_id(["alpha", "beta", "delta"]) != a
-
-
-def test_symlink_shared_stages_refuses_geometry_mismatch(tmp_path: Path) -> None:
-    """If a family run dir already symlinks stage1 to a DIFFERENT centroids run,
-    refuse to silently mix geometries — that would corrupt downstream stages.
-    """
-    artifact_root = tmp_path / "artifacts"
-    # Make two centroid sources with stage0/1/2 directories.
-    for run_id in ("centroids_a", "centroids_b"):
-        for stage in ("stage0", "stage1", "stage2"):
-            (artifact_root / run_id / stage).mkdir(parents=True)
-
-    family_id = "fam_test"
-    _symlink_shared_stages(artifact_root, family_id, "centroids_a")
-    # Simulate a stale family dir pointing at the wrong centroids run.
-    # First run created symlinks to centroids_a; now demand centroids_b.
-    try:
-        _symlink_shared_stages(artifact_root, family_id, "centroids_b")
-    except RuntimeError as e:
-        assert "centroids_b" in str(e)
-    else:
-        raise AssertionError(
-            "_symlink_shared_stages should refuse to overwrite a symlink that "
-            "points at a different centroids run."
-        )
-
-
 def test_stage9_no_drop_mode_keeps_all_rows(tmp_path: Path) -> None:
-    """With drop_on_top1_mismatch=False, every row passes through to
-    production_filtered.csv and e5_dropped.csv is empty. Audit CSV still
-    annotates each row's neighborhood for human review.
-    """
     cleaned_csv = tmp_path / "cleaned.csv"
     rows = [
         ("alpha apple", "a"),
@@ -468,3 +298,308 @@ def test_stage9_no_drop_mode_keeps_all_rows(tmp_path: Path) -> None:
     dropped = pd.read_csv(stage_dir / "e5_dropped.csv")
     assert len(kept) == len(rows)
     assert len(dropped) == 0
+
+
+# ------------------------- compose ---------------------------------
+
+def test_compose_concats_and_dedupes_top40s(tmp_path: Path) -> None:
+    artifact_root = tmp_path / "artifacts"
+    a_dir = artifact_root / "family_a" / "stage6"
+    a_dir.mkdir(parents=True)
+    (a_dir / "question_tag.top40.csv").write_text("question,tag\nq1,a\nq2,b\n", encoding="utf-8")
+    b_dir = artifact_root / "family_b" / "stage6"
+    b_dir.mkdir(parents=True)
+    (b_dir / "question_tag.top40.csv").write_text("question,tag\nq1,a\nq3,c\n", encoding="utf-8")
+    cfg = CleanerConfig(artifact_root=artifact_root)
+    out = artifact_root / "production" / "composed.csv"
+
+    run_compose(cfg, ["family_a", "family_b"], "top40", out)
+
+    df = pd.read_csv(out)
+    assert list(df.columns) == ["question", "tag"]
+    assert len(df) == 3
+    assert sorted(zip(df.question, df.tag)) == [("q1", "a"), ("q2", "b"), ("q3", "c")]
+    assert list(df.tag) == ["a", "b", "c"]
+
+
+def test_compose_errors_on_missing_source(tmp_path: Path) -> None:
+    cfg = CleanerConfig(artifact_root=tmp_path / "artifacts")
+    out = tmp_path / "out.csv"
+    try:
+        run_compose(cfg, ["nope"], "top40", out)
+    except FileNotFoundError as e:
+        assert "nope" in str(e)
+    else:
+        raise AssertionError("compose should raise when a source run is missing")
+
+
+# --------------------- discover / scaling --------------------------
+
+def test_stable_family_id_is_order_invariant() -> None:
+    a = _stable_family_id(["alpha", "beta", "gamma"])
+    b = _stable_family_id(["gamma", "alpha", "beta"])
+    c = _stable_family_id(["alpha", "beta", "gamma"])
+    assert a == b == c
+    assert a.startswith("fam_")
+    assert _stable_family_id(["alpha", "beta", "delta"]) != a
+
+
+def test_symlink_shared_stages_refuses_geometry_mismatch(tmp_path: Path) -> None:
+    artifact_root = tmp_path / "artifacts"
+    for run_id in ("centroids_a", "centroids_b"):
+        for stage in ("stage0", "stage1", "stage2"):
+            (artifact_root / run_id / stage).mkdir(parents=True)
+
+    family_id = "fam_test"
+    _symlink_shared_stages(artifact_root, family_id, "centroids_a")
+    try:
+        _symlink_shared_stages(artifact_root, family_id, "centroids_b")
+    except RuntimeError as e:
+        assert "centroids_b" in str(e)
+    else:
+        raise AssertionError(
+            "_symlink_shared_stages should refuse to overwrite a symlink that "
+            "points at a different centroids run."
+        )
+
+
+# --------------------- Stage QA -----------------------------------
+
+def test_stage_qa_prompt_does_not_leak_tag_name() -> None:
+    """Anonymization invariant: the tag name must never appear in the
+    Stage QA prompt sent to Claude. Codex's primary recommendation."""
+    packet = pd.DataFrame([
+        {"row_id": 1, "question_raw": "raw1", "question_norm": "norm1"},
+        {"row_id": 2, "question_raw": "raw2", "question_norm": "norm2"},
+    ])
+    prompt = build_stage_qa_prompt(packet)
+    payload = json.loads(prompt)
+    assert "tag" not in payload
+    assert "tag_description" not in payload
+    assert "tag_one_line_intent" not in payload
+    assert "rival_context" not in payload  # rival exemplars dropped
+    # The schema in the contract should also be name-free.
+    assert "tag" not in payload["required_json_schema"]["properties"]
+
+
+def test_stage_qa_prompt_includes_majority_theme_framing() -> None:
+    """Codex addition: prompt must tell Claude to infer the majority
+    theme of the packet and judge each row against THAT, not against
+    the weirdest row or the (absent) tag label."""
+    packet = pd.DataFrame([{"row_id": 1, "question_raw": "x", "question_norm": "x"}])
+    payload = json.loads(build_stage_qa_prompt(packet))
+    assert "MAJORITY THEME" in payload["reference_frame"]
+
+
+def test_stage_qa_schema_is_strict_required_nullable() -> None:
+    """Anthropic strict --json-schema mode requires every property to
+    appear in `required`. related_row_id is nullable in value but the
+    field must be required at the schema level."""
+    schema = StageQAResult.model_json_schema()
+    flagged_def = schema["$defs"]["FlaggedRow"]
+    assert set(flagged_def["required"]) == {"row_id", "why", "related_row_id"}
+    # related_row_id type allows null
+    rrid = flagged_def["properties"]["related_row_id"]
+    assert rrid.get("anyOf") or rrid.get("type") == ["integer", "null"]
+
+
+def test_aggregate_qa_results_marks_incomplete_packets(tmp_path: Path) -> None:
+    """Coverage failure is packet-level (Codex): if a packet returned
+    audit_status=audit_incomplete, its rows are kept by default but
+    surfaced in the summary so partial coverage is visible."""
+    stage_dir = tmp_path / "stage5"
+    (stage_dir / "qa_packets").mkdir(parents=True)
+    pkt = {
+        "packet_id": "qa_packet:000000",
+        "row_ids": [100, 101],
+        "audit_status": "audit_incomplete",
+        "result": StageQAResult(
+            audited_row_ids=[100],  # 101 missing
+            flagged_rows=[],
+        ).model_dump(),
+    }
+    (stage_dir / "qa_packets" / "packet_000000.json").write_text(
+        json.dumps(pkt), encoding="utf-8",
+    )
+    per_row, summary = aggregate_qa_results(stage_dir)
+    assert summary["incomplete_packets"] == 1
+    assert per_row[100]["flagged"] is False
+    assert per_row[100]["audit_status"] == "audit_incomplete"
+
+
+def test_aggregate_qa_results_records_flags_and_telemetry(tmp_path: Path) -> None:
+    """Successful packet: flagged rows get a why + related_row_id; the
+    rest are audit_status='audited'; summary captures empty-flagged rate."""
+    stage_dir = tmp_path / "stage5"
+    (stage_dir / "qa_packets").mkdir(parents=True)
+    pkt = {
+        "packet_id": "qa_packet:000000",
+        "row_ids": [10, 11, 12],
+        "audit_status": "audited",
+        "result": StageQAResult(
+            audited_row_ids=[10, 11, 12],
+            flagged_rows=[
+                FlaggedRow(row_id=11, why="off-intent", related_row_id=None),
+                FlaggedRow(row_id=12, why="dup of row 10", related_row_id=10),
+            ],
+        ).model_dump(),
+    }
+    (stage_dir / "qa_packets" / "packet_000000.json").write_text(
+        json.dumps(pkt), encoding="utf-8",
+    )
+    per_row, summary = aggregate_qa_results(stage_dir)
+    assert summary["flagged_rows"] == 2
+    assert summary["empty_flagged_packets"] == 0
+    assert per_row[10]["flagged"] is False
+    assert per_row[11]["flagged"] is True
+    assert per_row[11]["why"] == "off-intent"
+    assert per_row[12]["related_row_id"] == 10
+
+
+def test_schema_fingerprint_changes_when_schema_changes() -> None:
+    """Resume hashes embed the schema fingerprint so a Pydantic model
+    rev forces a re-run rather than reusing stale artifacts."""
+    fp_a = _schema_fingerprint(StageQAResult.model_json_schema())
+    fp_b = _schema_fingerprint(FlaggedRow.model_json_schema())
+    assert fp_a != fp_b
+    assert fp_a == _schema_fingerprint(StageQAResult.model_json_schema())
+
+
+def test_stage_qa_prompt_version_set() -> None:
+    assert STAGE_QA_PROMPT_VERSION
+    assert "qa" in STAGE_QA_PROMPT_VERSION.lower()
+
+
+# --------------------- claude_cli wrapper --------------------------
+
+def _make_stub_claude(dest: Path, body: str) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(f"#!/usr/bin/env python3\n{body}\n")
+    dest.chmod(dest.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+    return dest
+
+
+@pytest.fixture(autouse=True)
+def _reset_claude_cache():
+    claude_cli._reset_cache_for_tests()
+    yield
+    claude_cli._reset_cache_for_tests()
+
+
+def test_build_subprocess_env_strips_anthropic_routing_vars(monkeypatch) -> None:
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-foo")
+    monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "Bearer-foo")
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://proxy.example")
+    monkeypatch.setenv("KEEP_ME", "ok")
+    env = claude_cli.build_subprocess_env()
+    assert "ANTHROPIC_API_KEY" not in env
+    assert "ANTHROPIC_AUTH_TOKEN" not in env
+    assert "ANTHROPIC_BASE_URL" not in env
+    assert env.get("KEEP_ME") == "ok"
+
+
+def test_resolve_claude_binary_raises_when_absent(tmp_path, monkeypatch) -> None:
+    fake_home = tmp_path / "home"
+    fake_home.mkdir()
+    monkeypatch.setenv("HOME", str(fake_home))
+    monkeypatch.setenv("PATH", str(tmp_path / "empty"))
+    with pytest.raises(claude_cli.ClaudeNotFound):
+        claude_cli.resolve_claude_binary()
+
+
+def test_resolve_claude_binary_finds_via_path(tmp_path, monkeypatch) -> None:
+    bin_dir = tmp_path / "bin"
+    stub = _make_stub_claude(bin_dir / "claude", "print('{\"subtype\": \"success\"}')")
+    monkeypatch.setenv("PATH", str(bin_dir))
+    assert claude_cli.resolve_claude_binary() == stub.resolve()
+
+
+def test_spawn_claude_success_returns_structured_output(tmp_path, monkeypatch) -> None:
+    bin_dir = tmp_path / "bin"
+    _make_stub_claude(
+        bin_dir / "claude",
+        "import sys, json; sys.stdin.read(); "
+        "print(json.dumps({"
+        "'subtype': 'success', 'is_error': False, "
+        "'structured_output': {'ok': True}, "
+        "'total_cost_usd': 0.02, "
+        "'usage': {'cache_creation_input_tokens': 100, 'cache_read_input_tokens': 50},"
+        "'num_turns': 1, 'duration_ms': 1234, 'session_id': 'sess-x'"
+        "}))",
+    )
+    monkeypatch.setenv("PATH", str(bin_dir))
+    res = asyncio.run(claude_cli.spawn_claude(
+        prompt="anything", model="opus", fallback_model="sonnet",
+    ))
+    assert res.ok
+    assert res.structured_output == {"ok": True}
+    assert res.total_cost_usd == pytest.approx(0.02)
+    assert res.cache_creation_input_tokens == 100
+    assert res.cache_read_input_tokens == 50
+    assert res.subtype == "success"
+
+
+def test_spawn_claude_classifies_non_success_subtype_as_transient(tmp_path, monkeypatch) -> None:
+    """Codex correctness ask: don't trust is_error alone — check subtype.
+    Claude returns valid JSON envelopes for many failures with subtype set."""
+    bin_dir = tmp_path / "bin"
+    _make_stub_claude(
+        bin_dir / "claude",
+        "import sys, json; sys.stdin.read(); "
+        "print(json.dumps({"
+        "'subtype': 'error_max_structured_output_retries', 'is_error': False, "
+        "'result': 'gave up after 5 retries', 'total_cost_usd': 0.04"
+        "}))",
+    )
+    monkeypatch.setenv("PATH", str(bin_dir))
+    res = asyncio.run(claude_cli.spawn_claude(
+        prompt="x", model="opus", fallback_model="sonnet",
+    ))
+    assert not res.ok
+    assert res.error_kind == claude_cli.ErrorKind.TRANSIENT
+    assert "error_max_structured_output_retries" in res.error_message
+    # cost still recorded for telemetry
+    assert res.total_cost_usd == pytest.approx(0.04)
+
+
+def test_spawn_claude_classifies_auth_failure_as_infra(tmp_path, monkeypatch) -> None:
+    bin_dir = tmp_path / "bin"
+    _make_stub_claude(
+        bin_dir / "claude",
+        "import sys; sys.stdin.read(); "
+        "sys.stderr.write('Not logged in. Please run `claude /login`.'); "
+        "sys.exit(1)",
+    )
+    monkeypatch.setenv("PATH", str(bin_dir))
+    res = asyncio.run(claude_cli.spawn_claude(
+        prompt="x", model="opus", fallback_model="sonnet",
+    ))
+    assert not res.ok
+    assert res.error_kind == claude_cli.ErrorKind.INFRA
+
+
+def test_spawn_claude_parse_failure_classified_as_parse(tmp_path, monkeypatch) -> None:
+    bin_dir = tmp_path / "bin"
+    _make_stub_claude(
+        bin_dir / "claude",
+        "import sys; sys.stdin.read(); print('not json at all')",
+    )
+    monkeypatch.setenv("PATH", str(bin_dir))
+    res = asyncio.run(claude_cli.spawn_claude(
+        prompt="x", model="opus", fallback_model="sonnet",
+    ))
+    assert res.error_kind == claude_cli.ErrorKind.PARSE
+
+
+def test_spawn_claude_timeout_classified_as_transient(tmp_path, monkeypatch) -> None:
+    bin_dir = tmp_path / "bin"
+    _make_stub_claude(
+        bin_dir / "claude",
+        "import time; time.sleep(60)",
+    )
+    monkeypatch.setenv("PATH", str(bin_dir))
+    res = asyncio.run(claude_cli.spawn_claude(
+        prompt="x", model="opus", fallback_model="sonnet", timeout=0.5,
+    ))
+    assert res.error_kind == claude_cli.ErrorKind.TRANSIENT
+    assert "timed out" in res.error_message.lower()

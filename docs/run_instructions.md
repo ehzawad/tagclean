@@ -5,8 +5,8 @@ How to install, configure, and run the cleaner. For **why** the pipeline is shap
 ## Prerequisites
 
 - Python 3.10+ (3.14 tested)
-- `OPENAI_API_KEY` env var (when running with `--judge-mode agents` or `sync`)
-- ~3 GB free for cached HuggingFace models (E5 1024d + EmbeddingGemma 768d)
+- Claude Code CLI installed and logged in (`claude /login`)
+- ~2 GB free for cached HuggingFace models (E5 1024d)
 - Optional GPU (CUDA on Linux, MPS on Mac); CPU works too, slower
 
 ## Install
@@ -16,8 +16,12 @@ git clone <this repo> ~/tagclean
 cd ~/tagclean
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[all]"
-pytest -q                              # 13 unit tests, no API
+pytest -q
 ```
+
+Install Claude Code CLI separately (see https://claude.com/claude-code) and run `claude /login` once. tagclean spawns `claude -p` per call; it strips `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN` / `ANTHROPIC_BASE_URL` from the subprocess env so calls always route through your subscription, not an API key.
+
+A startup probe runs a trivial `claude -p` call before launching any pipeline that uses Claude — this catches "not logged in" failures in seconds rather than 20 minutes into a run.
 
 Install the pre-commit guard so you don't accidentally check in run artifacts:
 
@@ -31,18 +35,14 @@ chmod +x tools/precommit_artifact_check.sh
 The most common workflow: you know which close-sibling tags are leaky, and you want to clean them as a unit.
 
 ```bash
-export OPENAI_API_KEY=sk-...
-
 tagclean stage8 \
     --input /path/to/question_tag.csv \
     --tag-answer /path/to/tag_answer.json \
     --target-tags account_locked,account_locked_retrials,account_locked_unlock_request \
-    --judge-mode agents \
-    --openai-model gpt-5.5 \
     --run-id account_locked_clean_v1
 ```
 
-This runs all stages 0→8 with sensible defaults. Output lands in `artifacts/account_locked_clean_v1/`. Time: ~10 min for ~540 rows; ~$0.50 in GPT spend.
+This runs all stages 0→8 with sensible defaults (Stage 3 = Opus/high, Stage 5 = Sonnet/medium). Output lands in `artifacts/account_locked_clean_v1/`. Time: ~5–10 min for ~540 rows.
 
 ## Three ways to pick which tags to clean
 
@@ -54,28 +54,20 @@ tagclean stage8 --target-tags T1,T2,T3 ...
 ```
 
 ### 2. Seed expansion — `--seed-tag`
-You know one suspect tag. The harness finds its close-tag cluster automatically (cosine ≥ `boundary_policy_threshold` in BOTH E5 and Gemma):
+You know one suspect tag. The harness finds its close-tag cluster automatically (cosine ≥ `boundary_policy_threshold` in E5):
 
 ```bash
 tagclean stage8 --seed-tag account_locked ...
 ```
 
-The CLI prints the resolved cluster **and** the top-5 nearest excluded tags with their similarity scores. If a sibling you expected is missing, the diagnostic tells you why:
-
-```
-[seed] resolved cluster from 'account_locked': ['account_locked_retrials', 'account_locked_unlock_request', 'account_locked']
-[seed] threshold=0.85 (min of E5/Gemma must clear). Nearest excluded tags:
-        account_locked_unlock_failed              E5=0.92  Gemma=0.81  min=0.81 ← sibling, just below threshold
-```
-
-When that happens, lower `boundary_policy_threshold` in your config or pass `--target-tags` explicitly to include the missing tag.
+The CLI prints the resolved cluster **and** the top-5 nearest excluded tags with their similarity scores. Note: at full corpus scale (1394 tags) this can collapse into a mega-component. Use `--target-tags` directly when you see it.
 
 ### 3. Whole corpus — omit both flags
 ```bash
 tagclean stage8 --input ... --tag-answer ...
 ```
 
-This processes every tag and discovers all close-tag clusters automatically. **High GPT cost** — only do it once you've validated on individual families and the budget is approved.
+This processes every tag and discovers all close-tag clusters automatically. **High Claude-call volume** — only do it once you've validated on individual families.
 
 ## Configuration
 
@@ -85,12 +77,12 @@ This processes every tag and discovers all close-tag clusters automatically. **H
 cp configs/example.yaml my-config.yaml
 ```
 
-The full config-knob table lives in the README. The fields you'll actually edit for a Bengali NID run:
+The fields you'll actually edit for a Bengali NID run:
 
 ```yaml
 input_csv: ~/ec-faq-bot/full_dataset/question_tag.csv
 tag_answer_json: ~/ec-faq-bot/full_dataset/tag_answer.json
-artifact_root: runs                  # gitignored; safe to keep under the repo
+artifact_root: runs                  # gitignored
 run_id: account_locked_clean_v1
 
 language: bn
@@ -101,8 +93,11 @@ e5_instruction: |
   by intent and concrete details, prioritizing exact phrase matches.
 
 embedding_backend: sentence-transformers
-judge_mode: agents
-openai_model: gpt-5.5
+judge_mode: claude
+stage3_model: opus
+stage3_effort: high
+stage5_model: sonnet
+stage5_effort: medium
 
 # Tune these only if --seed-tag misses an obvious sibling or the audit looks too aggressive.
 boundary_policy_threshold: 0.85
@@ -110,7 +105,7 @@ audit_buffer_size: 80
 top_n: 40
 ```
 
-Then run with `--config my-config.yaml`; CLI flags still override individual fields. **Recommended `artifact_root` is `runs/`** — both `runs/` and `artifacts/` are gitignored, and the pre-commit hook refuses staged artifact paths in either.
+Then run with `--config my-config.yaml`; CLI flags still override individual fields.
 
 ## Outputs
 
@@ -120,18 +115,22 @@ For a run with `run_id=foo`, in `<artifact_root>/foo/`:
 foo/
 ├── run_manifest.json                   ← top-level identity (version, hashes, models)
 ├── stage0/intake.parquet
-├── stage1/{emb_e5,emb_gemma}.npy + faiss indices
-├── stage2/{tag_profile.parquet, tag_centroids_*.npy, tag_index.json}
+├── stage1/emb_e5.npy + faiss index
+├── stage2/{tag_profile.parquet, tag_centroids_e5.npy, tag_index.json}
 ├── stage3/
 │   ├── tag_merge_map.csv               ← old_tag → canonical_tag
-│   ├── tag_boundary_policy.jsonl       ← GPT-authored discriminative rules
-│   └── merge_candidates.jsonl
+│   ├── tag_boundary_policy.jsonl       ← Claude-authored discriminative rules
+│   ├── merge_candidates.jsonl
+│   └── llm_calls.jsonl                 ← per-call telemetry (cost, cache, subtype)
 ├── stage4/row_features.parquet         ← composite_score, audit_buffer flag
-├── stage5/audit_results.jsonl          ← per-row keep/flag with reasons
+├── stage5/
+│   ├── audit_results.jsonl             ← per-row keep/flag with reasons
+│   ├── audit_packets/                  ← raw Claude packet inputs/outputs
+│   └── llm_calls.jsonl
 ├── stage6/
 │   ├── question_tag.cleaned.csv        ← all audit-pass rows, ranked
 │   ├── question_tag.top40.csv          ← top-N per tag, 2-col `question,tag`
-│   └── jettisoned_rows.csv             ← dropped rows + reasons + GPT rationale
+│   └── jettisoned_rows.csv             ← dropped rows + reasons + Claude rationale
 └── stage8/cleaning_report.json         ← LOO retrieval accuracy + confusion
 ```
 
@@ -148,11 +147,13 @@ Each stage chains its predecessors and resumes from cache:
 tagclean stage0 --config my-config.yaml      # intake only
 tagclean stage1 --config my-config.yaml      # + embeddings
 tagclean stage6 --config my-config.yaml      # → stages 0–6
-tagclean stage8 --config my-config.yaml      # → all
-tagclean all --config my-config.yaml         # alias for stage8 in non-batch modes
+tagclean stage8 --config my-config.yaml      # → all (skips deleted stage7)
+tagclean all --config my-config.yaml         # alias for stage8
 ```
 
-Re-running with `--resume` (default) skips any stage whose input hash matches its manifest. `--no-resume` forces a clean rerun of the requested stage and downstream.
+Re-running with `--resume` (default) skips any stage whose input hash matches its manifest. Stage 3 / Stage 5 hashes include LLM identity (model, effort, prompt-version, schema fingerprint), so a model change forces a re-run rather than reusing stale boundary policies.
+
+`--no-resume` forces a clean rerun of the requested stage and downstream.
 
 ## Recipes
 
@@ -162,8 +163,6 @@ tagclean stage8 \
     --input ~/ec-faq-bot/full_dataset/question_tag.csv \
     --tag-answer ~/ec-faq-bot/full_dataset/tag_answer.json \
     --target-tags name_correction_in_nid_card,parents_name_correction_new,spouse_name_correction_new \
-    --max-tags 0 \
-    --judge-mode agents --openai-model gpt-5.5 \
     --run-id name_correction_v1
 ```
 
@@ -172,47 +171,46 @@ tagclean stage8 \
 tagclean stage8 \
     --input ... --tag-answer ... \
     --seed-tag account_locked \
-    --judge-mode agents --openai-model gpt-5.5 \
     --run-id account_locked_v1
 ```
 
-### "Just rank, no GPT — fast offline pass"
+### "Just rank, no LLM — fast offline pass"
 ```bash
 tagclean stage6 --config my-config.yaml --judge-mode heuristic --no-resume
 ```
 
 Heuristic mode flags rows that are duplicates / cross-tag duplicates / high artifact score. No semantic intent check — use only to sanity-check the ranker.
 
-### "Run only Stage 5 batch preparation, submit later"
+### "Force a different model on Stage 5"
 ```bash
-tagclean stage5 --config my-config.yaml --judge-mode batch_prepare    # writes batch JSONL
-tagclean stage5 --config my-config.yaml --judge-mode batch_submit     # uploads to OpenAI Batch API
-# ... wait up to 24h ...
-tagclean stage5 --config my-config.yaml --judge-mode batch_collect    # ingests results
-tagclean stage8 --config my-config.yaml                                # finish the pipeline
+tagclean stage8 ... --stage5-model opus --stage5-effort high
 ```
 
-Batch API is 50% cheaper than sync but has 24h SLA. Worth it for full-corpus runs.
+Stage 3 + Stage 5 input hashes include model + effort, so this forces a clean re-run of those two stages without invalidating Stage 1/2/4 caches.
 
 ## Troubleshooting
 
+### Startup: "auth probe failed [infra]: ... not logged in"
+Run `claude /login` (or `claude auth login`) once and retry. The probe spawns a trivial `claude -p` call under the same env-stripped subprocess that real pipeline calls use, so a successful probe means the real calls will work.
+
+### Startup: "claude binary not found"
+Install Claude Code CLI (https://claude.com/claude-code) and ensure `claude` is on PATH (or in `~/.local/bin`, `/opt/homebrew/bin`, or `/usr/local/bin` — the wrapper checks those fallbacks).
+
 ### `--seed-tag` only resolved 2 of my 3 expected tags
-The third was just below `boundary_policy_threshold` (default 0.85) on Gemma. The CLI's diagnostic line shows you the exact min(E5, Gemma) value. Either:
-- Lower `boundary_policy_threshold` to 0.80 in config, OR
-- Use `--target-tags` with the explicit list.
+The third was just below `boundary_policy_threshold` (default 0.85) on E5 cosine. The CLI's diagnostic line shows you the exact value. Either lower `boundary_policy_threshold` to 0.80 in config, OR use `--target-tags` with the explicit list.
 
-### OpenAI 400 "Invalid schema for response_format ... 'required' is required to be supplied"
-A pydantic model used as `output_type` has a field with `default_factory=` or `default=`. OpenAI strict mode requires every property to be in `required`. Remove the default; let GPT supply `[]` if applicable.
-
-### Stage 3 says "boundary policy passes disagree"
-You're on an old version with multi-pass self-consistency. The current code uses single-pass + structural validation. `git pull`.
+### Stage 5 halted with "CIRCUIT BREAKER: last 10 packets all failed"
+Sustained Claude failures — probably rate limits or an account issue. Inspect `stage5/llm_calls.jsonl`: look at `subtype` and `error_message` of recent failures. Common causes:
+- Rate-limit storm: lower `concurrency` (default 6) and rerun.
+- `--effort max` with a long prompt: switch to `medium`.
+- Model overload: `--claude-fallback-model` should already kick in; check that the fallback isn't also hitting limits.
 
 ### Process exits with SIGSEGV (139) right after writing artifacts
 Joblib's loky parallel backend (used inside sentence-transformers) leaks a semaphore on Python 3.14 / Mac shutdown. The pipeline already wrote everything before the crash. To suppress: `export TOKENIZERS_PARALLELISM=false` before running.
 
 ### Mac MPS slow / OOM, or no GPU
 - Pass `--device cpu` to force CPU; embedding takes longer but is stable.
-- For a 80k-row corpus on Mac CPU, expect ~15–30 min per model in Stage 1; on Linux+L4 it's well under 5.
+- For an 80k-row corpus on Mac CPU, expect ~15–30 min in Stage 1; on Linux+L4 it's well under 5.
 - Set `TOKENIZERS_PARALLELISM=false` to also avoid the loky semaphore-leak warning.
 
 ### I accidentally staged run artifacts
@@ -221,28 +219,21 @@ The pre-commit hook should have refused. If you bypassed it or the hook isn't in
 git config core.hooksPath tools/githooks    # install
 git restore --staged runs/ artifacts/       # unstage
 ```
-History rewrite (squash/reset) is fine while the branch isn't pushed; once pushed, leave it unless artifacts contain anything sensitive.
-
-### Run is slow / hits OpenAI rate limits
-- Reduce `audit_rows_per_packet` (default 24) so packets are smaller and GPT is faster per call.
-- Lower `concurrency` for sync mode if you're rate-limited.
-- For corpus-wide, use `--judge-mode batch_prepare/submit/collect`.
 
 ### "I want to verify the cleaned set is actually better"
 After Stage 8 runs, `stage8/cleaning_report.json` has leave-one-out top-1 retrieval accuracy. >0.95 = cleanly separable in E5 space. Manually eyeball the top-5 of `cleaned.csv` per tag — they should be textbook examples of each intent.
 
-### "I want to change which tags get cleaned"
-See the README's "Adjusting which tags to clean" section for the full breakdown. Quick pointer:
+### "I want to track Claude cost / cache hit drift across runs"
+Inspect `stageN/llm_calls.jsonl`: each line has `total_cost_usd`, `cache_creation_input_tokens`, `cache_read_input_tokens`, `subtype`, `num_turns`. Sum across runs to see whether prompt drift is busting the cache.
 
-- Editing the manifest (`runs/families.yaml`) is the canonical way once you've run `tagclean discover`. Flip `status: approved` ↔ `rejected`, or edit `target_tags` per family. `run-families --skip-completed` (default) won't re-clean families whose stage8 outputs already exist.
-- For one-off runs without a manifest, pass `--target-tags T1,T2,T3` directly to `tagclean stage8`.
-- To restrict `discover` to a curated subset of the corpus, write a `production_tags.txt` (one tag per line) and pass `--production-tags production_tags.txt`. Unknown tags hard-fail.
+### "I want to change which tags get cleaned"
+- Editing `runs/families.yaml` (after `tagclean discover`) is the canonical way. Flip `status: approved` ↔ `rejected`, or edit `target_tags` per family. `run-families --skip-completed` (default) won't re-clean families whose stage8 outputs already exist.
+- For one-off runs, pass `--target-tags T1,T2,T3` directly to `tagclean stage8`.
+- To restrict `discover` to a curated subset, write a `production_tags.txt` (one tag per line) and pass `--production-tags production_tags.txt`. Unknown tags hard-fail.
 
 ### "Build the final production CSV from N family runs"
-The end-to-end pipeline once you've cleaned several close-tag families:
-
 ```bash
-# 1. Clean each family separately (one stage8 invocation per family)
+# 1. Clean each family separately
 tagclean stage8 --target-tags T1,T2,T3 --run-id family_a ...
 tagclean stage8 --target-tags U1,U2,U3 --run-id family_b ...
 tagclean stage8 --target-tags V1,V2,V3 --run-id family_c ...
@@ -254,7 +245,7 @@ tagclean compose \
     --compose-source top40 \
     --out runs/production/composed_top40.csv
 
-# 3. Run cross-family Stage 9 audit on the composed CSV
+# 3. Cross-family Stage 9 audit on the composed CSV
 tagclean stage9 \
     --e5-audit-input runs/production/composed_top40.csv \
     --run-id production
@@ -262,10 +253,10 @@ tagclean stage9 \
 
 The final E5-ready production set is `runs/production/stage9/production_filtered.csv`.
 
-**Why compose from `top40` (not from per-family `stage9/production_filtered.csv`)?** A row that fails LOO inside a 3-tag family can be safely separable in the 9+-tag production union (its in-family rival is no longer a peer). Filter once globally, after composition. Per-family Stage 9 stays useful for per-family diagnostics; compose treats top40s as the production-recommended subset.
+**Why compose from `top40` (not from per-family `stage9/production_filtered.csv`)?** A row that fails LOO inside a 3-tag family can be safely separable in the 9+-tag production union (its in-family rival is no longer a peer). Filter once globally, after composition.
 
 ### "Filter the cleaned set against production E5 retrieval"
-Production inference is E5-only (no Gemma). Stage 9 audits the cleaned set against an E5 leave-one-out retrieval and, by default, drops rows whose top-1 neighbor belongs to a different tag — the rows E5 itself confuses at inference time. Severity per row is reported as "own-share-top-K" (% of K nearest neighbors with the same tag).
+Production inference is E5-only. Stage 9 audits the cleaned set against an E5 leave-one-out retrieval and, by default, drops rows whose top-1 neighbor belongs to a different tag.
 
 ```bash
 # Audit + drop top-1 mismatches from the current run's cleaned.csv
@@ -284,17 +275,19 @@ Outputs land in `<run>/stage9/`: `e5_neighbor_audit.csv` (per-row diagnostics), 
 
 ## Costs reference
 
-| Scope | GPT calls | $$ (gpt-5.5, high reasoning) | Wall time |
-|---|---|---|---|
-| 3-tag family (~540 rows) | ~12 | ~$0.50 | ~10 min |
-| 6-tag families | ~25 | ~$1 | ~20 min |
-| Full Bengali corpus (1394 tags, 79k rows) | ~4500–5500 | ~$50–150 | ~3–6 hours |
+| Scope | Claude calls | Wall time |
+|---|---|---|
+| 3-tag family (~540 rows) | ~12 (1 Stage3 + ~10 Stage5) | ~5–10 min |
+| 6-tag families | ~25 | ~10–20 min |
+| Full Bengali corpus (1394 tags, 79k rows) | ~4500 (~270 Stage3 + ~4200 Stage5) | ~3–6 hours |
 
-Embedding cost is GPU/Mac time, not API. Models are downloaded once (~3 GB).
+All Claude calls bill against the Claude Code subscription, not an API key. Per-call cost is recorded in `stageN/llm_calls.jsonl` for postmortem.
+
+Embedding cost is GPU/Mac time, not API. Models are downloaded once (~2 GB).
 
 ## What NOT to do
 
-- **Don't `--auto-cluster`** (not implemented, and not advised). Validate one family at a time.
-- **Don't enable Stage 7 `review_enabled: true`** unless you have a specific reason; the buffer audit in Stage 5 already covers the same ground.
+- **Don't enable Stage 7.** It's been deleted; the dispatcher already skips it. The `review_*` config knobs from prior versions are ignored.
 - **Don't `git add -A`** while a cleaning run is writing. Use the pre-commit hook (`tools/githooks/pre-commit`).
 - **Don't commit `runs/` or `artifacts/`** — gitignore covers them; the hook double-protects.
+- **Don't set `ANTHROPIC_API_KEY` if you want subscription billing.** The wrapper strips it from the subprocess env; if it leaks back via your shell config, calls flip to API-key billing silently.

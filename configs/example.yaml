@@ -4,11 +4,11 @@ tag_answer_json: data/tag_answer.json
 artifact_root: artifacts
 run_id: cleaning_run_v1
 
-# Models
+# Models. Single embedding model (E5) drives all geometry. The prior
+# EmbeddingGemma cross-validation gate has been replaced by E5 cosine
+# + row-level kNN-overlap multi-gates inside Stage 3 / discover.
 embedding_backend: sentence-transformers
 e5_model: intfloat/multilingual-e5-large-instruct
-gemma_model: google/embeddinggemma-300m
-gemma_dim: 768
 
 # Override the E5-instruct prompt for your domain. The default is generic; the
 # Bengali NID/voter domain benefits from something like the example below.
@@ -22,19 +22,22 @@ gemma_dim: 768
 # "none" disables language-specific steps.
 language: bn
 
-# OpenAI judge / audit
-openai_model: gpt-5.5
-openai_reasoning_effort: high
-judge_mode: agents      # heuristic | sync | agents | batch_prepare | batch_collect
-self_consistency_passes: 1
+# Stage 3 (boundary policy) + Stage 5 (audit) call `claude -p` headlessly.
+# No API key — calls route through the user's Claude Code subscription
+# (ANTHROPIC_API_KEY / AUTH_TOKEN / BASE_URL are stripped from the
+# subprocess env so subscription auth always wins).
+judge_mode: claude              # claude | heuristic
+stage5_model: sonnet            # Stage QA reviewer model
+stage5_effort: medium
+claude_fallback_model: sonnet   # used when primary is overloaded
+claude_call_timeout_s: 300
+qa_rows_per_packet: 20
 
 # Pipeline knobs
-audit_buffer_size: 80
-audit_rows_per_packet: 24
 boundary_policy_threshold: 0.85
 boundary_policy_max_cluster_size: 6
 top_n: 40
 near_duplicate_threshold: 0.98
 e5_merge_threshold: 0.90
-gemma_merge_threshold: 0.88
 knn_overlap_threshold: 0.30
+concurrency: 6
