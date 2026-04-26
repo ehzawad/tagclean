@@ -1,7 +1,7 @@
 # tagclean
 
 LLM-assisted dataset cleaner for tagged FAQ corpora. Built for the Bangladesh
-Election Commission Bengali NID/voter FAQ domain (1395 tags, 79k GPT-generated
+Election Commission Bengali NID/voter FAQ domain (1394 tags, 79k GPT-generated
 rows), but the harness is language-neutral when you set `language: none`.
 
 You give it `question_tag.csv` (and optionally `tag_answer.json`); it gives back
@@ -9,11 +9,28 @@ a cleaned production subset where ambiguous, duplicated, and synthetic-looking
 rows are jettisoned and the survivors are filtered against the model
 production actually uses at inference (E5).
 
-**This branch (`claude-cli-harness`):** the cleaner shells out to the `claude`
+**This branch (`claude-cli-stage-qa`):** the cleaner shells out to the `claude`
 CLI binary instead of calling the OpenAI Responses API. No API key, no per-call
 billing — calls route through your Claude Code subscription. The second
 embedding model (EmbeddingGemma) was also dropped; cluster discovery now uses
-E5 cosine + row-level kNN-overlap as multi-criteria gates.
+E5 cosine + row-level kNN-overlap as multi-criteria gates. The original
+boundary-policy + per-row buffer-audit Stage 5 was replaced by **Stage QA** —
+a single anonymized Claude pass per tag that flags obvious outliers in the
+deterministic top-N (no tag name in the prompt; majority-theme judging).
+
+## The cleaned corpus
+
+The final cleaned production-ready corpus lives at the repo root:
+
+```
+cleaned_bn_nid_corpus.csv
+```
+
+Two columns (`question`, `tag`). Produced by running this branch's pipeline
+end-to-end on the full 79k-row corpus across 461 production tags
+(`_followup_*` dialog-turn artifacts excluded by design). This is the file
+production E5 should index against at inference time. To regenerate from
+scratch see [End-to-end production recipe](#end-to-end-production-recipe).
 
 ## The problem
 
