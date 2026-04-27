@@ -1,29 +1,17 @@
 from __future__ import annotations
 
-import asyncio
 import csv
 import json
-import os
-import stat
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import pytest
 
-from tagclean import claude_cli
 from tagclean.cleaner import (
     CleanerConfig,
-    FlaggedRow,
-    STAGE_QA_PROMPT_VERSION,
-    StageQAResult,
-    _schema_fingerprint,
     _stable_family_id,
     _symlink_shared_stages,
-    aggregate_qa_results,
     artifact_score,
-    build_stage_qa_packets,
-    build_stage_qa_prompt,
     canonical_tag_name,
     coerce_optional_str_list,
     comparison_key,
@@ -32,9 +20,8 @@ from tagclean.cleaner import (
     resolve_target_tags,
     run_compose,
     run_stage0,
+    run_stage8,
     run_stage9,
-    token_alignment_score,
-    write_jsonl,
 )
 
 
@@ -68,17 +55,6 @@ def test_canonical_tag_name_prefers_base_semantic_tag() -> None:
     assert canonical_tag_name(list(counts), counts) == "nid_fee"
 
 
-def test_token_alignment_scores_must_have_and_must_avoid() -> None:
-    text_with = "তথ্য ঠিক দিলেও সমাধান হচ্ছে না। কখন আবার চেষ্টা করব?"
-    text_without = "অ্যাকাউন্ট লক, কীভাবে আনলক করব?"
-    must_have = ["তথ্য ঠিক", "আবার"]
-    must_avoid = ["আনলক করব"]
-
-    assert token_alignment_score(text_with, must_have, must_avoid) == 1.0
-    assert token_alignment_score(text_without, must_have, must_avoid) == -1.0
-    assert token_alignment_score("", [], []) == 0.0
-
-
 def test_artifact_score_flags_short_and_repetitive_text() -> None:
     assert artifact_score("ok") >= 0.5
     assert artifact_score("aaaaa repeated") > 0.0
@@ -109,7 +85,6 @@ def test_stage0_jettisons_duplicates_context_and_artifacts(tmp_path: Path) -> No
         artifact_root=tmp_path / "artifacts",
         run_id="test_run",
         embedding_backend="hashing",
-        judge_mode="heuristic",
     )
 
     run_stage0(cfg, resume=False)
@@ -125,30 +100,7 @@ def test_stage0_jettisons_duplicates_context_and_artifacts(tmp_path: Path) -> No
     assert set(conflicts.iloc[0]["tags"]) == {"transfer_form", "transfer_form_followup_a"}
 
 
-# --------------------------- packet shaping ------------------------
-
-def test_build_stage_qa_packets_groups_by_tag_and_caps_size() -> None:
-    """Stage QA packets are per-tag, packet-size-capped, sorted by
-    composite_score desc within each tag (strongest rows first)."""
-    rows = []
-    for tag in ["x", "y"]:
-        for idx in range(30):
-            rows.append({
-                "row_id": len(rows) + 1,
-                "canonical_tag": tag,
-                "composite_score": (30 - idx) / 30.0,
-                "question_raw": f"Q{idx}",
-                "question_norm": f"q{idx}",
-            })
-    packets = build_stage_qa_packets(pd.DataFrame(rows), packet_size=8)
-
-    assert all(packet["canonical_tag"].nunique() == 1 for packet in packets)
-    assert all(len(packet) <= 8 for packet in packets)
-    assert sum(len(p) for p in packets) == 60
-    # First row in any packet has the highest composite_score within that packet
-    for p in packets:
-        assert p["composite_score"].iloc[0] == p["composite_score"].max()
-
+# --------------------------- target scope --------------------------
 
 def test_resolve_target_tags_keeps_corpus_scope_separate() -> None:
     rows = pd.DataFrame(
@@ -187,8 +139,7 @@ def test_find_close_tag_clusters_groups_above_threshold_e5_only() -> None:
 
 
 def test_find_close_tag_clusters_edge_predicate_can_veto_pair() -> None:
-    """Cosine alone passes; the kNN-overlap predicate vetoes the edge.
-    Replaces the prior dual-cosine min(E5, Gemma) gate."""
+    """Cosine alone passes; the kNN-overlap predicate vetoes the edge."""
     tags = ["a", "b"]
     sim_e5 = np.array([[1.0, 0.95], [0.95, 1.0]], dtype=np.float32)
 
@@ -233,7 +184,6 @@ def test_stage9_audits_emit_expected_artifacts(tmp_path: Path) -> None:
         artifact_root=tmp_path / "artifacts",
         run_id="stage9_test",
         embedding_backend="hashing",
-        judge_mode="heuristic",
         e5_use_prefixes=False,
         e5_audit_top_k=3,
         stage9_input_csv=str(cleaned_csv),
@@ -286,7 +236,6 @@ def test_stage9_no_drop_mode_keeps_all_rows(tmp_path: Path) -> None:
         artifact_root=tmp_path / "artifacts",
         run_id="stage9_no_drop",
         embedding_backend="hashing",
-        judge_mode="heuristic",
         e5_use_prefixes=False,
         e5_audit_top_k=2,
         stage9_input_csv=str(cleaned_csv),
@@ -363,243 +312,93 @@ def test_symlink_shared_stages_refuses_geometry_mismatch(tmp_path: Path) -> None
         )
 
 
-# --------------------- Stage QA -----------------------------------
+# ------------- deterministic-only end-to-end regression ------------
 
-def test_stage_qa_prompt_does_not_leak_tag_name() -> None:
-    """Anonymization invariant: the tag name must never appear in the
-    Stage QA prompt sent to Claude. Codex's primary recommendation."""
-    packet = pd.DataFrame([
-        {"row_id": 1, "question_raw": "raw1", "question_norm": "norm1"},
-        {"row_id": 2, "question_raw": "raw2", "question_norm": "norm2"},
-    ])
-    prompt = build_stage_qa_prompt(packet)
-    payload = json.loads(prompt)
-    assert "tag" not in payload
-    assert "tag_description" not in payload
-    assert "tag_one_line_intent" not in payload
-    assert "rival_context" not in payload  # rival exemplars dropped
-    # The schema in the contract should also be name-free.
-    assert "tag" not in payload["required_json_schema"]["properties"]
+def test_deterministic_pipeline_stage8_then_stage9(tmp_path: Path) -> None:
+    """Smoke test for the deterministic-only chain.
 
-
-def test_stage_qa_prompt_includes_majority_theme_framing() -> None:
-    """Codex addition: prompt must tell Claude to infer the majority
-    theme of the packet and judge each row against THAT, not against
-    the weirdest row or the (absent) tag label."""
-    packet = pd.DataFrame([{"row_id": 1, "question_raw": "x", "question_norm": "x"}])
-    payload = json.loads(build_stage_qa_prompt(packet))
-    assert "MAJORITY THEME" in payload["reference_frame"]
-
-
-def test_stage_qa_schema_is_strict_required_nullable() -> None:
-    """Anthropic strict --json-schema mode requires every property to
-    appear in `required`. related_row_id is nullable in value but the
-    field must be required at the schema level."""
-    schema = StageQAResult.model_json_schema()
-    flagged_def = schema["$defs"]["FlaggedRow"]
-    assert set(flagged_def["required"]) == {"row_id", "why", "related_row_id"}
-    # related_row_id type allows null
-    rrid = flagged_def["properties"]["related_row_id"]
-    assert rrid.get("anyOf") or rrid.get("type") == ["integer", "null"]
-
-
-def test_aggregate_qa_results_marks_incomplete_packets(tmp_path: Path) -> None:
-    """Coverage failure is packet-level (Codex): if a packet returned
-    audit_status=audit_incomplete, its rows are kept by default but
-    surfaced in the summary so partial coverage is visible."""
-    stage_dir = tmp_path / "stage5"
-    (stage_dir / "qa_packets").mkdir(parents=True)
-    pkt = {
-        "packet_id": "qa_packet:000000",
-        "row_ids": [100, 101],
-        "audit_status": "audit_incomplete",
-        "result": StageQAResult(
-            audited_row_ids=[100],  # 101 missing
-            flagged_rows=[],
-        ).model_dump(),
-    }
-    (stage_dir / "qa_packets" / "packet_000000.json").write_text(
-        json.dumps(pkt), encoding="utf-8",
+    Stage 8 must reach Stage 6 directly (no Stage QA in the chain) and
+    Stage 9 must read its input from stage6/cleaned.csv. Tiny synthetic
+    fixture: 3 well-separated tags x ~10 rows. Only validates wiring +
+    output shape, not embedding quality.
+    """
+    csv_path = tmp_path / "question_tag.csv"
+    _write_question_tag(
+        csv_path,
+        [
+            ("the cat sat on the mat", "feline"),
+            ("a cat purred softly", "feline"),
+            ("kittens love yarn", "feline"),
+            ("a small kitten meowed", "feline"),
+            ("the tabby cat napped", "feline"),
+            ("a cat licked its paw", "feline"),
+            ("dogs chase squirrels", "canine"),
+            ("the puppy barked loudly", "canine"),
+            ("a wolf howled at the moon", "canine"),
+            ("the dog wagged its tail", "canine"),
+            ("a beagle ran in the yard", "canine"),
+            ("the husky pulled the sled", "canine"),
+            ("apples are sweet fruit", "fruit"),
+            ("oranges grow on trees", "fruit"),
+            ("ripe banana tastes good", "fruit"),
+            ("a pear is juicy", "fruit"),
+            ("grapes hang from vines", "fruit"),
+            ("mango is a tropical fruit", "fruit"),
+        ],
     )
-    per_row, summary = aggregate_qa_results(stage_dir)
-    assert summary["incomplete_packets"] == 1
-    assert per_row[100]["flagged"] is False
-    assert per_row[100]["audit_status"] == "audit_incomplete"
+    tag_answer = tmp_path / "tag_answer.json"
+    tag_answer.write_text("{}", encoding="utf-8")
 
-
-def test_aggregate_qa_results_records_flags_and_telemetry(tmp_path: Path) -> None:
-    """Successful packet: flagged rows get a why + related_row_id; the
-    rest are audit_status='audited'; summary captures empty-flagged rate."""
-    stage_dir = tmp_path / "stage5"
-    (stage_dir / "qa_packets").mkdir(parents=True)
-    pkt = {
-        "packet_id": "qa_packet:000000",
-        "row_ids": [10, 11, 12],
-        "audit_status": "audited",
-        "result": StageQAResult(
-            audited_row_ids=[10, 11, 12],
-            flagged_rows=[
-                FlaggedRow(row_id=11, why="off-intent", related_row_id=None),
-                FlaggedRow(row_id=12, why="dup of row 10", related_row_id=10),
-            ],
-        ).model_dump(),
-    }
-    (stage_dir / "qa_packets" / "packet_000000.json").write_text(
-        json.dumps(pkt), encoding="utf-8",
+    cfg = CleanerConfig(
+        input_csv=csv_path,
+        tag_answer_json=tag_answer,
+        artifact_root=tmp_path / "artifacts",
+        run_id="det_only_smoke",
+        embedding_backend="hashing",
+        e5_use_prefixes=False,
+        language="none",
+        top_n=4,
     )
-    per_row, summary = aggregate_qa_results(stage_dir)
-    assert summary["flagged_rows"] == 2
-    assert summary["empty_flagged_packets"] == 0
-    assert per_row[10]["flagged"] is False
-    assert per_row[11]["flagged"] is True
-    assert per_row[11]["why"] == "off-intent"
-    assert per_row[12]["related_row_id"] == 10
+
+    run_stage8(cfg, resume=False)
+
+    run_dir = cfg.run_dir()
+    cleaned = pd.read_csv(run_dir / "stage6" / "question_tag.cleaned.csv")
+    top40 = pd.read_csv(run_dir / "stage6" / "question_tag.top40.csv")
+    assert len(cleaned) > 0
+    assert len(top40) > 0
+    forbidden = {"audit_status", "reason_code", "rationale"}
+    assert forbidden.isdisjoint(set(cleaned.columns))
+    # Stage QA dir must NOT exist; Stage 8 chains through Stage 6 directly.
+    assert not (run_dir / "stage5").exists()
+
+    # Stage 8's LOO report
+    cleaning_report = json.loads((run_dir / "stage8" / "cleaning_report.json").read_text())
+    assert "cleaned" in cleaning_report and "top40" in cleaning_report
+
+    # Stage 9 reads stage6/cleaned.csv by default (no stage5/ preference).
+    run_stage9(cfg, resume=False)
+    stage9_dir = run_dir / "stage9"
+    assert (stage9_dir / "audit_report.json").exists()
+    assert (stage9_dir / "production_filtered.csv").exists()
 
 
-def test_schema_fingerprint_changes_when_schema_changes() -> None:
-    """Resume hashes embed the schema fingerprint so a Pydantic model
-    rev forces a re-run rather than reusing stale artifacts."""
-    fp_a = _schema_fingerprint(StageQAResult.model_json_schema())
-    fp_b = _schema_fingerprint(FlaggedRow.model_json_schema())
-    assert fp_a != fp_b
-    assert fp_a == _schema_fingerprint(StageQAResult.model_json_schema())
-
-
-def test_stage_qa_prompt_version_set() -> None:
-    assert STAGE_QA_PROMPT_VERSION
-    assert "qa" in STAGE_QA_PROMPT_VERSION.lower()
-
-
-# --------------------- claude_cli wrapper --------------------------
-
-def _make_stub_claude(dest: Path, body: str) -> Path:
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text(f"#!/usr/bin/env python3\n{body}\n")
-    dest.chmod(dest.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
-    return dest
-
-
-@pytest.fixture(autouse=True)
-def _reset_claude_cache():
-    claude_cli._reset_cache_for_tests()
-    yield
-    claude_cli._reset_cache_for_tests()
-
-
-def test_build_subprocess_env_strips_anthropic_routing_vars(monkeypatch) -> None:
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-foo")
-    monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "Bearer-foo")
-    monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://proxy.example")
-    monkeypatch.setenv("KEEP_ME", "ok")
-    env = claude_cli.build_subprocess_env()
-    assert "ANTHROPIC_API_KEY" not in env
-    assert "ANTHROPIC_AUTH_TOKEN" not in env
-    assert "ANTHROPIC_BASE_URL" not in env
-    assert env.get("KEEP_ME") == "ok"
-
-
-def test_resolve_claude_binary_raises_when_absent(tmp_path, monkeypatch) -> None:
-    fake_home = tmp_path / "home"
-    fake_home.mkdir()
-    monkeypatch.setenv("HOME", str(fake_home))
-    monkeypatch.setenv("PATH", str(tmp_path / "empty"))
-    with pytest.raises(claude_cli.ClaudeNotFound):
-        claude_cli.resolve_claude_binary()
-
-
-def test_resolve_claude_binary_finds_via_path(tmp_path, monkeypatch) -> None:
-    bin_dir = tmp_path / "bin"
-    stub = _make_stub_claude(bin_dir / "claude", "print('{\"subtype\": \"success\"}')")
-    monkeypatch.setenv("PATH", str(bin_dir))
-    assert claude_cli.resolve_claude_binary() == stub.resolve()
-
-
-def test_spawn_claude_success_returns_structured_output(tmp_path, monkeypatch) -> None:
-    bin_dir = tmp_path / "bin"
-    _make_stub_claude(
-        bin_dir / "claude",
-        "import sys, json; sys.stdin.read(); "
-        "print(json.dumps({"
-        "'subtype': 'success', 'is_error': False, "
-        "'structured_output': {'ok': True}, "
-        "'total_cost_usd': 0.02, "
-        "'usage': {'cache_creation_input_tokens': 100, 'cache_read_input_tokens': 50},"
-        "'num_turns': 1, 'duration_ms': 1234, 'session_id': 'sess-x'"
-        "}))",
+def test_compose_does_not_look_at_stage5(tmp_path: Path) -> None:
+    """Regression: compose must read stage6/ only. If a stage5/ dir
+    exists from an earlier branch, it must be ignored."""
+    artifact_root = tmp_path / "artifacts"
+    fam_dir = artifact_root / "fam_x"
+    (fam_dir / "stage5").mkdir(parents=True)
+    (fam_dir / "stage5" / "question_tag.top40.csv").write_text(
+        "question,tag\nfrom_stage5,wrong\n", encoding="utf-8"
     )
-    monkeypatch.setenv("PATH", str(bin_dir))
-    res = asyncio.run(claude_cli.spawn_claude(
-        prompt="anything", model="opus", fallback_model="sonnet",
-    ))
-    assert res.ok
-    assert res.structured_output == {"ok": True}
-    assert res.total_cost_usd == pytest.approx(0.02)
-    assert res.cache_creation_input_tokens == 100
-    assert res.cache_read_input_tokens == 50
-    assert res.subtype == "success"
-
-
-def test_spawn_claude_classifies_non_success_subtype_as_transient(tmp_path, monkeypatch) -> None:
-    """Codex correctness ask: don't trust is_error alone — check subtype.
-    Claude returns valid JSON envelopes for many failures with subtype set."""
-    bin_dir = tmp_path / "bin"
-    _make_stub_claude(
-        bin_dir / "claude",
-        "import sys, json; sys.stdin.read(); "
-        "print(json.dumps({"
-        "'subtype': 'error_max_structured_output_retries', 'is_error': False, "
-        "'result': 'gave up after 5 retries', 'total_cost_usd': 0.04"
-        "}))",
+    (fam_dir / "stage6").mkdir(parents=True)
+    (fam_dir / "stage6" / "question_tag.top40.csv").write_text(
+        "question,tag\nfrom_stage6,right\n", encoding="utf-8"
     )
-    monkeypatch.setenv("PATH", str(bin_dir))
-    res = asyncio.run(claude_cli.spawn_claude(
-        prompt="x", model="opus", fallback_model="sonnet",
-    ))
-    assert not res.ok
-    assert res.error_kind == claude_cli.ErrorKind.TRANSIENT
-    assert "error_max_structured_output_retries" in res.error_message
-    # cost still recorded for telemetry
-    assert res.total_cost_usd == pytest.approx(0.04)
-
-
-def test_spawn_claude_classifies_auth_failure_as_infra(tmp_path, monkeypatch) -> None:
-    bin_dir = tmp_path / "bin"
-    _make_stub_claude(
-        bin_dir / "claude",
-        "import sys; sys.stdin.read(); "
-        "sys.stderr.write('Not logged in. Please run `claude /login`.'); "
-        "sys.exit(1)",
-    )
-    monkeypatch.setenv("PATH", str(bin_dir))
-    res = asyncio.run(claude_cli.spawn_claude(
-        prompt="x", model="opus", fallback_model="sonnet",
-    ))
-    assert not res.ok
-    assert res.error_kind == claude_cli.ErrorKind.INFRA
-
-
-def test_spawn_claude_parse_failure_classified_as_parse(tmp_path, monkeypatch) -> None:
-    bin_dir = tmp_path / "bin"
-    _make_stub_claude(
-        bin_dir / "claude",
-        "import sys; sys.stdin.read(); print('not json at all')",
-    )
-    monkeypatch.setenv("PATH", str(bin_dir))
-    res = asyncio.run(claude_cli.spawn_claude(
-        prompt="x", model="opus", fallback_model="sonnet",
-    ))
-    assert res.error_kind == claude_cli.ErrorKind.PARSE
-
-
-def test_spawn_claude_timeout_classified_as_transient(tmp_path, monkeypatch) -> None:
-    bin_dir = tmp_path / "bin"
-    _make_stub_claude(
-        bin_dir / "claude",
-        "import time; time.sleep(60)",
-    )
-    monkeypatch.setenv("PATH", str(bin_dir))
-    res = asyncio.run(claude_cli.spawn_claude(
-        prompt="x", model="opus", fallback_model="sonnet", timeout=0.5,
-    ))
-    assert res.error_kind == claude_cli.ErrorKind.TRANSIENT
-    assert "timed out" in res.error_message.lower()
+    cfg = CleanerConfig(artifact_root=artifact_root)
+    out = tmp_path / "composed.csv"
+    run_compose(cfg, ["fam_x"], "top40", out)
+    df = pd.read_csv(out)
+    assert list(df.tag) == ["right"]
+    assert "from_stage5" not in set(df.question)

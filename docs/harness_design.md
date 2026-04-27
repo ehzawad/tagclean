@@ -16,20 +16,21 @@ A naive cleanup is "ask the LLM for each row whether it fits its tag." That trie
 - Unreliable (~50% of packets had missing decisions; the harness silently jettisoned them).
 - Dominated (the LLM's per-row score weighted 40% of the composite, making the embeddings cosmetic).
 
-So the design constraint: **the LLM must not be the per-row scorer.** Embeddings rank, the LLM only writes policy and audits the top-N buffer.
+Subsequent designs experimented with two narrower LLM roles — Claude writing per-cluster boundary policies (Stage 3) and Claude reviewing the deterministic top-N output (Stage QA / Stage 5). Both are removed in this branch. The decision is documented under [Why the LLM was removed entirely](#why-the-llm-was-removed-entirely).
 
-Each stage writes parquet/jsonl artifacts; resume is hash-based. The full pipeline diagram lives in the README so the design doc stays focused on rationale, not flowcharts.
+So the design constraint on this branch: **no LLM calls anywhere.** Embeddings rank, deterministic heuristics filter, the production-truth audit drops what production E5 itself would misroute.
+
+Each stage writes parquet/jsonl artifacts; resume is hash-based. The pipeline diagram lives in the README.
 
 ## Model roles
 
-| Model | Role | Weight in ranking |
+| Component | Role | Weight in ranking |
 |---|---|---|
-| **E5-multilingual-large-instruct** (1024d) | Primary geometry. Defines "tag fit". Production also uses E5 at inference, so we optimize against it. | 75% (own-sim 45 + margin 30) |
-| **Token alignment** | Cross-validates LLM-authored boundary rules against row text. | 15% |
-| **Claude (Opus, `--effort high`)** | Boundary-rule author for close-tag clusters (Stage 3). 1 call per cluster. Never scores rows. | 0% — appears only as `must_have_concepts` / `must_avoid_concepts` feeding token alignment |
-| **Claude (Sonnet, `--effort medium`)** | Auditor of the top-N buffer (Stage 5). ~10 calls per family. | 0% — appears only as a `keep`/`flag` filter on top-ranked rows |
+| **E5-multilingual-large-instruct** (1024d) | Primary geometry. Defines "tag fit". Production also uses E5 at inference, so we optimize against it. | 90% (own-sim 55 + margin 35) |
+| **Penalties** | near_duplicate, cross_tag_duplicate, artifact_score | -5%, -10%, -10% |
+| **MMR** | Within-tag re-rank for the top-N (λ=0.7) | 15% post-rerank |
 
-The single-embedding choice is intentional. The earlier design used EmbeddingGemma as an independent second opinion to catch E5 idiosyncrasies on shared Bengali NID vocabulary. Dropping it loses that signal *at the cluster-discovery level*; the replacement is multi-criteria E5-only gates: cosine + row-level kNN overlap inside `find_close_tag_clusters`, plus reciprocal top-K + pair-threshold inside `discover`. Stage 4 row scoring still benefits indirectly: a row that fails the deterministic ranker is rarely rescued by a second embedding; the original Gemma weights mostly correlated with E5.
+The single-embedding choice is intentional. The earlier design used EmbeddingGemma as an independent second opinion to catch E5 idiosyncrasies on shared Bengali NID vocabulary. Dropping it loses that signal *at the cluster-discovery level*; the replacement is multi-criteria E5-only gates: cosine + row-level kNN overlap inside `find_close_tag_clusters`, plus reciprocal top-K + pair-threshold inside `discover`.
 
 ## Stage-by-stage rationale
 
@@ -56,7 +57,7 @@ For each canonical tag T:
 
 - **Centroid (E5).** Take all of T's rows, embed each, and average the L2-normalized vectors. Outlier-trimmed: drop the top/bottom 5% by within-tag distance before averaging, so a few mis-tagged rows can't drag the centroid into a sibling's territory.
 - **Medoid.** The actual row whose embedding is closest to the centroid.
-- **Top-K central rows.** The 5 rows nearest the medoid. These are what Stage 3 (boundary policy) and Stage 5 (audit) show Claude as "this is what a clean example of T looks like."
+- **Top-K central rows.** The 5 rows nearest the medoid. Used as illustrative anchors when humans inspect a tag.
 - **Discriminative phrases.** Bigrams/trigrams in T's rows that have high log-odds against neighbor tags.
 
 #### Why centroids are the right abstraction
@@ -66,66 +67,56 @@ The centroid lets us reduce a tag — typically 100–250 rows of paraphrased qu
 1. **Tag-to-tag similarity.** `cos(centroid(A), centroid(B))` answers "how close are these two intents in embedding space?" Used by `find_close_tag_clusters` and `discover` to find sibling families.
 2. **Row-to-tag fit.** `cos(row_emb, centroid(tag))` answers "how well does this row belong to its assigned tag?" The composite score in Stage 4 is mostly this signal — own-tag cosine + margin against the nearest competing-tag centroid.
 
-The 5%/5% outlier trim keeps the centroid stable when a small number of mis-tagged rows would otherwise drag it. If a tag is contaminated past ~50%, the centroid reflects the contamination and Stage 3's policy will codify the wrong intent — human review of the boundary policy is the mitigation there.
+The 5%/5% outlier trim keeps the centroid stable when a small number of mis-tagged rows would otherwise drag it. If a tag is contaminated past ~50%, the centroid reflects the contamination — Stage 9's production-truth audit is the safety net.
 
-### Stage 3 — Tag-boundary policy
-The bottleneck where embeddings alone aren't enough.
+### Stage 3 — Deterministic merge map
 
 **Cluster discovery (within a single family run):**
 
-- If `--target-tags` (or `--seed-tag` resolving to ≥2 tags) is supplied, **the user-provided tag set IS the cluster** — Stage 3 skips union-find and authors a policy for exactly those tags. This is the recommended path at corpus scale.
-- Otherwise the legacy fallback applies: `find_close_tag_clusters` finds connected components where `cos(centroid_e5) ≥ 0.85` AND row-level `_knn_overlap ≥ knn_overlap_threshold`. The kNN-overlap predicate replaces the prior Gemma cosine as the second criterion that survives the dual-model drop.
+- If `--target-tags` (or `--seed-tag` resolving to ≥2 tags) is supplied, **the user-provided tag set IS the cluster** — Stage 3 honors that scope directly.
+- Otherwise the legacy fallback applies: `find_close_tag_clusters` finds connected components where `cos(centroid_e5) ≥ 0.85` AND row-level `_knn_overlap ≥ knn_overlap_threshold`. The kNN-overlap predicate is the second criterion that survives the dual-model drop.
 
-**Boundary policy authoring:**
+**Merge decisions:**
 
-For each cluster, Claude (Opus, `--effort high`) authors a `BoundaryPolicyResult`:
-- `one_line_intent` per tag.
-- `must_have_concepts` — 3–7 short cues a clean row should mention.
-- `must_avoid_concepts` — cues that signal a sibling tag instead.
+For each candidate pair within a cluster, a deterministic check decides whether to merge tags into one canonical tag:
 
-Single pass, fixed tag order. Validation: schema must validate AND the returned tag set must cover the input tags. Else fall back to a heuristic stub built from tag-name tokens. The `tag_answer.json`, when provided, gates merging: two tags merge only if questions look equivalent AND their canonical answers do too. Otherwise keep both and tighten the boundary.
+- Token overlap on tag names (e.g. `nid_fee` vs `nid_fee_01_followup_a` → same base).
+- Answer-token overlap on `tag_answer.json` (when provided), as a merge-safety gate — two tags merge only if questions look equivalent AND their canonical answers do too.
 
-The call goes through `claude -p --json-schema`. Per-call cost / cache tokens / subtype are persisted to `stage3/llm_calls.jsonl`.
+The result is `tag_merge_map.csv` (`old_tag → canonical_tag`). No LLM call; the output is fully reproducible from the corpus + config.
 
 ### Stage 4 — Deterministic ranker
+
 For each row in target scope, compute:
 
 ```
-score(r) =
-   0.45 · cos(r_e5, centroid_e5(tag(r)))
- + 0.30 · margin_e5(r, tag)                         (own − nearest other-tag centroid)
- + 0.15 · token_alignment(r, must_have / must_avoid)  (from Stage 3 policy)
+composite_score(r) =
+   0.55 · cos(r_e5, centroid_e5(tag(r)))            (E5 own-similarity)
+ + 0.35 · margin_e5(r, tag)                         (own − nearest other-tag centroid)
  − 0.05 · near_dup_count(r)
  − 0.10 · cross_tag_duplicate(r)
  − 0.10 · artifact_score(r)                         (short / repeat-char / synthetic)
 ```
 
-- Weights chosen so a typical clean row lands near 1.0; ambiguous rows fall well below.
-- Top `audit_buffer_size` rows per tag (default 80) are marked `audit_buffer=true`. Below-buffer rows are jettisoned by Stage 6.
-- Gemma's prior 0.15 (own) + 0.10 (margin) + 0.10 (rank_agreement) was absorbed into E5 (0.30→0.45, 0.20→0.30) and token_alignment (0.10→0.15) so the positive weights still sum to ~1.0.
+Weights chosen so a typical clean row lands near 1.0; ambiguous rows fall well below. The previous design's token-alignment feature (15%) was deleted along with the boundary-policy authoring it depended on; that weight was redistributed into E5 own-similarity (45 → 55) and margin (30 → 35).
 
-### Stage 5 — Buffer audit
-- Per tag, group buffer rows into packets of `audit_rows_per_packet` (default 24).
-- Claude (Sonnet, `--effort medium`) gets:
-  - The tag's `one_line_intent`, `must_have_concepts`, `must_avoid_concepts` (from Stage 3).
-  - The tag's central exemplars and discriminative phrases (from Stage 2).
-  - Up to 24 candidate rows.
-- For each row: `keep` or `flag` with `reason_code` ∈ {`clean`, `wrong_intent`, `sibling_collision`, `too_generic`, `duplicate`, `synthetic_artifact`, `context_dependent`, `audit_missing`}.
-- Policy: `prefer_flag_when_unsure`.
-- **Fail-closed on missing decisions**: if a packet response omits a buffer row, that row defaults to `flag` with `reason_code=audit_missing`. The earlier design defaulted missing rows to `keep` ("the ranker already endorsed them"); at corpus scale that turned silent rate-limit storms into thousands of false-positive inclusions.
-- **Circuit breaker**: if the most recent N audit packets all errored (default N=10), the stage halts with a diagnostic and refuses to write `audit_results.jsonl`.
-- **Per-call telemetry**: `subtype`, `total_cost_usd`, `cache_creation_input_tokens`, `cache_read_input_tokens`, `num_turns`, `duration_ms` written to `stage5/llm_calls.jsonl`.
+### Stage 5 — (deleted)
+
+Was the Stage QA reviewer pass: per-tag anonymized prompt to Claude that flagged obvious outliers in the deterministic top-N. See [Why the LLM was removed entirely](#why-the-llm-was-removed-entirely).
 
 ### Stage 6 — Selection
-- Filter: rows `in audit_buffer AND audit decision = keep`.
-- MMR-adjust within each tag (λ=0.7 in E5 space) so top-K covers phrasing diversity, not 40 paraphrases of the medoid.
+
+- Filter: rows in scope (no Stage QA pre-filter; the deterministic ranker decides).
+- MMR-adjust within each canonical tag (λ=0.7 in E5 space) so the top-K covers phrasing diversity, not 40 paraphrases of the medoid.
 - Sort by `0.85 · composite_score + 0.15 · MMR`.
 - Top `top_n` per tag (default 40) → `production_recommended=true`.
 
 ### Stage 7 — (deleted)
-Was a per-row second-pass review over the bottom quartile of Stage 6 keeps. Stage 5's buffer audit subsumes it. The dispatcher in `run_stage8` skips directly from Stage 6 to validation.
+
+Was a per-row second-pass review over the bottom quartile of Stage 6 keeps. Removed in an earlier branch.
 
 ### Stage 8 — Validation
+
 - Build a shadow FAISS index from `cleaned.csv`.
 - **Leave-one-out self-retrieval**: for each row, remove from index, query, check top-1 tag matches. Per-tag and global accuracy.
 - Confusion matrix at top-1 and top-5; surface remaining boundary issues.
@@ -133,57 +124,47 @@ Was a per-row second-pass review over the bottom quartile of Stage 6 keeps. Stag
 
 ### Stage 9 — E5-only production-risk audit
 
-Stage 4's ranker is E5 + token-alignment. Production inference uses E5 *alone*. So a row that scored well jointly but E5 alone misroutes is a production failure, not a cleaning failure. Stage 9 is the production-truth gate.
+Stage 4's ranker uses E5 plus deterministic penalties. Production inference uses E5 *alone*. So a row that scored well composite but E5 alone misroutes is a production failure, not a cleaning failure. Stage 9 is the production-truth gate.
 
-- For each row in the input set, run leave-one-out top-K retrieval over E5 (no token alignment, no Stage 3 policy). Default `K=10`.
+- For each row in the input set, run leave-one-out top-K retrieval over E5 (no penalties, no Stage 3 merge map). Default `K=10`.
 - Default policy: drop rows whose top-1 non-self neighbor is a different tag.
 - Severity diagnostics: per-row `own_share_top_K` (fraction of K neighbors with the same tag) and `neighbor_tag_dist` (full distribution).
 - Pure-numpy chunked top-K (`vecs @ vecs.T` → `argpartition`, default chunk = 4096 rows). FAISS+sentence-transformers segfault when both load in the same process on Python 3.14/Mac.
 - Single encode (passages = queries with same E5-instruct prefix); skip the redundant second encode.
-- Standalone — never auto-chains stage0–8. Auto-chain silently overwrote `cleaned.csv` when `judge_mode` differed across invocations.
+- Standalone — never auto-chains stage0–8. Auto-chain silently overwrote `cleaned.csv` when geometry config differed across invocations.
 
 Stage 9 takes either the run's own `stage6/question_tag.cleaned.csv` (per-family diagnostics) or an external CSV via `--e5-audit-input` (the cross-family production union). The latter is the production exit shape.
 
-## How `claude -p` is called
+## Why the LLM was removed entirely
 
-A single async helper (`tagclean.claude_cli.spawn_claude`) wraps every Stage 3 / Stage 5 invocation:
+The branch history is:
 
-```
-claude -p \
-    --model {opus|sonnet} --fallback-model sonnet --effort {high|medium} \
-    --output-format json --no-session-persistence \
-    --json-schema '<pydantic-derived schema>'
-# prompt streamed via stdin, response parsed from envelope.structured_output
-```
+1. **Stage QA branch** (`claude-cli-stage-qa`): a single anonymized Claude pass per tag, post-Stage-6, flagged obvious outliers in the deterministic top-N. Worked. Empirically improved cleanliness for 157/251 families on the Bengali corpus before subscription rate limits stopped 94 families mid-run.
+2. **This branch** (`deterministic-only`): drop Stage QA. Ship the deterministic top-N + global Stage 9 audit.
 
-The subprocess env strips `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, and `ANTHROPIC_BASE_URL` so subscription routing wins. The envelope's `subtype` field is the canonical success signal — `is_error` alone is too narrow because Claude returns valid JSON envelopes with `subtype != "success"` for many real failures (`error_during_execution`, `error_max_structured_output_retries`, `error_max_turns`).
+The trade-off is small and deliberate. Stage QA's incremental contribution on the Bengali NID corpus was modest paraphrase removal — useful, but not load-bearing for production retrieval accuracy (which is dominated by E5 geometry plus the Stage 9 production-truth audit). Holding that against:
 
-Failure classification:
+- Subscription rate limits stalling corpus-scale runs.
+- Non-determinism — running the same input twice does not produce identical output.
+- Per-call telemetry, breakers, retries, vacuity checks, prompt-version hashes — all infrastructure that exists only because the LLM is on the hot path.
 
-| Class | Examples | Retry |
-|---|---|---|
-| INFRA | binary missing, perm denied, "not logged in" stderr | no |
-| TRANSIENT | timeout, claude `subtype != success`, non-zero exit | yes |
-| PARSE | envelope JSON unreadable | yes |
+…the deterministic pipeline is preferable when reproducibility and operational simplicity outweigh the last few percent of paraphrase polish.
 
-The Stage 5 audit loop wraps `spawn_claude` with `asyncio.Semaphore(concurrency=6)`, an atomic tmp+rename packet write, a per-call telemetry append, and a sliding-window failure circuit breaker.
+What's lost: a domain-drift safety valve. Deterministic geometry will silently canonize whatever the corpus happens to contain. If tags get noisier, new services appear, or phrasing shifts, the pipeline cannot say "this row is obviously broken/off-intent." Stage 9 catches embedding-routable errors but not semantic-but-still-embeds-plausibly errors. Mitigation: human spot-check `stage6/top40.csv` and `stage9/e5_dropped.csv` per family.
 
 ## Resume hash hardening
 
-`stage_done(stage_dir, expected_hash)` compares the pre-stage input hash against `manifest.json`. The historical Stage 3 / Stage 5 hashes only included data inputs — **not** model identity. That meant an OpenAI→Claude migration (or any prompt/effort change) silently reused stale boundary policies and audits. Both stages now bake in:
+`stage_done(stage_dir, expected_hash)` compares the pre-stage input hash against `manifest.json`. Each stage's input hash bakes in:
 
-- `judge_mode`
-- model name
-- effort
-- prompt-version constant (`STAGE3_PROMPT_VERSION` / `STAGE5_PROMPT_VERSION`)
-- pydantic schema fingerprint (sha256 of the JSON schema, sorted-keys)
-- packet geometry (Stage 5 only)
+- File hashes of all input CSVs / parquets / numpy arrays.
+- Geometry config (`e5_merge_threshold`, `knn_overlap_threshold`, `near_duplicate_threshold`, `top_n`, etc.).
+- Scope when applicable (`target_tags` set hash for target-restricted runs).
 
-Bump the prompt-version constant when you change prompt text or schema shape.
+A target-restricted run is treated as a different artifact than a corpus-wide one and must not silently resume from each other.
 
-## Scaling: from 3 hand-picked families to all 1394 tags
+## Scaling: from 3 hand-picked families to all tags
 
-The original `--seed-tag` does union-find on tag centroids: connected components above threshold. At Bengali NID corpus scale (1394 tags, heavily shared vocabulary), this collapses into a single 488-tag mega-component — `max_cluster_size=6` then truncates the component by alphabetical tag-index order, returning a useless cluster that doesn't even contain the seed.
+The original `--seed-tag` does union-find on tag centroids: connected components above threshold. At Bengali NID corpus scale (1394 tags, heavily shared vocabulary), this collapses into a single ~488-tag mega-component — `max_cluster_size=6` then truncates the component by alphabetical tag-index order, returning a useless cluster that doesn't even contain the seed.
 
 Replacement: **`tagclean discover`**, seed-centric reciprocal-NN ego-family expansion (E5-only).
 
@@ -195,12 +176,10 @@ Replacement: **`tagclean discover`**, seed-centric reciprocal-NN ego-family expa
 
 No transitive closure → no mega-components. Output is a hand-editable `families.yaml` with deterministic `family_id` (8-char hash of the sorted tag set) so re-running discover produces stable IDs and `run-families --skip-completed` resumes naturally.
 
-The reciprocal top-K + pair-threshold gates are themselves multi-criteria robustness — they don't depend on Gemma; the prior dual-cosine `min(E5, Gemma) ≥ threshold` was an additional layer that's been collapsed.
-
 Companion commands:
 
 - **`tagclean run-families --manifest families.yaml`** dispatches `stage8` per approved family. Stage 0–2 are symlinked from the manifest's `centroids_run_id`, so the corpus-wide embeddings are computed once and reused.
-- **`tagclean compose --manifest families.yaml --compose-source cleaned --out PATH`** unions per-family `stage6/cleaned.csv` (or `top40.csv`) into one production candidate set with `(question, tag)` dedup and deterministic ordering.
+- **`tagclean compose --manifest families.yaml --compose-source top40 --out PATH`** unions per-family `stage6/top40.csv` into one production candidate set with `(question, tag)` dedup and deterministic ordering.
 - **`tagclean stage9 --e5-audit-input PATH --run-id production`** does the final cross-family E5 audit.
 
 Production end-state: `runs/<production_run>/stage9/production_filtered.csv`.
@@ -210,57 +189,27 @@ Production end-state: `runs/<production_run>/stage9/production_filtered.csv`.
 | Rejected | Why |
 |---|---|
 | Per-row LLM judging | Dominates the ranking, expensive, unreliable on partial responses. |
+| LLM-authored boundary policy (Stage 3) | The policy artifact was contaminated by tag-name anchoring; deterministic merge map is more reproducible. |
+| LLM Stage QA reviewer (Stage 5) | Subscription rate limits and non-determinism outweighed incremental polish at corpus scale. See [Why the LLM was removed entirely](#why-the-llm-was-removed-entirely). |
 | First-3-row anchors per tag | The CSV is alphabetically sorted within tag, so "first 3" picks earliest-by-Bengali-sort questions, not canonical seeds. Medoid + top-K central is robust. |
-| Multi-pass self-consistency with string-overlap agreement check | Too strict — the LLM phrases concepts differently across passes for close siblings. Single pass + structural validation is sufficient. |
 | Auto-cluster as default workflow | Footgun. Conflates discovery, prioritization, and execution. *"Hard to triage which clusters need attention vs which are fine."* |
-| Use `tag_answer.json` as judge context for row decisions | Anchors the LLM incorrectly. Reserved for the merge-safety gate only. |
+| Use `tag_answer.json` as judge context for row decisions | Anchors the LLM (and any future deterministic per-row scorer) incorrectly. Reserved for the merge-safety gate only. |
 | `--language` global toggle inside `normalize_question` | Threading config is invasive. Module-level `_NORMALIZATION_LANGUAGE` set by `main()` — small but pragmatic compromise. |
-| Tool-use / MCP for Stage 3 | Considered: let the boundary-policy author `Read` more sample rows on demand. Trades determinism + cache-keyability for context the model usually doesn't need. Pure structured-output transport wins for a batch tool. |
-| Long-running stateful Claude session per family | Considered: most "harness-native." Loses within-family parallelism, harder failure semantics. |
 
 ## Known risks
 
-- **Single-embedding cluster discovery may miss human siblings** that the prior dual-model setup caught via Gemma's independent geometry. Mitigation: row-level kNN-overlap is now an explicit second criterion in `find_close_tag_clusters`, and `discover`'s reciprocal + pair-threshold pipeline already provides multi-criteria robustness. Validate by comparing `runs/families_report.md` against the prior dual-model manifest if you have one.
+- **Single-embedding cluster discovery may miss human siblings** that the prior dual-model setup caught via Gemma's independent geometry. Mitigation: row-level kNN-overlap is now an explicit second criterion in `find_close_tag_clusters`, and `discover`'s reciprocal + pair-threshold pipeline already provides multi-criteria robustness. Validate by inspecting `runs/families_report.md`.
 - **Cluster threshold can miss human siblings.** `boundary_policy_threshold` (default 0.85) is calibrated to tight Bengali NID clusters; English-style domains with looser sibling similarity may leave human-recognizable family members below the cut. Mitigation: `--seed-tag` prints the nearest excluded tags with similarity scores; lower the threshold or pass `--target-tags` explicitly when you see siblings just below the line.
-- **Dirty centroids can canonize bad clusters.** Stage 2's medoid is computed AFTER outlier trimming, but if a tag is contaminated past 50%, the medoid itself reflects the contamination and Stage 3's policy will codify it. Mitigation: human-review the boundary policy for any tag that looks suspect; sample top-5 of `cleaned.csv` per tag.
-- **Stage 8 LOO accuracy is supportive, not definitive.** It can look high (>0.95) even when the taxonomy is wrong, because each row is its own nearest neighbor in the cluster GPT chose. Always pair LOO with a manual eyeball of `top40.csv` and a sample of `jettisoned_rows.csv` rationales.
-- **Subscription rate limits.** The Claude Code subscription has per-minute quotas. Stage 5's circuit breaker (default: halt after 10 consecutive failures) catches sustained outages; for transient bursts, lower `concurrency` (default 6).
+- **Dirty centroids can canonize bad clusters.** Stage 2's medoid is computed AFTER outlier trimming, but if a tag is contaminated past 50%, the medoid itself reflects the contamination. Mitigation: human-review `top40.csv` per tag; sample dropped rows in `stage9/e5_dropped.csv`.
+- **Stage 8 LOO accuracy is supportive, not definitive.** It can look high (>0.95) even when the taxonomy is wrong, because each row is its own nearest neighbor in the cluster GPT chose. Always pair LOO with a manual eyeball of `top40.csv`.
+- **No semantic safety valve.** The deterministic pipeline cannot catch rows that embed plausibly but are off-intent. If domain drifts, regenerate the corpus and re-run; do not rely on this pipeline to flag drift.
 
 ## Cost & runtime envelope
 
 For a 3-tag close-cluster run on the Bengali EC FAQ data (~540 rows):
 - Stage 1 embedding (E5 on Mac MPS, model cached): ~30 sec.
-- Stage 3 boundary policy: 1 Claude (Opus) call (~30–90 sec).
-- Stage 5 audit: ~10 packets × ~10–30 sec each = 2–5 min on Sonnet.
-- Stages 0/2/4/6/8 deterministic: <30 sec total.
-- **Total: ~4–10 min, billed against the user's Claude Code subscription.**
+- Stages 0/2/3/4/6/8 deterministic: <30 sec total.
+- Stage 9 deterministic E5 audit: <10 sec for the family.
+- **Total: <2 min, no API spend.**
 
-For a 60k-row corpus-wide run, multiply embedding by ~150× (still 30 min on a single L4 GPU; 30+ min on Mac MPS). Audit Claude cost scales with `audit_buffer_size × n_tags / audit_rows_per_packet` — for the full ~1394-tag Bengali corpus at default settings, around 4600 audit calls. Subscription quota and rate limits become the real bottleneck rather than dollar cost.
-
-## Schema details (pydantic)
-
-All models forbid extra fields and have all properties listed in `required` (Anthropic strict-mode `--json-schema` compliance — same constraint OpenAI strict mode had).
-
-```python
-class TagBoundaryRule(BaseModel):
-    tag: str
-    one_line_intent: str
-    must_have_concepts: list[str]   # required, can be []
-    must_avoid_concepts: list[str]  # required, can be []
-
-class BoundaryPolicyResult(BaseModel):
-    cluster_id: str
-    rules: list[TagBoundaryRule]
-    cluster_rationale: str
-
-class AuditRowDecision(BaseModel):
-    row_id: int
-    decision: Literal["keep", "flag"]
-    reason_code: Literal["clean", "wrong_intent", "sibling_collision",
-                          "too_generic", "duplicate", "synthetic_artifact",
-                          "context_dependent", "audit_missing"]
-    rationale: str
-```
-
-### History note: the `default_factory` schema bug
-Earlier versions had `must_have_concepts: list[str] = Field(default_factory=list)`. Pydantic generated a JSON schema with that field in `properties` but **not** in `required`. OpenAI's strict-mode `response_format` rejected the call with HTTP 400. Two real-GPT runs fell back to heuristic boundary policy before this was caught. Anthropic's `--json-schema` strict mode has the same constraint — never use `default_factory=` or `default=` on fields used as the response schema for an LLM structured-output call.
+For a 60k-row corpus-wide run, multiply embedding by ~150× (~30 min on a single L4 GPU; 30+ min on Mac MPS). Subsequent per-family stage4/6/8 runs are CPU-bound and parallelizable across families.

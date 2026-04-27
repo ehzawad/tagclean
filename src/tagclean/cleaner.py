@@ -10,7 +10,6 @@ deterministic stages and tests can run without loading models.
 from __future__ import annotations
 
 import argparse
-import asyncio
 import csv
 import hashlib
 import json
@@ -22,12 +21,12 @@ import unicodedata
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Iterable, Literal
+from typing import Any, Iterable
 
 import numpy as np
 import pandas as pd
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field
 
 # Defaults are relative to the working directory; CLI/config resolves them.
 PROJECT_ROOT = Path.cwd()
@@ -47,20 +46,6 @@ DEFAULT_E5_INSTRUCTION = (
     "intent, and specific details. Use semantic similarity and contextual "
     "understanding; prioritize exact phrase matches and context-aware matching."
 )
-
-
-# Bump these when prompt text or schema shape for a stage changes. They
-# get folded into the per-stage input_hash so a Claude prompt rewrite (or
-# an OpenAI->Claude migration) doesn't silently reuse stale artifacts
-# from a prior config — Codex flagged this as the migration's biggest
-# correctness footgun.
-STAGE_QA_PROMPT_VERSION = "claude-sonnet-qa-v1"
-
-
-def _schema_fingerprint(schema: dict[str, Any]) -> str:
-    """Stable hash of a JSON schema. Sorted keys so dict ordering doesn't
-    perturb the fingerprint across Python versions."""
-    return hashlib.sha256(json.dumps(schema, sort_keys=True).encode("utf-8")).hexdigest()[:16]
 
 
 def coerce_optional_str_list(value: Any) -> list[str]:
@@ -111,21 +96,7 @@ class CleanerConfig:
     # normalization via bnunicodenormalizer; "none" disables.
     language: str = "bn"
 
-    # Claude CLI settings. Stage 3 is Claude-free (deterministic merge map
-    # only). Stage 5 = Stage QA (post-Stage-6 severity reviewer): Sonnet +
-    # medium effort by default — Codex flagged --effort max as overkill
-    # that invites over-thinking and runaway latency on a hot loop.
-    judge_mode: str = "claude"  # claude | heuristic
-    stage5_model: str = "sonnet"
-    stage5_effort: str = "medium"
-    claude_fallback_model: str = "sonnet"
-    claude_call_timeout_s: float = 300.0
-    concurrency: int = 6  # bounded; subscription quotas don't reward bursting
-
-    # Stage QA: rows per packet shown to Claude in one call (default 20,
-    # bounded so a single packet stays inside Sonnet's careful-reading
-    # window; 40 invites tail slop per Codex).
-    qa_rows_per_packet: int = 20
+    concurrency: int = 6
 
     # Thresholds. "auto" values are calibrated from each run.
     # E5-only after the Gemma drop — the dual-geometry gate is replaced by
@@ -198,35 +169,6 @@ class AnswerSafetyResult(BaseModel):
     same_answer: bool
     confidence: float = Field(ge=0, le=100)
     rationale: str = Field(min_length=1, max_length=500)
-
-
-# ---------- Stage QA (the post-selection severity reviewer) ----------
-#
-# Stage QA is the new last-mile Claude pass. It runs AFTER Stage 6 (top-N
-# selection + MMR) and gives Claude one job: read ~20 questions known to
-# share an intent, identify the obvious outliers, drop them. No boundary
-# policy authoring, no per-row keep/flag scoring, no taxonomy of reasons —
-# just a free-text `why` per dropped row. Codex-approved schema shape:
-# the enum was a hangover from the old Stage 5's downstream routing; here
-# every flag does the same thing (drop the row), so the bucket label was
-# decoration. `related_row_id` is required by the schema but nullable in
-# value — needed for Anthropic strict --json-schema mode, which (like
-# OpenAI strict) demands every property appear in `required`.
-
-
-class FlaggedRow(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    row_id: int
-    why: str = Field(min_length=1, max_length=300)
-    related_row_id: int | None  # nullable but required field
-
-
-class StageQAResult(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    audited_row_ids: list[int]
-    flagged_rows: list[FlaggedRow]
 
 
 def load_config(path: Path | None) -> CleanerConfig:
@@ -602,32 +544,6 @@ def _central_row_ids(group: pd.DataFrame, vectors: np.ndarray, local_indices: np
     return row_ids, raw_centroid, sims
 
 
-def text_contains_concept(text: str, concept: str) -> bool:
-    """Substring check with light normalization both sides."""
-    if not concept:
-        return False
-    return normalize_question(concept) in normalize_question(text)
-
-
-def token_alignment_score(text: str, must_have: list[str], must_avoid: list[str]) -> float:
-    """Fraction of must_have concepts present in text minus avoid penalty.
-
-    Returns a value roughly in [-1, 1]. Used as an additive feature in Stage 4
-    scoring; weight is small so empty/missing policies degrade gracefully.
-    """
-    if not must_have and not must_avoid:
-        return 0.0
-    have_score = 0.0
-    if must_have:
-        hits = sum(1 for c in must_have if text_contains_concept(text, c))
-        have_score = hits / len(must_have)
-    avoid_pen = 0.0
-    if must_avoid:
-        hits = sum(1 for c in must_avoid if text_contains_concept(text, c))
-        avoid_pen = hits / len(must_avoid)
-    return have_score - avoid_pen
-
-
 def artifact_score(text: str) -> float:
     """Higher = more artifact-like / suspicious. Range [0,1].
 
@@ -886,8 +802,6 @@ def run_stage3(config: CleanerConfig, resume: bool = True) -> None:
     hash_parts = [
         dataframe_hash(profiles, ["tag", "row_count", "description"]),
         file_sha256(config.tag_answer_json),
-        # Stage 3 is now deterministic-only (no Claude); LLM identity
-        # fields are dropped from the hash. Stage QA hash carries them.
         f"e5_merge_threshold={config.e5_merge_threshold}",
         f"knn_overlap_threshold={config.knn_overlap_threshold}",
     ]
@@ -1001,13 +915,6 @@ def run_stage3(config: CleanerConfig, resume: bool = True) -> None:
     pd.DataFrame(remap).to_csv(stage_dir / "tag_merge_map.csv", index=False)
     pd.DataFrame(candidates).to_json(stage_dir / "merge_candidates.jsonl", orient="records", lines=True, force_ascii=False)
 
-    # Stage 3 used to author per-cluster boundary policy via Claude; in
-    # the Stage QA architecture that step is gone (the policy artifact
-    # was contaminated by tag-name anchoring per Codex's review). Emit
-    # an empty policy file for back-compat with anything that still
-    # opens it. The merge_map.csv is the actual load-bearing output.
-    write_jsonl(stage_dir / "tag_boundary_policy.jsonl", [])
-
     finish_stage(
         stage_dir,
         config,
@@ -1040,14 +947,6 @@ def _calibrated_threshold(values: np.ndarray, quantile: float) -> float:
     return float(np.quantile(finite, quantile))
 
 
-# _neighbor_evidence + _evidence_summary deleted: full-corpus per-row
-# kNN was the Stage 4 bottleneck and Codex/user concluded its only
-# Stage QA consumer (the risky-row gate for rival_context injection)
-# is itself unnecessary — Claude's majority-theme framing handles the
-# off-intent calls without sibling exemplars. Centroid-only scoring
-# reduces Stage 4 from ~25 min to seconds at corpus scale.
-
-
 def run_stage4(config: CleanerConfig, resume: bool = True) -> None:
     run_stage3(config, resume=resume)
     run_dir = config.run_dir()
@@ -1071,14 +970,6 @@ def run_stage4(config: CleanerConfig, resume: bool = True) -> None:
     cross_dups = read_jsonl(run_dir / "stage0" / "cross_tag_duplicates.jsonl")
     cross_dup_ids = {int(row_id) for item in cross_dups for row_id in item.get("row_ids", [])}
 
-    # Vectorized per-row scoring. Codex called the prior per-row Python
-    # loop dead weight in the new architecture: it computed full-corpus
-    # row-level kNN evidence (`e5_top10_evidence`) for every row in the
-    # 79k-row corpus when the only consumer was Stage QA's risky-row
-    # gate — itself dropped because Claude's majority-theme framing
-    # makes rival-context injection unnecessary. What Stage QA actually
-    # needs is e5_own_sim, e5_margin, near_dup_count, artifact_score,
-    # cross_tag_duplicate. All vectorizable.
     own_idx = rows["canonical_tag"].map(tag_to_idx).to_numpy(dtype=np.int64)
     n_rows = len(rows)
     row_indices = np.arange(n_rows)
@@ -1123,13 +1014,8 @@ def run_stage4(config: CleanerConfig, resume: bool = True) -> None:
         artifact_score(q) for q in feature_df["question_raw"].tolist()
     ]
 
-    # Deterministic composite score, E5-only. token_alignment was 0.15 of
-    # the score in the prior design; with Stage 3's policy authoring
-    # gone, the only honest move is to redistribute its weight back into
-    # the geometry signals. Stage QA (post-Stage 6) absorbs the role
-    # token_alignment was playing.
-    #   e5_own 0.45 -> 0.55,  e5_margin 0.30 -> 0.35.
-    # Positive weights still sum to 0.90; a typical clean row lands ~1.0.
+    # Deterministic composite score, E5-only. Positive weights sum to 0.90;
+    # a typical clean row lands ~1.0.
     e5_own_n = _normalize_series(feature_df["e5_own_sim"])
     e5_margin_n = _normalize_series(feature_df["e5_margin"])
     near_dup_n = _normalize_series(feature_df["near_dup_count"].astype(float))
@@ -1186,552 +1072,6 @@ def _json_cell(value: Any, default: Any) -> Any:
         except json.JSONDecodeError:
             return default
     return value
-
-
-# ============================================================================
-# Stage QA — single Claude pass per tag, post-Stage-6, anonymized + free-text
-#
-# Runs AFTER Stage 6 (top-N selection + MMR). Shows Claude ~20 rows from the
-# selected top-N for one tag at a time. The tag NAME is never in the prompt;
-# Claude infers the majority theme of the packet and flags rows that don't
-# fit. Output is free-text `why` per dropped row — Codex's recommendation
-# after we considered a 4-category enum and rejected it: every flag does the
-# same thing here (drop the row), so the bucket label was decoration.
-#
-# Optional `RIVAL_A`/`RIVAL_B` rival exemplars are injected only when a row
-# in the packet is "risky" (e5_margin in the bottom 15% of its tag AND a
-# single sibling tag dominates ≥2 of its top-5 evidence neighbors).
-# ============================================================================
-
-
-def build_stage_qa_packets(top_df: pd.DataFrame, packet_size: int) -> list[pd.DataFrame]:
-    """Split each tag's top-N rows into packets of `packet_size`.
-
-    Sorted by composite_score desc within each tag so the strongest rows
-    come first in each packet — easier for Claude to spot the pattern.
-    """
-    if top_df.empty:
-        return []
-    sorted_df = top_df.sort_values(
-        ["canonical_tag", "composite_score", "row_id"], ascending=[True, False, True]
-    )
-    packets: list[pd.DataFrame] = []
-    for _, group in sorted_df.groupby("canonical_tag", sort=True):
-        for start in range(0, len(group), packet_size):
-            packets.append(group.iloc[start : start + packet_size].reset_index(drop=True))
-    return packets
-
-
-# _is_risky_row + _build_rival_context deleted: rival-context injection
-# was a hedge against Claude conflating "wrong intent" with "ugly wording
-# for the right intent." The user and Codex agreed that with majority-
-# theme framing + precision-bias instruction, Claude doesn't need sibling
-# exemplars to make that call. Dropping the gate also drops the only
-# consumer of the row-level kNN evidence in Stage 4 (now centroid-only).
-
-
-def build_stage_qa_prompt(packet: pd.DataFrame) -> str:
-    """Anonymized Stage QA prompt — no tag name leaks into the prompt.
-
-    The harness knows which tag this packet is for; Claude does not need
-    that to identify intra-packet outliers, and removing it eliminates
-    the dominant anchoring vector Codex flagged.
-    """
-    payload = {
-        "task": (
-            "You are a quality reviewer for a Bengali NID/voter FAQ "
-            "dataset. You will see ~20 questions all assigned to the SAME "
-            "(unnamed) intent. Identify questions that obviously don't "
-            "belong with the rest of the packet."
-        ),
-        "reference_frame": (
-            "Read every question first. Identify the MAJORITY THEME of the "
-            "packet — the dominant intent across these ~20 questions. "
-            "Judge each row against that theme. Do not invent a theme to "
-            "make outliers fit; do not anchor on the weirdest row. If the "
-            "packet contains two coherent sub-themes (say 60/40), respect "
-            "both — flag only rows that belong to NEITHER."
-        ),
-        "flag_when": [
-            "different intent from the packet's majority theme",
-            "grammatically broken Bengali, garbled, or half-sentence",
-            (
-                "needs prior conversation, or is a fragment / single-word "
-                "reply / meta-question that can't stand alone as an FAQ row"
-            ),
-            (
-                "near-paraphrase of another row in THIS same packet "
-                "(populate `related_row_id` with the duplicate's row_id)"
-            ),
-        ],
-        "do_not_flag": [
-            (
-                "borderline cases — flag only when confident a human "
-                "reviewer would agree immediately. Aggressive recall is "
-                "the deterministic ranker's job, not yours."
-            ),
-            (
-                "stylistic / register variation; valid alternate phrasings; "
-                "rare vocabulary if the intent is clear"
-            ),
-            "rows that fit a coherent secondary sub-theme",
-        ],
-        "output_contract": {
-            "audited_row_ids": (
-                "MUST contain every row_id sent in target_rows. If you "
-                "read a row and decided not to flag, list it in "
-                "audited_row_ids anyway."
-            ),
-            "flagged_rows": (
-                "Each entry: {row_id, why (one English sentence), "
-                "related_row_id (the row_id of the duplicate, only when "
-                "the flag is for near-paraphrase; null otherwise)}."
-            ),
-            "primary_field": (
-                "question_raw is primary; question_norm is the normalized "
-                "backup if you suspect raw is mis-encoded."
-            ),
-        },
-        "target_rows": [
-            {
-                "row_id": int(row["row_id"]),
-                "question_raw": row["question_raw"],
-                "question_norm": row["question_norm"],
-            }
-            for _, row in packet.iterrows()
-        ],
-        "required_json_schema": StageQAResult.model_json_schema(),
-    }
-    return json.dumps(payload, ensure_ascii=False, indent=2)
-
-
-def aggregate_qa_results(
-    stage_dir: Path,
-) -> tuple[dict[int, dict[str, Any]], dict[str, Any]]:
-    """Merge per-packet QA results into a row-level dict + summary stats.
-
-    Returns (per_row, summary). per_row[row_id] is one of:
-      {flagged: True,  why: "...", related_row_id: int|None, packet_id: ...}
-      {flagged: False, audit_status: "audited",            packet_id: ...}
-      {flagged: False, audit_status: "audit_incomplete",   packet_id: ...}
-    """
-    per_row: dict[int, dict[str, Any]] = {}
-    flagged_count = 0
-    incomplete_packets = 0
-    rationale_lengths: list[int] = []
-    rationale_strings: list[str] = []
-    empty_packets = 0
-    total_packets = 0
-
-    for path in sorted((stage_dir / "qa_packets").glob("packet_*.json")):
-        payload = read_json(path)
-        if not payload:
-            continue
-        total_packets += 1
-        packet_id = payload.get("packet_id", path.stem)
-        sent_ids = set(int(v) for v in payload.get("row_ids", []))
-        status = payload.get("audit_status", "audited")
-        if status == "audit_incomplete":
-            incomplete_packets += 1
-            for rid in sent_ids:
-                per_row.setdefault(int(rid), {
-                    "flagged": False, "audit_status": "audit_incomplete",
-                    "packet_id": packet_id,
-                })
-            continue
-        result = StageQAResult.model_validate(payload["result"])
-        flagged_ids = {f.row_id for f in result.flagged_rows}
-        if not result.flagged_rows:
-            empty_packets += 1
-        for f in result.flagged_rows:
-            per_row[int(f.row_id)] = {
-                "flagged": True,
-                "why": f.why,
-                "related_row_id": f.related_row_id,
-                "packet_id": packet_id,
-            }
-            flagged_count += 1
-            rationale_lengths.append(len(f.why))
-            rationale_strings.append(f.why.strip().lower())
-        for rid in sent_ids:
-            if int(rid) in flagged_ids:
-                continue
-            per_row.setdefault(int(rid), {
-                "flagged": False, "audit_status": "audited",
-                "packet_id": packet_id,
-            })
-
-    repeated = Counter(rationale_strings)
-    repeated_top = [
-        {"rationale": r, "count": c}
-        for r, c in repeated.most_common(5)
-        if c > 1
-    ]
-    summary = {
-        "total_packets": total_packets,
-        "incomplete_packets": incomplete_packets,
-        "empty_flagged_packets": empty_packets,
-        "empty_flagged_rate": (empty_packets / total_packets) if total_packets else 0.0,
-        "flagged_rows": flagged_count,
-        "mean_rationale_length": (
-            sum(rationale_lengths) / len(rationale_lengths)
-        ) if rationale_lengths else 0.0,
-        "repeated_rationales_top5": repeated_top,
-    }
-    return per_row, summary
-
-
-async def _run_stage_qa_loop(
-    config: CleanerConfig,
-    top_df: pd.DataFrame,
-    stage_dir: Path,
-) -> None:
-    """Run Stage QA packets concurrently with bounded `claude -p` subprocesses.
-
-    Resilience layers per Codex's hostile review:
-    - Per-packet retry: if `audited_row_ids` doesn't cover the sent set,
-      retry the FULL packet once (preserves the packet-as-reference
-      property). If still incomplete, mark `audit_incomplete`, keep the
-      rows by default, surface in summary.
-    - Rolling-window breaker: failure rate over last 50 calls > 60% halts
-      the run; OR no successful call in last 5 minutes halts.
-    - Exponential backoff with jitter on TRANSIENT/PARSE retries.
-    - Per-call telemetry to llm_calls.jsonl.
-    """
-    from .claude_cli import ErrorKind, spawn_claude
-    import random
-    from collections import deque
-
-    packet_size = max(1, int(config.qa_rows_per_packet))
-    packets = build_stage_qa_packets(top_df, packet_size)
-    (stage_dir / "qa_packets").mkdir(parents=True, exist_ok=True)
-
-    semaphore = asyncio.Semaphore(max(1, int(config.concurrency)))
-    state: dict[str, Any] = {"ok": 0, "skipped": 0, "failed": 0, "incomplete": 0}
-    telemetry: list[dict[str, Any]] = []
-    window_size = 50
-    recent: "deque[str]" = deque(maxlen=window_size)
-    last_success_time = [time.monotonic()]
-    breaker_tripped = asyncio.Event()
-    schema = StageQAResult.model_json_schema()
-
-    async def call_with_backoff(prompt: str) -> Any:
-        """Single-call loop with exp backoff + jitter on TRANSIENT/PARSE."""
-        max_attempts = 3
-        last_res = None
-        for attempt in range(max_attempts):
-            res = await spawn_claude(
-                prompt=prompt,
-                model=config.stage5_model,
-                fallback_model=config.claude_fallback_model,
-                effort=config.stage5_effort,
-                json_schema=schema,
-                timeout=config.claude_call_timeout_s,
-            )
-            last_res = res
-            if res.ok or res.error_kind == ErrorKind.INFRA:
-                return res
-            await asyncio.sleep((2 ** attempt) + random.uniform(0, 1))
-        return last_res
-
-    def record_telemetry(packet_id: str, attempt_label: str, res: Any) -> None:
-        telemetry.append({
-            "packet_id": packet_id,
-            "attempt": attempt_label,
-            "stage": "stage_qa",
-            "model": config.stage5_model,
-            "effort": config.stage5_effort,
-            "subtype": res.subtype,
-            "ok": res.ok,
-            "error_kind": res.error_kind.value if res.error_kind else None,
-            "error_message": res.error_message,
-            "total_cost_usd": res.total_cost_usd,
-            "cache_creation_input_tokens": res.cache_creation_input_tokens,
-            "cache_read_input_tokens": res.cache_read_input_tokens,
-            "num_turns": res.num_turns,
-            "duration_ms": res.duration_ms,
-        })
-
-    def check_breaker() -> bool:
-        """Trip if rolling failure rate > 60% over a full window OR no
-        successful call in last 5 minutes. Codex's sizing for ~1800-call
-        corpus runs (the toy 'N-consecutive-failures' rule it replaced
-        was prone to single-burst false trips)."""
-        if breaker_tripped.is_set():
-            return True
-        if len(recent) >= window_size:
-            failures = sum(1 for o in recent if o == "failed")
-            if failures / window_size > 0.6:
-                breaker_tripped.set()
-                print(
-                    f"[stage_qa] CIRCUIT BREAKER: failure rate "
-                    f"{failures}/{window_size} > 60% over recent window; halting."
-                )
-                return True
-        if time.monotonic() - last_success_time[0] > 300.0:
-            breaker_tripped.set()
-            print(
-                "[stage_qa] CIRCUIT BREAKER: no successful call in last 5 min; halting."
-            )
-            return True
-        return False
-
-    async def process_packet(packet_idx: int, packet: pd.DataFrame) -> None:
-        if check_breaker():
-            return
-        packet_id = f"qa_packet:{packet_idx:06d}"
-        out_path = stage_dir / "qa_packets" / f"packet_{packet_idx:06d}.json"
-        sent_ids = [int(v) for v in packet["row_id"].tolist()]
-        if out_path.exists():
-            state["skipped"] += 1
-            return
-
-        prompt = build_stage_qa_prompt(packet)
-
-        async with semaphore:
-            if check_breaker():
-                return
-            res = await call_with_backoff(prompt)
-        record_telemetry(packet_id, "first", res)
-
-        if not res.ok or not res.structured_output:
-            state["failed"] += 1
-            recent.append("failed")
-            kind = res.error_kind.value if res.error_kind else "no-structured-output"
-            print(f"[stage_qa] {packet_id} failed [{kind}]: {res.error_message[:200]}")
-            check_breaker()
-            return
-
-        try:
-            parsed = StageQAResult.model_validate(res.structured_output)
-        except ValidationError as exc:
-            state["failed"] += 1
-            recent.append("failed")
-            print(f"[stage_qa] {packet_id} schema mismatch: {str(exc)[:200]}")
-            check_breaker()
-            return
-
-        # Coverage check: did Claude audit every row we sent?
-        sent_set = set(sent_ids)
-        audited_set = set(int(rid) for rid in parsed.audited_row_ids)
-        audit_status = "audited"
-        if sent_set - audited_set:
-            print(
-                f"[stage_qa] {packet_id} coverage miss: "
-                f"{len(sent_set - audited_set)} rows; retrying full packet"
-            )
-            async with semaphore:
-                retry_res = await call_with_backoff(prompt)
-            record_telemetry(packet_id, "retry", retry_res)
-            if retry_res.ok and retry_res.structured_output:
-                try:
-                    retry_parsed = StageQAResult.model_validate(retry_res.structured_output)
-                    retry_audited = set(int(rid) for rid in retry_parsed.audited_row_ids)
-                    if sent_set - retry_audited:
-                        audit_status = "audit_incomplete"
-                        state["incomplete"] += 1
-                    else:
-                        parsed = retry_parsed
-                except ValidationError:
-                    audit_status = "audit_incomplete"
-                    state["incomplete"] += 1
-            else:
-                audit_status = "audit_incomplete"
-                state["incomplete"] += 1
-
-        tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
-        write_json(
-            tmp_path,
-            {
-                "packet_id": packet_id,
-                "row_ids": sent_ids,
-                "audit_status": audit_status,
-                "result": parsed.model_dump(),
-            },
-        )
-        tmp_path.replace(out_path)
-        state["ok"] += 1
-        recent.append("ok")
-        last_success_time[0] = time.monotonic()
-        completed = state["ok"] + state["skipped"] + state["failed"]
-        print(
-            f"[stage_qa] progress: {completed}/{len(packets)} packets "
-            f"(ok={state['ok']} cached={state['skipped']} "
-            f"failed={state['failed']} incomplete={state['incomplete']})"
-        )
-
-    await asyncio.gather(*(process_packet(i, p) for i, p in enumerate(packets)))
-
-    if telemetry:
-        write_jsonl(stage_dir / "llm_calls.jsonl", telemetry)
-
-    print(
-        f"[stage_qa] done: {state['ok']} ok, {state['skipped']} cached, "
-        f"{state['failed']} failed, {state['incomplete']} incomplete; "
-        f"concurrency={config.concurrency}"
-    )
-
-    if breaker_tripped.is_set():
-        raise RuntimeError(
-            "stage_qa circuit breaker tripped: refusing to finalize a partial QA. "
-            f"See {stage_dir / 'llm_calls.jsonl'} for failure pattern."
-        )
-
-
-def _heuristic_qa(top_df: pd.DataFrame, stage_dir: Path) -> None:
-    """Heuristic-mode QA: flag rows whose features already say they're suspect.
-
-    Used when --judge-mode heuristic. Emits the same per-packet artifact
-    shape as the Claude path so Stage 5's downstream aggregation +
-    summary code is identical for both modes.
-    """
-    (stage_dir / "qa_packets").mkdir(parents=True, exist_ok=True)
-    if top_df.empty:
-        return
-    sorted_df = top_df.sort_values(
-        ["canonical_tag", "composite_score", "row_id"], ascending=[True, False, True]
-    )
-    for packet_idx, (_tag, group) in enumerate(sorted_df.groupby("canonical_tag", sort=True)):
-        sent_ids = [int(v) for v in group["row_id"].tolist()]
-        flagged = []
-        for _, row in group.iterrows():
-            reasons = []
-            if bool(row.get("cross_tag_duplicate", False)):
-                reasons.append("cross-tag duplicate (heuristic)")
-            if float(row.get("near_dup_count", 0)) > 0:
-                reasons.append("near-duplicate within tag (heuristic)")
-            if float(row.get("artifact_score", 0.0)) > 0.5:
-                reasons.append("synthetic-artifact features (heuristic)")
-            if reasons:
-                flagged.append({
-                    "row_id": int(row["row_id"]),
-                    "why": "; ".join(reasons),
-                    "related_row_id": None,
-                })
-        result = StageQAResult(
-            audited_row_ids=sent_ids,
-            flagged_rows=[FlaggedRow(**f) for f in flagged],
-        )
-        out_path = stage_dir / "qa_packets" / f"packet_{packet_idx:06d}.json"
-        tmp = out_path.with_suffix(out_path.suffix + ".tmp")
-        write_json(tmp, {
-            "packet_id": f"qa_packet:{packet_idx:06d}",
-            "row_ids": sent_ids,
-            "audit_status": "audited",
-            "result": result.model_dump(),
-        })
-        tmp.replace(out_path)
-
-
-def run_stage5(config: CleanerConfig, resume: bool = True) -> None:
-    """Stage QA — the post-selection severity reviewer.
-
-    NEW pipeline ordering: Stage 5 runs AFTER Stage 6 (the dispatch chain
-    is stage4 -> stage6 -> stage5 -> stage8). Stage 5 reads stage6's
-    top-N per tag, asks Claude "which of these obviously don't belong?",
-    and drops the flagged rows. Stage 8 prefers stage5 outputs when
-    present and falls back to stage6 otherwise.
-    """
-    run_stage6(config, resume=resume)
-    run_dir = config.run_dir()
-    stage_dir = run_dir / "stage5"
-
-    top_path = run_dir / "stage6" / "question_tag.top40.csv"
-    cleaned_path = run_dir / "stage6" / "question_tag.cleaned.csv"
-    feature_df = pd.read_parquet(run_dir / "stage4" / "row_features.parquet")
-
-    # top40 is just (question, tag) — recover row_id by joining against
-    # the full cleaned.csv from Stage 6, then grab features for each.
-    top40 = pd.read_csv(top_path)
-    if "tag_clean" in top40.columns and "tag" not in top40.columns:
-        top40 = top40.rename(columns={"tag_clean": "tag"})
-    if "row_id" not in top40.columns:
-        cleaned_full = pd.read_csv(cleaned_path)
-        if "tag_clean" in cleaned_full.columns and "tag" not in cleaned_full.columns:
-            cleaned_full = cleaned_full.rename(columns={"tag_clean": "tag"})
-        if "row_id" in cleaned_full.columns:
-            top40 = top40.merge(
-                cleaned_full[["question", "tag", "row_id"]],
-                on=["question", "tag"], how="left",
-            )
-    top40 = top40.dropna(subset=["row_id"]).copy()
-    if not top40.empty:
-        top40["row_id"] = top40["row_id"].astype(int)
-    top_df = feature_df.merge(top40[["row_id"]], on="row_id", how="inner")
-
-    hash_parts = [
-        file_sha256(top_path),
-        file_sha256(cleaned_path),
-        f"judge={config.judge_mode}",
-        f"qa_model={config.stage5_model}",
-        f"qa_effort={config.stage5_effort}",
-        f"prompt_v={STAGE_QA_PROMPT_VERSION}",
-        f"schema_fp={_schema_fingerprint(StageQAResult.model_json_schema())}",
-        f"packet_size={config.qa_rows_per_packet}",
-    ]
-    input_hash = hashlib.sha256("|".join(hash_parts).encode("utf-8")).hexdigest()
-    if (
-        resume
-        and stage_done(stage_dir, input_hash)
-        and (stage_dir / "question_tag.cleaned.csv").exists()
-    ):
-        print(f"[stage5] skip: {stage_dir}")
-        return
-
-    stage_dir.mkdir(parents=True, exist_ok=True)
-    if config.judge_mode == "heuristic":
-        _heuristic_qa(top_df, stage_dir)
-    elif config.judge_mode == "claude":
-        asyncio.run(_run_stage_qa_loop(config, top_df, stage_dir))
-    else:
-        raise ValueError(
-            f"Unsupported judge_mode: {config.judge_mode!r}. "
-            "Expected one of: claude, heuristic."
-        )
-
-    per_row, summary = aggregate_qa_results(stage_dir)
-    write_jsonl(
-        stage_dir / "qa_results.jsonl",
-        [{"row_id": rid, **info} for rid, info in sorted(per_row.items())],
-    )
-    write_json(stage_dir / "qa_summary.json", summary)
-
-    # Apply drops to produce the post-QA cleaned + top40 CSVs.
-    drop_ids = {rid for rid, info in per_row.items() if info.get("flagged")}
-    cleaned_full = pd.read_csv(cleaned_path)
-    if "tag_clean" in cleaned_full.columns and "tag" not in cleaned_full.columns:
-        cleaned_full = cleaned_full.rename(columns={"tag_clean": "tag"})
-    if "row_id" in cleaned_full.columns:
-        kept_cleaned = cleaned_full[~cleaned_full["row_id"].astype(int).isin(drop_ids)].copy()
-    else:
-        kept_cleaned = cleaned_full
-    kept_cleaned.to_csv(stage_dir / "question_tag.cleaned.csv", index=False)
-    if not top40.empty:
-        kept_top40 = top40[~top40["row_id"].isin(drop_ids)].copy()
-        kept_top40[["question", "tag"]].to_csv(stage_dir / "question_tag.top40.csv", index=False)
-    else:
-        pd.DataFrame(columns=["question", "tag"]).to_csv(
-            stage_dir / "question_tag.top40.csv", index=False,
-        )
-
-    finish_stage(
-        stage_dir,
-        config,
-        input_hash,
-        {
-            "judge_mode": config.judge_mode,
-            "input_top40_rows": int(len(top40)),
-            "drops": int(len(drop_ids)),
-            "audit_incomplete_packets": int(summary.get("incomplete_packets", 0)),
-            "empty_flagged_rate": float(summary.get("empty_flagged_rate", 0.0)),
-        },
-    )
-    print(
-        f"[stage5] wrote {stage_dir}  in={len(top40)}  drops={len(drop_ids)}  "
-        f"empty_flagged_packets={summary.get('empty_flagged_packets', 0)}/"
-        f"{summary.get('total_packets', 0)}"
-    )
-
 
 def _normalize_series(s: pd.Series) -> pd.Series:
     if s.empty:
@@ -1816,7 +1156,7 @@ def run_stage6(config: CleanerConfig, resume: bool = True) -> None:
         df["rank"] = []
         df["production_recommended"] = []
 
-    kept = df.copy()  # all in-scope rows; Stage QA will subset later
+    kept = df.copy()
     jettisoned_below_top_n = df[~df["production_recommended"]] if "production_recommended" in df.columns else df.iloc[0:0]
 
     stage_dir.mkdir(parents=True, exist_ok=True)
@@ -1905,25 +1245,13 @@ def _loo_metrics(df: pd.DataFrame, vectors: np.ndarray, query_vectors: np.ndarra
 
 
 def run_stage8(config: CleanerConfig, resume: bool = True) -> None:
-    # New pipeline ordering: stage4 -> stage6 -> stage5 (Stage QA) -> stage8.
-    # Validation prefers post-QA outputs from stage5/ when present and
-    # falls back to stage6/ outputs (the deterministic top-N before any
-    # Claude review). Legacy stage7/ paths are honored for back-compat
-    # with pre-migration runs.
-    run_stage5(config, resume=resume)
+    # Deterministic-only chain: stage4 -> stage6 -> stage8.
+    # Stage 8 validates the deterministic top-N (Stage 6) directly via LOO.
+    run_stage6(config, resume=resume)
     run_dir = config.run_dir()
     stage_dir = run_dir / "stage8"
-    qa_cleaned = run_dir / "stage5" / "question_tag.cleaned.csv"
-    qa_top40 = run_dir / "stage5" / "question_tag.top40.csv"
-    legacy_reviewed = run_dir / "stage7" / "question_tag.reviewed.csv"
-    legacy_top40 = run_dir / "stage7" / "question_tag.top40.reviewed.csv"
-    if qa_cleaned.exists() and qa_top40.exists():
-        cleaned_path, top40_path = qa_cleaned, qa_top40
-    elif legacy_reviewed.exists() and legacy_top40.exists():
-        cleaned_path, top40_path = legacy_reviewed, legacy_top40
-    else:
-        cleaned_path = run_dir / "stage6" / "question_tag.cleaned.csv"
-        top40_path = run_dir / "stage6" / "question_tag.top40.csv"
+    cleaned_path = run_dir / "stage6" / "question_tag.cleaned.csv"
+    top40_path = run_dir / "stage6" / "question_tag.top40.csv"
     input_hash = hashlib.sha256(file_sha256(cleaned_path).encode("utf-8") + file_sha256(top40_path).encode("utf-8")).hexdigest()
     if resume and stage_done(stage_dir, input_hash):
         print(f"[stage8] skip: {stage_dir}")
@@ -1970,34 +1298,29 @@ def run_stage8(config: CleanerConfig, resume: bool = True) -> None:
 
 def run_stage9(config: CleanerConfig, resume: bool = True) -> None:
     """E5-only production-risk audit. Runs leave-one-out top-K retrieval over
-    the cleaned set using E5 alone (no Gemma) — this mimics production, where
-    inference is E5-only. Reports per-row neighborhood and, by default, drops
-    rows whose nearest non-self neighbor belongs to a different tag.
+    the cleaned set using E5 alone — this mimics production, where inference
+    is E5-only. Reports per-row neighborhood and, by default, drops rows
+    whose nearest non-self neighbor belongs to a different tag.
 
-    Input default: prefer `stage5/question_tag.cleaned.csv` (post-Stage QA)
-    when present; fall back to `stage6/question_tag.cleaned.csv` (pre-QA top-N)
-    otherwise. Pass `config.stage9_input_csv` to audit an external CSV —
-    typically the concatenation of top-40 sets across multiple family
-    runs (the actual
+    Input default: `stage6/question_tag.cleaned.csv` (the deterministic top-N).
+    Pass `config.stage9_input_csv` to audit an external CSV — typically the
+    concatenation of top-40 sets across multiple family runs (the actual
     production candidate set).
 
     Stage 9 NEVER chains Stage 0–8: chaining would silently overwrite the
-    cleaned set under a different config (e.g. running stage9 with a
-    different judge_mode would re-run stage4–6 with that config, clobbering
-    the original cleaned.csv). The user must run Stage 8 (or earlier)
-    explicitly first; Stage 9 only audits what's already there.
+    cleaned set under a different config. The user must run Stage 8 (or
+    earlier) explicitly first; Stage 9 only audits what's already there.
     """
     run_dir = config.run_dir()
     stage_dir = run_dir / "stage9"
     if config.stage9_input_csv:
         input_csv = Path(config.stage9_input_csv).expanduser().resolve()
     else:
-        qa_cleaned = run_dir / "stage5" / "question_tag.cleaned.csv"
-        input_csv = qa_cleaned if qa_cleaned.exists() else run_dir / "stage6" / "question_tag.cleaned.csv"
+        input_csv = run_dir / "stage6" / "question_tag.cleaned.csv"
     if not input_csv.exists():
         raise FileNotFoundError(
             f"Stage 9 input not found: {input_csv}\n"
-            f"Run `tagclean stage6` (or stage5/stage8) first, or pass --e5-audit-input <csv>."
+            f"Run `tagclean stage6` (or stage8) first, or pass --e5-audit-input <csv>."
         )
 
     knobs = f"{config.e5_audit_top_k}|{int(config.e5_audit_drop_on_top1_mismatch)}|{config.e5_model}|{int(config.e5_use_prefixes)}"
@@ -2121,16 +1444,22 @@ def run_stage9(config: CleanerConfig, resume: bool = True) -> None:
     )
 
 
+def _run_repair(config: "CleanerConfig", resume: bool = True) -> None:
+    """Lazy import to break the cleaner ↔ repair circular dependency."""
+    from .repair import run_repair as _impl
+    _impl(config, resume=resume)
+
+
 STAGES = {
     "stage0": run_stage0,
     "stage1": run_stage1,
     "stage2": run_stage2,
     "stage3": run_stage3,
     "stage4": run_stage4,
-    "stage5": run_stage5,
     "stage6": run_stage6,
     "stage8": run_stage8,
     "stage9": run_stage9,
+    "repair": _run_repair,
 }
 
 
@@ -2553,17 +1882,10 @@ def run_compose(
     duplicates = 0
     per_run: dict[str, tuple[int, int]] = {}
     for run_id in from_runs:
-        # Codex correctness fix: prefer post-Stage-QA outputs from stage5/
-        # when present (the Claude-flagged drops are baked in there), fall
-        # back to stage6/ for back-compat with pre-Stage-QA runs.
-        # Without this, compose silently throws away every Claude QA flag.
-        qa_src = config.artifact_root / run_id / "stage5" / file_name
-        legacy_src = config.artifact_root / run_id / "stage6" / file_name
-        src = qa_src if qa_src.exists() else legacy_src
+        src = config.artifact_root / run_id / "stage6" / file_name
         if not src.exists():
             raise FileNotFoundError(
-                f"Source CSV not found for run {run_id!r}: tried "
-                f"{qa_src} then {legacy_src}"
+                f"Source CSV not found for run {run_id!r}: {src}"
             )
         frame = pd.read_csv(src)
         if "tag" not in frame.columns and "tag_clean" in frame.columns:
@@ -2612,18 +1934,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--run-id", default=None)
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--no-resume", action="store_true")
-    parser.add_argument(
-        "--judge-mode",
-        choices=["claude", "heuristic"],
-        default=None,
-        help="LLM mode for Stage 3 + Stage 5 (default: claude). 'heuristic' "
-        "skips claude entirely and uses tag-name token alignment + duplicate "
-        "flags — useful for offline smoke tests.",
-    )
-    parser.add_argument("--stage5-model", default=None, help="Claude model for Stage QA (default: sonnet)")
-    parser.add_argument("--stage5-effort", default=None, help="Claude effort for Stage QA (default: medium)")
-    parser.add_argument("--claude-fallback-model", default=None, help="Fallback model when primary is overloaded (default: sonnet)")
-    parser.add_argument("--claude-call-timeout", type=float, default=None, help="Per-call timeout in seconds (default: 300)")
     parser.add_argument("--language", choices=["bn", "none"], default=None, help="Text-normalization language (default: bn)")
     parser.add_argument("--embedding-backend", choices=["sentence-transformers", "hashing"], default=None)
     parser.add_argument("--device", choices=["auto", "cpu", "cuda", "mps"], default=None)
@@ -2821,9 +2131,7 @@ def write_run_manifest(config: CleanerConfig, stage: str) -> Path:
         "tag_answer_sha256": file_sha256(config.tag_answer_json) if config.tag_answer_json.exists() else None,
         "models": {
             "e5": config.e5_model,
-            "claude_qa": config.stage5_model,
         },
-        "judge_mode": config.judge_mode,
         "language": config.language,
         "config": _redact_secrets({
             k: str(v) if isinstance(v, Path) else v for k, v in asdict(config).items()
@@ -2847,16 +2155,6 @@ def main() -> None:
         config.artifact_root = args.artifact_root.resolve()
     if args.run_id:
         config.run_id = args.run_id
-    if args.judge_mode:
-        config.judge_mode = args.judge_mode
-    if args.stage5_model:
-        config.stage5_model = args.stage5_model
-    if args.stage5_effort:
-        config.stage5_effort = args.stage5_effort
-    if args.claude_fallback_model:
-        config.claude_fallback_model = args.claude_fallback_model
-    if args.claude_call_timeout is not None:
-        config.claude_call_timeout_s = args.claude_call_timeout
     if args.language:
         config.language = args.language
     if args.embedding_backend:
@@ -2888,23 +2186,6 @@ def main() -> None:
         config.e5_audit_drop_on_top1_mismatch = False
 
     _NORMALIZATION_LANGUAGE = config.language
-
-    # Cheap startup probe: confirm `claude -p` works under the stripped-env
-    # subprocess (subscription routing) before launching a multi-hour run.
-    # Only when we'll actually call Claude — heuristic / discover / compose
-    # paths don't need it.
-    if (
-        config.judge_mode == "claude"
-        and args.stage in {"stage5", "stage8", "all", "run-families"}
-    ):
-        from .claude_cli import probe_auth
-        ok, msg = asyncio.run(probe_auth())
-        print(f"[claude-cli] {msg}")
-        if not ok:
-            raise SystemExit(
-                "Aborting: claude CLI auth probe failed. Run `claude /login` "
-                "(or `claude auth login`) and try again."
-            )
 
     resume = args.resume or not args.no_resume
     if args.stage == "discover":
@@ -2965,15 +2246,10 @@ def main() -> None:
                 if args.compose_source == "top40"
                 else "question_tag.cleaned.csv"
             )
-            # Stage QA outputs live in stage5/ (post-Claude); stage6/ is the
-            # pre-QA fallback for back-compat with old runs.
             present = [
                 fam
                 for fam in wanted
-                if (
-                    (config.artifact_root / fam["family_id"] / "stage5" / file_name).exists()
-                    or (config.artifact_root / fam["family_id"] / "stage6" / file_name).exists()
-                )
+                if (config.artifact_root / fam["family_id"] / "stage6" / file_name).exists()
             ]
             missing = [fam for fam in wanted if fam not in present]
             if missing and args.require_complete:

@@ -22,22 +22,11 @@ e5_model: intfloat/multilingual-e5-large-instruct
 # "none" disables language-specific steps.
 language: bn
 
-# Stage 3 (boundary policy) + Stage 5 (audit) call `claude -p` headlessly.
-# No API key — calls route through the user's Claude Code subscription
-# (ANTHROPIC_API_KEY / AUTH_TOKEN / BASE_URL are stripped from the
-# subprocess env so subscription auth always wins).
-judge_mode: claude              # claude | heuristic
-stage5_model: sonnet            # Stage QA reviewer model
-stage5_effort: medium
-claude_fallback_model: sonnet   # used when primary is overloaded
-claude_call_timeout_s: 300
-qa_rows_per_packet: 20
-
 # Pipeline knobs
-boundary_policy_threshold: 0.85
-boundary_policy_max_cluster_size: 6
 top_n: 40
 near_duplicate_threshold: 0.98
 e5_merge_threshold: 0.90
 knn_overlap_threshold: 0.30
+boundary_policy_threshold: 0.85
+boundary_policy_max_cluster_size: 6
 concurrency: 6

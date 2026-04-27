@@ -30,3 +30,15 @@ dist/
 .tagclean/
 *.log
 .claude/
+
+# Per-run cleaning artifacts. Stages 0-9 + repair write big intermediate
+# state (parquet, npy, FAISS indexes, per-iter ops jsonl). The deliverable
+# is the cleaned CSV at repo root; everything else regenerates on demand.
+runs/
+artifacts/
+.last_run/
+
+# Editor / IDE leftovers
+.mypy_cache/
+.ipynb_checkpoints/
+Thumbs.db

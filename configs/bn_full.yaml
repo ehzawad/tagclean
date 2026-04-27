@@ -7,18 +7,11 @@ e5_model: intfloat/multilingual-e5-large-instruct
 
 language: bn
 
-judge_mode: claude
-stage5_model: sonnet
-stage5_effort: medium
-claude_fallback_model: sonnet
-claude_call_timeout_s: 300
-qa_rows_per_packet: 20
-
-boundary_policy_threshold: 0.85
-boundary_policy_max_cluster_size: 6
 top_n: 40
 near_duplicate_threshold: 0.98
 e5_merge_threshold: 0.90
 knn_overlap_threshold: 0.30
+boundary_policy_threshold: 0.85
+boundary_policy_max_cluster_size: 6
 
 concurrency: 6

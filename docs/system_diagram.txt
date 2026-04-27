@@ -1,29 +1,21 @@
                                   TAGCLEAN — END-TO-END SYSTEM
                               (Bengali EC/NID FAQ corpus cleaner)
-                              [claude-cli-harness branch — E5-only + claude -p]
+                              [deterministic-only branch — E5 + heuristics; no LLM]
 
 
 INPUTS
 ==============================================================================================
-  question_tag.csv     -- 79k rows × 1394 tags. Columns: question, tag (UTF-8, BOM-tolerant).
+  question_tag.csv     -- ~79k rows × 1394 tags. Columns: question, tag (UTF-8, BOM-tolerant).
   tag_answer.json      -- { tag: canonical_answer }. Used as merge-safety gate in Stage 3.
-  config.yaml          -- e5_instruction, thresholds, stage3/stage5 model+effort, ...
+  config.yaml          -- e5_instruction, thresholds, top_n, ...
 
-MODELS  (roles fixed by design)
+MODELS
 ==============================================================================================
-  E5-multilingual-large-instruct (1024d) -- single source of geometry. ~75% of ranking weight.
+  E5-multilingual-large-instruct (1024d) -- single source of geometry.
                                             Same model production uses at inference.
-                                            (Token alignment from boundary policy adds ~15%.)
-  Claude (Opus, --effort high)            -- boundary-rule author for Stage 3.
-                                            1 call per close-tag cluster.
-                                            NEVER scores rows directly.
-  Claude (Sonnet, --effort medium)        -- buffer auditor for Stage 5.
-                                            ~10 calls per family, 24 rows per packet.
-                                            keep | flag(reason_code).
+                                            Composite weight: 90% (own 55 + margin 35).
 
-  All Claude calls go through `claude -p --json-schema --no-session-persistence`.
-  Subprocess env strips ANTHROPIC_API_KEY/AUTH_TOKEN/BASE_URL so subscription
-  routing always wins (no per-call billing).
+  No LLM calls anywhere on this branch.
 
 
 CORPUS-WIDE BOOTSTRAP  (run once; cached for all family runs)
@@ -58,8 +50,6 @@ SCALING DISCOVERY  (one-shot; emits a hand-editable manifest)
   |   6. Uncovered tags become singletons (full coverage guaranteed).                 |
   |                                                                                  |
   |   No transitive closure -> no mega-components at corpus scale.                    |
-  |   Reciprocal + pair_threshold gates supply multi-criteria robustness that         |
-  |   the prior dual-cosine min(E5, Gemma) gate added.                                |
   +----------------------------------------------------------------------------------+
                                          |
                                          v
@@ -84,37 +74,29 @@ PER-FAMILY PIPELINE  (run-families dispatches one stage8 invocation per approved
   +--------------------------------------------------------------------------+
                                          |
                                          v
-  Stage 3  tag-boundary policy (Claude Opus, --effort high, --json-schema)
+  Stage 3  deterministic merge map (NO LLM)
            target_tags-aware: when family >= 2 tags, cluster IS target_tags.
-           1 Claude call per family. one_line_intent + must_have + must_avoid.
-           Resume hash bakes in (model, effort, prompt_version, schema_fp).
-           -> stage3/{tag_merge_map.csv, tag_boundary_policy.jsonl, llm_calls.jsonl}
-  Stage 4  deterministic ranker (NO LLM, E5-only)
-           composite_score = 0.45*cos_e5 + 0.30*margin_e5
-                           + 0.15*token_alignment(must_have/avoid)
+           Per-pair deterministic check: token overlap on tag names + answer-token
+           overlap on tag_answer.json (when provided) as merge-safety gate.
+           -> stage3/{tag_merge_map.csv, merge_candidates.jsonl}
+  Stage 4  deterministic ranker (E5-only)
+           composite_score = 0.55*cos_e5 + 0.35*margin_e5
                            - 0.05*near_dup - 0.10*xtag_dup - 0.10*artifact
-           Top-80 per tag -> audit_buffer=true
            -> stage4/row_features.parquet
-  Stage 5  buffer audit (Claude Sonnet, --effort medium, async, concurrency=6)
-           Packets of 24 + per-tag profile context.  keep | flag(reason_code)
-           - Fail-closed on missing rows -> reason_code=audit_missing
-           - Sliding-window failure circuit breaker (default N=10)
-           - Per-call telemetry: subtype, cost, cache tokens, num_turns
-           Resume hash bakes in (model, effort, prompt_version, schema_fp, packet_size).
-           -> stage5/{audit_results.jsonl, audit_packets/, llm_calls.jsonl}
+  Stage 5  (DELETED — no LLM Stage QA reviewer on this branch)
   Stage 6  selection + MMR (lambda=0.7 in E5 space) -> top-N=40 per tag
            -> stage6/{question_tag.cleaned.csv, .top40.csv, jettisoned_rows.csv}
-  Stage 7  (DELETED — Stage 5 buffer audit subsumes it)
+  Stage 7  (DELETED — long ago)
   Stage 8  leave-one-out validation (E5-only retrieval)
            -> stage8/cleaning_report.json
 
 
 CROSS-FAMILY PRODUCTION COMPOSITION
 ==============================================================================================
-  fam_xxxx/stage6/cleaned.csv ---+
-  fam_yyyy/stage6/cleaned.csv ---+--> tagclean compose --manifest families.yaml
-  fam_zzzz/stage6/cleaned.csv ---+    [--compose-source top40 | cleaned]    --> composed.csv
-                ...                   (concat + dedup + deterministic sort)
+  fam_xxxx/stage6/top40.csv  ---+
+  fam_yyyy/stage6/top40.csv  ---+--> tagclean compose --manifest families.yaml
+  fam_zzzz/stage6/top40.csv  ---+    [--compose-source top40 | cleaned]    --> composed.csv
+                ...                  (concat + dedup + deterministic sort)
                                           |
                                           v
                                     tagclean stage9 --e5-audit-input <composed.csv>
@@ -124,7 +106,7 @@ CROSS-FAMILY PRODUCTION COMPOSITION
                                     PRODUCTION CSV
                                     runs/<run_id>/stage9/production_filtered.csv
 
-  WHY compose from cleaned.csv (or top40), not per-family stage9 production_filtered:
+  WHY compose from top40 (or cleaned), not per-family stage9 production_filtered:
     A row that fails LOO inside its own family can be safely separable in the global
     production union -- its in-family rival is no longer the closest peer. Filter once
     globally, after composition. Per-family stage9 stays useful for diagnostics.
@@ -141,36 +123,8 @@ STAGE 9 INTERNALS  (E5-only production-risk audit)
                e5_dropped.csv, audit_report.json
 
   Default: drop rows with top-1 LOO mismatch.  --no-e5-drop = report-only mode.
-  Stage 9 NEVER chains stage0-8 (auto-chaining clobbered cleaned.csv when judge_mode
-  differed). Run stage8 (or run-families) first; stage9 only audits what's there.
-
-
-CLAUDE -P INVOCATION  (every Stage 3 + Stage 5 call)
-==============================================================================================
-
-  src/tagclean/claude_cli.py::spawn_claude(...)
-       |
-       | env stripping: ANTHROPIC_API_KEY / AUTH_TOKEN / BASE_URL removed
-       | so subscription routing wins (no API key needed)
-       |
-       v
-  claude -p
-      --model {opus|sonnet} --fallback-model sonnet --effort {high|medium}
-      --output-format json --no-session-persistence
-      --json-schema '<pydantic-derived schema>'
-       |
-       | prompt streamed via stdin
-       v
-  envelope: { subtype, structured_output, total_cost_usd, usage{cache_*}, ... }
-       |
-       | classification:
-       |   subtype=success            -> ok
-       |   subtype=error_during_execution / error_max_structured_output_retries
-       |   / error_max_turns          -> TRANSIENT (count against retries)
-       |   exit != 0 + auth-shape stderr -> INFRA (don't retry)
-       |   parse failure              -> PARSE (count against retries)
-       v
-  ClaudeResult(structured_output, total_cost_usd, cache_*, num_turns, error_kind)
+  Stage 9 NEVER chains stage0-8 (auto-chaining clobbered cleaned.csv when geometry
+  config differed). Run stage8 (or run-families) first; stage9 only audits what's there.
 
 
 END-TO-END FLOW
@@ -199,7 +153,7 @@ END-TO-END FLOW
                                           |
                                           v
                           tagclean compose  --manifest families.yaml
-                          --compose-source cleaned --out PATH
+                          --compose-source top40 --out PATH
                                           |
                                           v
                           tagclean stage9  --e5-audit-input PATH
@@ -212,10 +166,9 @@ END-TO-END FLOW
 
 NOTE ON VALIDATION HISTORY
 ==============================================================================================
-  Validation numbers in the prior README (account_locked / name_correction / otp,
-  top-1 LOO 0.961, 0/14 cross-family drops) were measured against:
-    - GPT-5.5 (high reasoning) for Stage 3 + Stage 5
-    - Dual embeddings (E5 + Gemma) for cluster discovery + Stage 4 ranking
-  This branch replaces both. The deterministic stages (0/1/2/4/6/8/9) are
-  shape-equivalent; Stage 3/5 LLM decisions are now Claude-authored. End-to-end
-  re-validation against the same 3-family test set is the next step.
+  Earlier validation numbers (account_locked / name_correction / otp, top-1 LOO 0.961,
+  0/14 cross-family drops) were measured against pipelines that included LLM-assisted
+  stages (GPT or Claude). The deterministic-only branch retains the geometry-driven
+  stages (0/1/2/4/6/8/9). The expected accuracy delta against the LLM-assisted
+  baselines is small (sub-1% to low-single-digit top-1 retrieval) but should be
+  re-measured against your dataset before shipping.
