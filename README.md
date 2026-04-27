@@ -46,18 +46,20 @@ Resource caps locked into `repair.py`: 4 OMP/MKL/OpenBLAS/FAISS threads, peak wo
 
 ## The result on the Bengali NID corpus
 
-Three sequential revisions at default thresholds:
+Single pass at the (now aggressive) default thresholds:
 
-| Stage | Rows | Tags | Drops this rev | Tag merges this rev | Loop status |
-|---|---:|---:|---:|---:|---|
-| Raw input | 78,990 | 1,394 | — | — | — |
-| **V1** (single repair pass) | 70,445 | 1,344 | 8,545 | 50 | aborted on drop-cap |
-| V2 (repair on V1) | 70,172 | 1,286 | 273 | 58 | converged |
-| **V3** (repair on V2) | **70,172** | **1,278** | **0** | **8** | **converged** |
+| Stage | Rows | Tags | pct_neg_margin |
+|---|---:|---:|---:|
+| Raw input | 78,990 | 1,394 | 21.5% |
+| Iter 1 | 46,376 | 1,354 | 3.1% |
+| Iter 2 | 39,312 | 1,334 | 0.6% |
+| Iter 3 | 37,860 | 1,334 | 0.026% |
+| Iter 4 (loop aborts on drop-cap) | 37,515 | 1,334 | 0.026% |
+| **Final** (after tiny-tag dissolves) | **37,355** | **1,334** | — |
 
-`pct_neg_margin` (fraction of rows whose own-tag cosine is below their best other-tag cosine): 21.5% → 17.7% → 16.7% → 16.1% (floor at default thresholds).
+The repo's `xray_cleanup.csv` is this output: **37,355 rows × 2 cols**. Almost every surviving row has positive margin (own-tag is the clear E5 winner over any other-tag).
 
-The repo's `xray_cleanup.csv` is the V3 output. To reach V3 from raw, run `tagclean repair` three times; each run takes the previous run's output as input.
+For looser cleaning (more rows, less aggressive), see [`docs/repair_thresholds.md`](docs/repair_thresholds.md) — overriding `hard_drop_thresh` toward 0 or below recovers more rows.
 
 ## What the loop does
 

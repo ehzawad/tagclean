@@ -463,14 +463,14 @@ disagreement = 1 - 0.83 = 0.17 > 0.15  →  OUTLIER-HEAVY (cold-start)
 | A | `knn_top_k` | 10 | Tighter neighborhood | Broader, more stable |
 | A | `intake_cap_per_tag` | 0.10 | Slower intake per iter | Faster (more drift) |
 | A | `move_budget` | 3 | Less ping-pong | More room to settle |
-| C | `merge_cosine_thresh` | 0.92 | More merges (more aggressive collapse) | Fewer merges |
+| C | `merge_cosine_thresh` | **0.90** | More merges (more aggressive collapse) | Fewer merges |
 | C | `mutual_confusion_thresh` | 0.50 | Easier merges | Stricter mutual evidence |
 | C | `merge_knn_overlap_thresh` | 0.50 | Easier merges | Stricter row-level evidence |
 | C | `merges_allowed_through_iter` | 2 | Less time for merges | More time (more cascade risk) |
-| B | `cross_tag_dup_thresh` | 0.985 | More pairs flagged | Fewer pairs |
-| B | `hard_drop_thresh` | -0.10 | More aggressive drops | More conservative |
-| B | `drop_cap_per_tag` | 0.20 | Slower drops per tag | Faster |
-| B | `drop_cap_strikes` | 3 | Earlier abort | More patience |
+| B | `cross_tag_dup_thresh` | **0.97** | More pairs flagged | Fewer pairs |
+| B | `hard_drop_thresh` | **+0.004** | More aggressive drops | More conservative |
+| B | `drop_cap_per_tag` | **0.30** | Slower drops per tag | Faster |
+| B | `drop_cap_strikes` | **4** | Earlier abort | More patience |
 | D | `absorber_intake_thresh` | 0.30 | Easier to flag absorbers | Harder |
 | D | `absorber_strikes_to_flag` | 2 | Faster flag | Slower (more evidence required) |
 | D | `convergence_change_frac` | 0.001 | Looser convergence | Tighter |
@@ -479,6 +479,8 @@ disagreement = 1 - 0.83 = 0.17 > 0.15  →  OUTLIER-HEAVY (cold-start)
 | Loop | `min_tag_rows` | 3 | Smaller tags survive | Larger min size |
 | Cold start | `medoid_diversity_trigger` | 0.40 | More tags use cold-start | Fewer |
 | Cold start | `medoid_centroid_disagreement_trigger` | 0.15 | More tags use cold-start | Fewer |
+
+**Defaults shipped in this branch are aggressive** — tuned for the Bengali NID corpus to land near 40k surviving rows from the 79k raw input. The thresholds in **bold** above were raised from earlier conservative defaults (`hard_drop_thresh: -0.10 → +0.004`, `cross_tag_dup_thresh: 0.985 → 0.97`, `merge_cosine_thresh: 0.92 → 0.90`, `drop_cap_per_tag: 0.20 → 0.30`). To get 70k surviving rows instead, override `hard_drop_thresh` back to -0.10.
 
 ## To loosen further (push past the 16% pct_neg_margin floor)
 

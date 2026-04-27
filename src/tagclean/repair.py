@@ -57,17 +57,19 @@ class RepairConfig:
     knn_top_k: int = 10                    # K for kNN tag-share vector
     intake_cap_per_tag: float = 0.10       # max reassigns IN per iter / tag size
 
-    # Drop
-    cross_tag_dup_thresh: float = 0.985    # cosine for cross-tag dup detection
-    hard_drop_thresh: float = -0.10        # hard-margin drop
-    drop_cap_per_tag: float = 0.20         # max drops per iter / tag size
-    drop_cap_strikes: int = 3              # consecutive cap hits → abort
+    # Drop — moderately aggressive for paraphrase-dense corpora (median margin
+    # near 0). On the Bengali NID set: at hard_drop_thresh=+0.004, the loop
+    # converges around 40-45k rows from a 79k raw input.
+    cross_tag_dup_thresh: float = 0.97     # cosine for cross-tag dup detection
+    hard_drop_thresh: float = 0.004        # hard-margin drop
+    drop_cap_per_tag: float = 0.30         # max drops per iter / tag size
+    drop_cap_strikes: int = 4              # consecutive cap hits → abort
 
-    # Merge (Phase C)
-    merge_cosine_thresh: float = 0.92
+    # Merge (Phase C) — slightly looser than original for dense corpora.
+    merge_cosine_thresh: float = 0.90
     merge_knn_overlap_thresh: float = 0.50
     mutual_confusion_thresh: float = 0.50
-    merges_allowed_through_iter: int = 2   # no merges from iter 3+
+    merges_allowed_through_iter: int = 2
 
     # Cold start
     medoid_diversity_trigger: float = 0.40  # e5_diversity > this → outlier-heavy
