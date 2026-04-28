@@ -59,7 +59,7 @@ Single pass at the (now aggressive) default thresholds:
 
 The repo's `xray_cleanup.csv` is this output: **37,355 rows × 2 cols**. Almost every surviving row has positive margin (own-tag is the clear E5 winner over any other-tag).
 
-For looser cleaning (more rows, less aggressive), see [`docs/repair_thresholds.md`](docs/repair_thresholds.md) — overriding `hard_drop_thresh` toward 0 or below recovers more rows.
+For looser cleaning (more rows, less aggressive), see [`docs/repair_thresholds.md`](docs/repair_thresholds.md) — overriding `hard_drop_thresh` toward 0 or below recovers more rows. For a side-by-side comparison of three actual hyperparameter choices we tried (conservative chain → 70k, aggressive overshoot → 7k, aggressive tuned → 37k), see [`docs/threshold_runs_comparison.md`](docs/threshold_runs_comparison.md).
 
 ## What the loop does
 
