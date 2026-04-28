@@ -8,6 +8,185 @@ Take a tagged FAQ corpus and produce a cleaned subset where, when each row is us
 
 Anything the loop drops, reassigns, or merges is a decision driven by frozen E5 embedding geometry — no LLM, no `tag_answer.json`, no tag-name heuristics.
 
+## High-level pipeline
+
+```
+                    ┌────────────────────────────────────┐
+                    │  data/question_tag.csv             │
+                    │  78,990 rows × 1,394 tags (raw)    │
+                    └──────────────────┬─────────────────┘
+                                       │
+                                       ▼
+                    ┌────────────────────────────────────┐
+                    │  Stage 0: intake                   │
+                    │  • normalize (Bengali Unicode)      │
+                    │  • dedup within tag                 │
+                    │  • cross-tag duplicate log          │
+                    └──────────────────┬─────────────────┘
+                                       │
+                                       ▼
+                    ┌────────────────────────────────────┐
+                    │  Stage 1: E5 embed                 │
+                    │  • multilingual-e5-large-instruct, │
+                    │    1024d, L2-normalized            │
+                    │  • FAISS IndexFlatIP built         │
+                    └──────────────────┬─────────────────┘
+                                       │
+                                       ▼
+                    ┌────────────────────────────────────┐
+                    │       REPAIR LOOP                  │
+                    │       (Phases A → C → B → D)       │
+                    └──────────────────┬─────────────────┘
+                                       │
+                                       ▼
+                    ┌────────────────────────────────────┐
+                    │  xray_cleanup.csv                  │
+                    │  37,355 rows × 1,334 tags          │
+                    │  pct_neg_margin = 0.026%           │
+                    └────────────────────────────────────┘
+```
+
+## Loop overview
+
+```
+                       ITER 0 (cold start, runs once)
+                       ──────────────────────────────
+                ┌─────────────────────────────────────┐
+                │  Detect outlier-heavy tags          │
+                │  (e5_diversity > 0.4)               │
+                │      ↓                              │
+                │  Bootstrap centroid:                │
+                │   • medoid + core for outlier-heavy │
+                │   • trimmed mean for the rest       │
+                │      ↓                              │
+                │  FREEZE iter-0 centroids +          │
+                │  pairwise cosines (used as          │
+                │  hysteresis predicate later)        │
+                └────────────────┬────────────────────┘
+                                 │
+                                 ▼
+        ┌────────────────────────────────────────────┐
+        │  ITER k = 1..max_iter (default 8)          │
+        │                                             │
+        │  ┌──────────────────────────────────────┐   │
+        │  │  PHASE A — REASSIGN                  │   │
+        │  │  Move rows that geometrically belong │   │
+        │  │  elsewhere. Gates: margin +          │   │
+        │  │  delta_move + kNN-majority +         │   │
+        │  │  hysteresis + budget.                │   │
+        │  └──────────────┬───────────────────────┘   │
+        │                 │                            │
+        │                 ▼                            │
+        │  ┌──────────────────────────────────────┐   │
+        │  │  PHASE C — MERGE  (only iter ≤ 2)    │   │
+        │  │  Collapse tag pairs that are E5-     │   │
+        │  │  indistinguishable AND mutually      │   │
+        │  │  confused. Iter-0 frozen cosine      │   │
+        │  │  hysteresis predicate.               │   │
+        │  │  Note: C runs BEFORE B so cross-tag  │   │
+        │  │  pairs whose tags merge disappear.   │   │
+        │  └──────────────┬───────────────────────┘   │
+        │                 │                            │
+        │                 ▼                            │
+        │  ┌──────────────────────────────────────┐   │
+        │  │  PHASE B — TRIAGE / DROP             │   │
+        │  │  Cross-tag dup pairs: winner-take    │   │
+        │  │   or drop-both.                      │   │
+        │  │  Hard-margin: drop rows below        │   │
+        │  │   hard_drop_thresh.                  │   │
+        │  │  Per-tag drop cap; abort after N     │   │
+        │  │   consecutive cap-strikes.           │   │
+        │  └──────────────┬───────────────────────┘   │
+        │                 │                            │
+        │                 ▼                            │
+        │  ┌──────────────────────────────────────┐   │
+        │  │  PHASE D — ABSORBER + CONVERGE       │   │
+        │  │  Flag tags with >30% intake/iter for │   │
+        │  │   2+ iters → freeze their centroid.  │   │
+        │  │  Check: (changes/N) < 0.001 for 2    │   │
+        │  │   consec iters → CONVERGED.          │   │
+        │  │  Check: pct_neg_margin rising for 2  │   │
+        │  │   consec iters → ABORT_OSCILLATION.  │   │
+        │  └──────────────┬───────────────────────┘   │
+        │                 │                            │
+        │  ┌──────────────┴───────────────────┐        │
+        │  │ continue OR exit (converged /   │        │
+        │  │ abort_drop_cap / max_iter)      │        │
+        │  └──────────────┬───────────────────┘        │
+        └─────────────────┼────────────────────────────┘
+                          │
+                          ▼
+                ┌─────────────────────────────────────┐
+                │  POST-LOOP                          │
+                │  • Dissolve tags with < 3 rows      │
+                │  • Emit final_assignment.parquet,   │
+                │    iter_metrics.jsonl, repair_      │
+                │    report.json, xray_cleanup.csv    │
+                └─────────────────────────────────────┘
+```
+
+## Per-row reassignment decision (Phase A gates)
+
+```
+   Input: row r in tag A, with embedding e(r)
+        │
+        ▼
+   ┌──────────────────────────────────┐
+   │  Compute geometry:               │
+   │   own_sim    = cos(e(r), C[A])   │
+   │   best_other = argmax cos(e(r),  │
+   │                C[t]) for t ≠ A   │
+   │   margin     = own_sim −         │
+   │                best_other_sim    │
+   └─────────────────┬────────────────┘
+                     │
+                     ▼
+   ┌──────────────────────────────────┐
+   │  margin < reassign_thresh        │   NO
+   │  (-0.03)?                        │ ──────► STAY
+   └─────────────────┬────────────────┘
+                     │ YES
+                     ▼
+   ┌──────────────────────────────────┐
+   │  best_other_sim − own_sim        │   NO
+   │  > delta_move (0.05)?            │ ──────► STAY
+   │  (+ delta_hyst if best_other     │
+   │   == prior_tag)                  │
+   └─────────────────┬────────────────┘
+                     │ YES
+                     ▼
+   ┌──────────────────────────────────┐
+   │  moves_remaining[r] > 0?         │   NO
+   │                                  │ ──────► FROZEN (drop candidate)
+   └─────────────────┬────────────────┘
+                     │ YES
+                     ▼
+   ┌──────────────────────────────────┐
+   │  best_other ∉ untrusted_tags?    │   NO
+   │  (absorber-flag protection)      │ ──────► STAY
+   └─────────────────┬────────────────┘
+                     │ YES
+                     ▼
+   ┌──────────────────────────────────┐
+   │  Compute kNN tag-share for r     │
+   │  (FAISS top-10, lazy)            │
+   │  knn_share[best_other] >         │   NO
+   │  knn_share[current]?             │ ──────► STAY (centroid agrees but
+   │                                  │         neighborhood disagrees)
+   └─────────────────┬────────────────┘
+                     │ YES
+                     ▼
+   ┌──────────────────────────────────┐
+   │  Per-tag intake cap check        │   NO
+   │  (≤ 10% of best_other size)?     │ ──────► DEFER (try next iter)
+   └─────────────────┬────────────────┘
+                     │ YES (rank by gap, top-N apply)
+                     ▼
+                  REASSIGN
+        A(r) := best_other,
+        prior_tag[r] := A,
+        moves_remaining[r] −= 1
+
 ## Inputs / outputs
 
 ```

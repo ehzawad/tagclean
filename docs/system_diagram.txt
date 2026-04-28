@@ -1,174 +1,278 @@
-                                  TAGCLEAN — END-TO-END SYSTEM
-                              (Bengali EC/NID FAQ corpus cleaner)
-                              [deterministic-only branch — E5 + heuristics; no LLM]
+                          TAGCLEAN — END-TO-END SYSTEM
+                       (Bengali EC/NID FAQ corpus cleaner)
+                  [geometric-repair branch — pure E5, no LLM]
 
 
-INPUTS
-==============================================================================================
-  question_tag.csv     -- ~79k rows × 1394 tags. Columns: question, tag (UTF-8, BOM-tolerant).
-  tag_answer.json      -- { tag: canonical_answer }. Used as merge-safety gate in Stage 3.
-  config.yaml          -- e5_instruction, thresholds, top_n, ...
-
-MODELS
-==============================================================================================
-  E5-multilingual-large-instruct (1024d) -- single source of geometry.
-                                            Same model production uses at inference.
-                                            Composite weight: 90% (own 55 + margin 35).
-
-  No LLM calls anywhere on this branch.
+INPUT
+=====
+  data/question_tag.csv   78,990 rows × 1,394 tags
+                          (UTF-8, columns: question, tag)
 
 
-CORPUS-WIDE BOOTSTRAP  (run once; cached for all family runs)
-==============================================================================================
-  Stage 0  intake / Bengali normalize / dedup
-           -> stage0/intake.parquet, cross_tag_duplicates.jsonl
-  Stage 1  E5 embeddings + FAISS IndexFlatIP over the FULL corpus
-           -> stage1/{emb_e5, emb_e5_query}.npy + faiss_e5.idx
-  Stage 2  per-tag profile: outlier-trimmed centroid, medoid, central exemplars
-           -> stage2/{tag_profile.parquet, tag_centroids_e5.npy, tag_index.json}
+PIPELINE FLOW
+=============
+
+                ┌────────────────────────────────────┐
+                │  data/question_tag.csv             │
+                │  78,990 rows × 1,394 tags (raw)    │
+                └──────────────────┬─────────────────┘
+                                   │
+                                   ▼
+                ┌────────────────────────────────────┐
+                │  Stage 0: intake                   │
+                │  • normalize Bengali Unicode       │
+                │  • dedup within tag                │
+                │  • cross-tag duplicate log         │
+                │                                    │
+                │  Output: stage0/intake.parquet,    │
+                │    cross_tag_duplicates.jsonl      │
+                └──────────────────┬─────────────────┘
+                                   │
+                                   ▼
+                ┌────────────────────────────────────┐
+                │  Stage 1: E5 embed                 │
+                │  • intfloat/multilingual-e5-large- │
+                │    instruct, 1024d                 │
+                │  • L2 normalized                   │
+                │  • FAISS IndexFlatIP built         │
+                │                                    │
+                │  Output: stage1/emb_e5.npy,        │
+                │    embedding_rows.parquet,         │
+                │    faiss_e5.idx                    │
+                └──────────────────┬─────────────────┘
+                                   │
+                                   ▼
+                ┌────────────────────────────────────┐
+                │       REPAIR LOOP                  │
+                │       Phases A → C → B → D         │
+                │       (see below)                  │
+                └──────────────────┬─────────────────┘
+                                   │
+                                   ▼
+                ┌────────────────────────────────────┐
+                │  xray_cleanup.csv                  │
+                │  37,355 rows × 1,334 tags          │
+                │  pct_neg_margin = 0.026%           │
+                └────────────────────────────────────┘
 
 
-SCALING DISCOVERY  (one-shot; emits a hand-editable manifest)
-==============================================================================================
-                       stage2/tag_centroids_e5.npy + tag_index.json
-                                         |
-                                         v
-  +----------------------------------------------------------------------------------+
-  | tagclean discover                                                                 |
-  |   --centroids-from <run>                                                          |
-  |   --threshold 0.88  --pair-threshold 0.86  --top-k 8  --max-family-size 4         |
-  |   [--exclude-tag-pattern '_followup_[a-d]$']    <- skip dialog-turn artifacts     |
-  |   [--production-tags FILE]                      <- optional allowlist             |
-  |                                                                                  |
-  | Algorithm (E5-only seed-centric reciprocal-NN ego-family expansion):              |
-  |   1. cos_e5 per pair; top-K neighbors per tag.                                    |
-  |   2. Edge kept iff reciprocal AND >= threshold.                                   |
-  |   3. Per seed: ego-family = seed + reciprocal nbrs, capped at max_family_size,    |
-  |      requiring pairwise min_sim >= pair_threshold with every existing member.     |
-  |   4. Score candidate by (min_edge_sim, avg_edge_sim, size).                       |
-  |   5. Greedy descending selection; mark members covered.                           |
-  |   6. Uncovered tags become singletons (full coverage guaranteed).                 |
-  |                                                                                  |
-  |   No transitive closure -> no mega-components at corpus scale.                    |
-  +----------------------------------------------------------------------------------+
-                                         |
-                                         v
-                                  families.yaml
-                            (deterministic family_id from
-                             sha256 of sorted tag set)
+REPAIR LOOP
+===========
+
+  ITER 0 (cold start, runs once)
+  ──────────────────────────────
+  ┌─────────────────────────────────────────┐
+  │  For each tag, detect outlier-heavy:    │
+  │   e5_diversity > 0.4 OR                 │
+  │   medoid-vs-trimmed-mean disagreement   │
+  │   > 0.15                                │
+  │                                         │
+  │  Bootstrap centroid:                    │
+  │   • outlier-heavy → medoid + core       │
+  │     (rows with cos > 0.85 to medoid)    │
+  │   • otherwise → trimmed mean (drop      │
+  │     top/bottom 5% by sim-to-rough)      │
+  │                                         │
+  │  FREEZE iter-0 centroids and pairwise   │
+  │  cosines. Used as hysteresis predicate  │
+  │  for merge phase + absorber rescue.     │
+  └─────────────────────────────────────────┘
+
+                       │
+                       ▼
+
+  ITER k = 1..max_iter (default 8)
+  ────────────────────────────────
+
+  ┌─────────────────────────────────────────────────────────────┐
+  │                                                             │
+  │  ┌─────────────────────────────────────────────────────┐   │
+  │  │  PHASE A — REASSIGN                                 │   │
+  │  │                                                     │   │
+  │  │  For each kept row r in tag A:                      │   │
+  │  │   1. Compute margin = cos(r, C[A]) − cos(r,         │   │
+  │  │      best-other-centroid)                           │   │
+  │  │   2. Cheap gates: margin < reassign_thresh AND      │   │
+  │  │      gap > delta_move (+delta_hyst if back-move)    │   │
+  │  │      AND moves_remaining > 0 AND best_other not     │   │
+  │  │      untrusted                                      │   │
+  │  │   3. Expensive gate (lazy): FAISS top-10 kNN        │   │
+  │  │      tag-share. Need knn_share[best_other] >        │   │
+  │  │      knn_share[current]                             │   │
+  │  │   4. Sort candidates by gap, apply per-tag intake   │   │
+  │  │      cap (10%); strongest moves win                 │   │
+  │  │   5. Recompute affected centroids with annealed     │   │
+  │  │      damping (50/50 → 70/30 → 85/15 → 100/0)        │   │
+  │  └─────────────────────┬───────────────────────────────┘   │
+  │                        │                                    │
+  │                        ▼                                    │
+  │  ┌─────────────────────────────────────────────────────┐   │
+  │  │  PHASE C — MERGE TAGS  (only iter ≤ 2)              │   │
+  │  │                                                     │   │
+  │  │  For each tag pair (a, b):                          │   │
+  │  │   1. cos(C[a], C[b]) > merge_cosine_thresh (0.90)   │   │
+  │  │   2. Hysteresis: iter-0 frozen pairwise also > 0.90 │   │
+  │  │   3. Mutual directed confusion > 0.50 in BOTH dirs  │   │
+  │  │   4. kNN overlap (sampled 50+50 rows) > 0.50        │   │
+  │  │                                                     │   │
+  │  │  → MERGE: pick canonical via geometric composite    │   │
+  │  │    score (row count + neighborhood support −        │   │
+  │  │    medoid disagreement). Loser dissolves; rows      │   │
+  │  │    reassign to canonical.                           │   │
+  │  │                                                     │   │
+  │  │  C runs BEFORE B so cross-tag pairs whose tags      │   │
+  │  │  merge disappear from B's pair-set.                 │   │
+  │  └─────────────────────┬───────────────────────────────┘   │
+  │                        │                                    │
+  │                        ▼                                    │
+  │  ┌─────────────────────────────────────────────────────┐   │
+  │  │  PHASE B — TRIAGE / DROP                            │   │
+  │  │                                                     │   │
+  │  │  1. Cross-tag near-duplicate pairs (FAISS range_    │   │
+  │  │     search at 0.97):                                │   │
+  │  │      Case 1: |own_sim_a − own_sim_b| > 0.05 →       │   │
+  │  │              winner-take (drop the loser)           │   │
+  │  │      Case 2: drop both (last resort)                │   │
+  │  │                                                     │   │
+  │  │  2. Hard-margin drop: any row with margin <         │   │
+  │  │     hard_drop_thresh (+0.004) → drop                │   │
+  │  │                                                     │   │
+  │  │  3. Per-tag drop cap: ≤ 30% of tag size per iter.   │   │
+  │  │     Excess deferred. After 4 consecutive cap hits   │   │
+  │  │     on same tag → ABORT_DROP_CAP.                   │   │
+  │  └─────────────────────┬───────────────────────────────┘   │
+  │                        │                                    │
+  │                        ▼                                    │
+  │  ┌─────────────────────────────────────────────────────┐   │
+  │  │  PHASE D — ABSORBER + CONVERGENCE                   │   │
+  │  │                                                     │   │
+  │  │  Per tag t: intake_frac = reassigns_in / tag_size   │   │
+  │  │   • Above 0.30 for 2 consec iters → flag t as       │   │
+  │  │     untrusted; replace centroid with iter-0 frozen  │   │
+  │  │   • Below 0.10 → recover (untrusted flag cleared)   │   │
+  │  │                                                     │   │
+  │  │  Convergence:                                       │   │
+  │  │   • (reassigned + dropped + merged) / N < 0.001     │   │
+  │  │     for 2 consec iters → CONVERGED                  │   │
+  │  │   • pct_neg_margin rises for 2 consec → ABORT_      │   │
+  │  │     OSCILLATION                                     │   │
+  │  │   • iter == max_iter without convergence → MAX_ITER │   │
+  │  └─────────────────────┬───────────────────────────────┘   │
+  │                        │                                    │
+  │                continue or exit                             │
+  │                        │                                    │
+  └────────────────────────┼────────────────────────────────────┘
+                           │
+                           ▼
+                  ┌────────────────────────────────────┐
+                  │  POST-LOOP                         │
+                  │  • Dissolve tags with < 3 rows     │
+                  │    (rows get status = dropped)     │
+                  │  • Emit:                           │
+                  │      final_assignment.parquet      │
+                  │      iter_metrics.jsonl            │
+                  │      iter_NN_ops.jsonl             │
+                  │      repair_report.json            │
+                  │      xray_cleanup.csv (deliverable)│
+                  └────────────────────────────────────┘
 
 
-PER-FAMILY PIPELINE  (run-families dispatches one stage8 invocation per approved family)
-==============================================================================================
-  +--------------------------------------------------------------------------+
-  | tagclean run-families --manifest families.yaml                            |
-  |   [--include-singletons]                                                  |
-  |   [--no-skip-completed]                                                   |
-  |                                                                          |
-  |   For each approved family:                                              |
-  |     1. Symlink stage0/1/2 from `centroids_run_id` -> family run dir       |
-  |        (stages 0-2 are corpus-wide, identical across families;            |
-  |         symlinking saves ~30-60 min Mac MPS embedding per family.)        |
-  |     2. Run stage8 with --target-tags <family target_tags> --run-id <fid>  |
-  |     3. Skip if <fid>/stage8/cleaning_report.json already exists.          |
-  +--------------------------------------------------------------------------+
-                                         |
-                                         v
-  Stage 3  deterministic merge map (NO LLM)
-           target_tags-aware: when family >= 2 tags, cluster IS target_tags.
-           Per-pair deterministic check: token overlap on tag names + answer-token
-           overlap on tag_answer.json (when provided) as merge-safety gate.
-           -> stage3/{tag_merge_map.csv, merge_candidates.jsonl}
-  Stage 4  deterministic ranker (E5-only)
-           composite_score = 0.55*cos_e5 + 0.35*margin_e5
-                           - 0.05*near_dup - 0.10*xtag_dup - 0.10*artifact
-           -> stage4/row_features.parquet
-  Stage 5  (DELETED — no LLM Stage QA reviewer on this branch)
-  Stage 6  selection + MMR (lambda=0.7 in E5 space) -> top-N=40 per tag
-           -> stage6/{question_tag.cleaned.csv, .top40.csv, jettisoned_rows.csv}
-  Stage 7  (DELETED — long ago)
-  Stage 8  leave-one-out validation (E5-only retrieval)
-           -> stage8/cleaning_report.json
+PER-ROW REASSIGNMENT DECISION (PHASE A GATES, IN ORDER)
+=======================================================
+
+   Row r in tag A
+        │
+        ▼
+   margin[r] = cos(r, C[A]) − cos(r, C[best_other])
+        │
+        ▼
+   margin[r] < reassign_thresh (-0.03)? ─── NO ───► STAY
+        │ YES
+        ▼
+   gap > delta_move (0.05)?              ─── NO ───► STAY
+   (+0.02 if best_other == prior_tag)
+        │ YES
+        ▼
+   moves_remaining[r] > 0?                ─── NO ───► FROZEN
+        │ YES
+        ▼
+   best_other ∉ untrusted_tags?           ─── NO ───► STAY
+        │ YES
+        ▼
+   knn_share[best_other] >                ─── NO ───► STAY
+   knn_share[current]?
+        │ YES
+        ▼
+   per-tag intake cap available?          ─── NO ───► DEFER
+        │ YES (rank by gap, top-N apply)
+        ▼
+   ── REASSIGN ──
+   A(r) ← best_other
+   prior_tag[r] ← A
+   moves_remaining[r] −= 1
 
 
-CROSS-FAMILY PRODUCTION COMPOSITION
-==============================================================================================
-  fam_xxxx/stage6/top40.csv  ---+
-  fam_yyyy/stage6/top40.csv  ---+--> tagclean compose --manifest families.yaml
-  fam_zzzz/stage6/top40.csv  ---+    [--compose-source top40 | cleaned]    --> composed.csv
-                ...                  (concat + dedup + deterministic sort)
-                                          |
-                                          v
-                                    tagclean stage9 --e5-audit-input <composed.csv>
-                                    (E5 LOO top-K audit; drops top-1 misses)
-                                          |
-                                          v
-                                    PRODUCTION CSV
-                                    runs/<run_id>/stage9/production_filtered.csv
+CROSS-TAG NEAR-DUP TRIAGE (PHASE B)
+===================================
 
-  WHY compose from top40 (or cleaned), not per-family stage9 production_filtered:
-    A row that fails LOO inside its own family can be safely separable in the global
-    production union -- its in-family rival is no longer the closest peer. Filter once
-    globally, after composition. Per-family stage9 stays useful for diagnostics.
+   For each pair (r_a in tag_A, r_b in tag_B) with cos(r_a, r_b) > 0.97:
+   (Phase C ran first, so pairs whose tags merged are already same-tag
+   and not detected here.)
+
+   |own_sim(r_a) − own_sim(r_b)| > 0.05?
+        │
+        ├── YES → WINNER-TAKE: drop the row with lower own_sim
+        │
+        └── NO  → DROP BOTH (last resort)
 
 
-STAGE 9 INTERNALS  (E5-only production-risk audit)
-==============================================================================================
-  Input CSV -> Bengali normalize -> E5 prefix -> encode (passages = queries)
-            -> chunked vecs @ vecs.T   (numpy, default chunk=4096; no FAISS to
-               avoid Py3.14/Mac segfault when both libs load in same process)
-            -> diag = -inf -> argpartition top-K + sort
-            -> per row: top1_neighbor_tag, top1_correct, own_share_top_K, neighbor_dist
-            -> e5_neighbor_audit.csv, production_filtered.csv,
-               e5_dropped.csv, audit_report.json
+PROCESS RESULTS — BENGALI NID CORPUS
+====================================
 
-  Default: drop rows with top-1 LOO mismatch.  --no-e5-drop = report-only mode.
-  Stage 9 NEVER chains stage0-8 (auto-chaining clobbered cleaned.csv when geometry
-  config differed). Run stage8 (or run-families) first; stage9 only audits what's there.
-
-
-END-TO-END FLOW
-==============================================================================================
-
-   data/question_tag.csv  ---->  [stage8 once on a 3-tag family --> stage0/1/2 cached]
-                                                              |
-                                                              v
-                                  +---------------------------+
-                                  |
-                                  v
-                          tagclean discover  --centroids-from <run>
-                          --exclude-tag-pattern '_followup_[a-d]$'
-                                          |
-                                          v
-                                    families.yaml
-                                          |
-                                          v
-                       (optional) human edits status: approved/rejected
-                                          |
-                                          v
-                          tagclean run-families  --manifest families.yaml
-                          (one stage8 per approved family;
-                           stage0/1/2 symlinked from centroids run;
-                           --skip-completed default; resumable)
-                                          |
-                                          v
-                          tagclean compose  --manifest families.yaml
-                          --compose-source top40 --out PATH
-                                          |
-                                          v
-                          tagclean stage9  --e5-audit-input PATH
-                          --run-id production
-                                          |
-                                          v
-                  runs/production/stage9/production_filtered.csv
-                          (final E5-ready clean data)
+  Iter   | Reassigned | Dropped | Merged | Rows alive | pct_neg_margin
+  -------+------------+---------+--------+------------+----------------
+  Input  |     —      |    —    |   —    |   78,990   |  21.5 %
+  Iter 1 |      6     | 32,614  |   40   |   46,376   |   3.1 %
+  Iter 2 |      0     |  7,064  |   20   |   39,312   |   0.6 %
+  Iter 3 |      0     |  1,452  |    0   |   37,860   |   0.026 %
+  Iter 4 |      0     |    345  |    0   |   37,515   |   0.026 %  (drop_cap abort)
+  Final  |     —      |    —    |   —    |   37,355   |   —
+  (after dissolves)
 
 
-NOTE ON VALIDATION HISTORY
-==============================================================================================
-  Earlier validation numbers (account_locked / name_correction / otp, top-1 LOO 0.961,
-  0/14 cross-family drops) were measured against pipelines that included LLM-assisted
-  stages (GPT or Claude). The deterministic-only branch retains the geometry-driven
-  stages (0/1/2/4/6/8/9). The expected accuracy delta against the LLM-assisted
-  baselines is small (sub-1% to low-single-digit top-1 retrieval) but should be
-  re-measured against your dataset before shipping.
+KEY DESIGN DECISIONS
+====================
+
+  • Pure E5 geometry only. No tag_answer.json, no tag-name patterns,
+    no LLM. The user accepted: this optimizes for E5-routability, not
+    truth-preserving taxonomy. Two tags with materially different
+    answers will collapse if E5 says they're indistinguishable.
+
+  • Phase order C → B (merge before drop) prevents stuck-deferred
+    pairs that would never resolve under the original A → B → C order.
+
+  • Iter-0 frozen centroids serve double duty: hysteresis predicate
+    for merges, and absorber rescue (replace runaway-magnet centroid).
+
+  • Annealed damping (heavy early, light late) prevents centroid
+    swing during the high-churn early iters.
+
+  • Per-row move budget = 3 + asymmetric δ_move/δ_hyst prevents
+    ping-pong oscillation.
+
+  • Lazy kNN-share: FAISS top-K computed only for cheap-pass candidates,
+    not all rows. Scales linearly with candidate count, not corpus size.
+
+  • Resource cap locked at module load: OMP/MKL/OpenBLAS/FAISS = 4
+    threads, peak working set < 2 GB.
+
+
+CALL SITE
+=========
+
+  PYTHONPATH=src python -m tagclean.cleaner repair \
+      --config configs/bn_full.yaml \
+      --run-id <run_id>
+
+  Wall-time on Bengali NID corpus: ~12 min total
+   (Stage 0/1 cached: ~30s, repair loop: ~10 min, post-loop: ~10s)
