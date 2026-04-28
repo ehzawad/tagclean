@@ -2,7 +2,7 @@
 
 A juxtaposition of the three concrete repair runs on the Bengali NID corpus. Same input (78,990 rows × 1,394 tags), different hyperparameter choices, very different cleaned outputs. The middle run was a misfire — kept here as a documented failure mode.
 
-## Side-by-side configuration
+## Side-by-side configuration (the levers I changed)
 
 | Hyperparameter | Run A: Conservative chain | Run B: Aggressive overshoot | Run C: Aggressive tuned (shipped default) |
 |---|---:|---:|---:|
@@ -15,7 +15,76 @@ A juxtaposition of the three concrete repair runs on the Bengali NID corpus. Sam
 | `drop_cap_per_tag` | 0.20 | 0.50 | **0.30** |
 | `drop_cap_strikes` | 3 | 6 | 4 |
 
-All other thresholds (reassign_thresh, delta_move/hyst, knn_top_k, intake_cap, max_iter, etc.) are the same across all three runs — see [`repair_thresholds.md`](repair_thresholds.md).
+## Complete hyperparameter inventory across all three runs
+
+Everything in `RepairConfig`, including the knobs that were held constant. Bold values were tuned across runs.
+
+### Phase A — Reassign
+
+| Knob | Run A | Run B | Run C |
+|---|---:|---:|---:|
+| `reassign_thresh` | -0.03 | -0.03 | -0.03 |
+| `delta_move` | 0.05 | 0.05 | 0.05 |
+| `delta_hyst` | 0.02 | 0.02 | 0.02 |
+| `knn_top_k` | 10 | 10 | 10 |
+| `intake_cap_per_tag` | 0.10 | 0.10 | 0.10 |
+| `move_budget` | 3 | 3 | 3 |
+
+### Phase B — Drop / triage
+
+| Knob | Run A | Run B | Run C |
+|---|---:|---:|---:|
+| **`cross_tag_dup_thresh`** | 0.985 | 0.95 | **0.97** |
+| **`hard_drop_thresh`** | -0.10 | +0.007 | **+0.004** |
+| **`drop_cap_per_tag`** | 0.20 | 0.50 | **0.30** |
+| **`drop_cap_strikes`** | 3 | 6 | 4 |
+
+### Phase C — Merge
+
+| Knob | Run A | Run B | Run C |
+|---|---:|---:|---:|
+| **`merge_cosine_thresh`** | 0.92 | 0.85 | **0.90** |
+| `merge_knn_overlap_thresh` | 0.50 | 0.40 | 0.50 |
+| `mutual_confusion_thresh` | 0.50 | 0.40 | 0.50 |
+| **`merges_allowed_through_iter`** | 2 | 4 | 2 |
+
+### Phase D — Absorber + convergence
+
+| Knob | Run A | Run B | Run C |
+|---|---:|---:|---:|
+| `absorber_intake_thresh` | 0.30 | 0.30 | 0.30 |
+| `absorber_strikes_to_flag` | 2 | 2 | 2 |
+| `convergence_change_frac` | 0.001 | 0.001 | 0.001 |
+| `convergence_required_consec` | 2 | 2 | 2 |
+
+### Cold start (iter 0)
+
+| Knob | Run A | Run B | Run C |
+|---|---:|---:|---:|
+| `medoid_diversity_trigger` | 0.40 | 0.40 | 0.40 |
+| `medoid_centroid_disagreement_trigger` | 0.15 | 0.15 | 0.15 |
+
+### Loop control
+
+| Knob | Run A | Run B | Run C |
+|---|---:|---:|---:|
+| `max_iter` | 8 | 8 | 8 |
+| `min_tag_rows` | 3 | 3 | 3 |
+| `damping_schedule` | (0.5, 0.5, 0.3, 0.3, 0.15, 0.15, 0.0, 0.0) | same | same |
+
+## Hidden magic numbers (not in `RepairConfig` — hardcoded in functions)
+
+These exist as default arguments or literal constants and are **identical across all three runs** (none of my tuning touched them). Listed here so you know they're tunable if you edit `repair.py`:
+
+| Where | Value | What it controls |
+|---|---:|---|
+| `compute_trimmed_centroid(... trim_fraction=0.05)` (line 99) | **0.05** | Drop top/bottom 5% of rows by sim-to-rough-centroid before computing the trimmed mean. Smaller value = less outlier-trimming. |
+| `medoid_centered_centroid(... core_threshold=0.85)` (line 138) | **0.85** | Cold-start core inclusion threshold. After bootstrapping from the medoid, only rows with `cos(row, medoid) > 0.85` count as the core. Lower → more rows included → centroid drifts; higher → tiny core, may fall back to trimmed mean. |
+| `compute_merge_knn_overlap(... sample_cap=50, k=10)` (line 801) | **50, 10** | When checking kNN overlap for a tag-pair merge gate, sample up to 50 rows from each tag and count cross-tag presence in their top-10 neighbors. Larger sample → more accurate but slower. |
+| `triage_cross_tag_pair`, line 652 | **0.05** | Winner-take own-sim diff threshold. Two cross-tag near-dup rows with `|own_sim_a − own_sim_b| > 0.05` → keep the higher, drop the lower. Tighter means more "drop both" outcomes. |
+| `_pick_canonical` score formula (line ~870) | **100, 50** | Composite tiebreak when two tags merge: `score = row_count + 100*neighborhood_support − 50*medoid_centroid_disagreement`. The `100` weight makes neighborhood density much more decisive than tag size differences; `50` penalizes outlier-heavy tags from winning canonicalization. |
+
+Of these, `core_threshold = 0.85` is the one most likely to matter for a different corpus — Bengali NID's tag clusters are tight enough that 0.85 captures real cores. A more diffuse corpus might need 0.75 or even 0.70.
 
 ## Outcomes
 

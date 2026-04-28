@@ -482,6 +482,89 @@ disagreement = 1 - 0.83 = 0.17 > 0.15  →  OUTLIER-HEAVY (cold-start)
 
 **Defaults shipped in this branch are aggressive** — tuned for the Bengali NID corpus to land near 40k surviving rows from the 79k raw input. The thresholds in **bold** above were raised from earlier conservative defaults (`hard_drop_thresh: -0.10 → +0.004`, `cross_tag_dup_thresh: 0.985 → 0.97`, `merge_cosine_thresh: 0.92 → 0.90`, `drop_cap_per_tag: 0.20 → 0.30`). To get 70k surviving rows instead, override `hard_drop_thresh` back to -0.10.
 
+## Hidden magic numbers (hardcoded in functions, not in `RepairConfig`)
+
+Several numbers live as default arguments or literal constants in `src/tagclean/repair.py` rather than `RepairConfig` fields. They're tunable but require editing `repair.py` (no CLI flag, no config-yaml entry). Listed here so they're not invisible.
+
+### `trim_fraction = 0.05` — outlier-trim for centroid mean
+
+In `compute_trimmed_centroid` (line ~99). The two-pass centroid: rough mean → drop top and bottom 5% of rows by sim-to-rough-centroid → re-mean of the survivors.
+
+**What it does.** A tag with 100 rows and 5 mistagged outliers: at 0.05 the trimmed centroid pulls toward the 90 honest rows, ignoring the outliers. At 0.0 (no trim), all 100 contribute and outliers drag the centroid.
+
+**Example.**
+```
+Tag A has 100 rows. Rough mean centroid c_rough.
+sims = cos(rows_A, c_rough)  → sorted: [0.42, 0.45, ..., 0.96, 0.97]
+At trim_fraction = 0.05: drop bottom 5 (0.42..0.50) and top 5 (0.96..0.97).
+Re-mean the middle 90 → c_trimmed.
+The 0.42-row that was a corpus mistag doesn't pull the centroid anymore.
+```
+
+When to change: corpus with more mistagged rows → bump to 0.10. Cleaner corpus → 0.025.
+
+### `core_threshold = 0.85` — cold-start core inclusion
+
+In `medoid_centered_centroid` (line ~138). When a tag is flagged outlier-heavy at iter 0, the centroid is bootstrapped from the medoid + its core (rows with `cos(row, medoid) > 0.85`).
+
+**What it does.** Defines what "looks like the dominant cluster of this tag's rows" means. At 0.85: tight, strict — bimodal tag's contamination is excluded. At 0.70: looser — risks including some contamination.
+
+**Example.**
+```
+Bimodal tag B: 7 real rows + 5 contaminating rows.
+medoid = the most central real row.
+At core_threshold = 0.85:
+  cos(row, medoid) > 0.85 → only the 7 real rows pass.
+  centroid = mean of 7 real rows. Contamination ignored.
+
+At core_threshold = 0.70:
+  cos(row, medoid) > 0.70 → includes 7 real + 2 contaminating rows
+  whose cos to medoid happens to be >0.70.
+  centroid drifts slightly toward contamination.
+```
+
+When to change: looser corpora (E5 cosines run lower, e.g. English non-FAQ) → 0.70-0.75. Tighter Bengali → 0.85 is right.
+
+### `winner_take_diff = 0.05` — cross-tag dup triage threshold
+
+In `triage_cross_tag_pair` (line ~652). When two cross-tag near-dup rows are detected, the one with higher own_sim wins iff the gap exceeds 0.05; otherwise drop both.
+
+**Example.**
+```
+Pair: r_a own_sim 0.92, r_b own_sim 0.88
+diff = 0.04 < 0.05 → DROP BOTH
+
+Same pair: r_a own_sim 0.95, r_b own_sim 0.86
+diff = 0.09 > 0.05 → KEEP r_a, DROP r_b
+```
+
+When to change: tighter (e.g. 0.03) makes more pairs winner-take and fewer drop-both. Looser (e.g. 0.10) demands a bigger gap, more drop-both. Bengali NID at 0.05 splits them roughly evenly.
+
+### `sample_cap = 50, k = 10` — kNN overlap sampling for merges
+
+In `compute_merge_knn_overlap` (line ~801). When checking a tag-pair merge gate, sample 50 rows from each tag and look at top-10 neighbors of each in the combined set. Cross-tag overlap fraction is the gate.
+
+When to change: larger sample (e.g. 100) → more accurate but quadratically slower per merge candidate. Smaller (e.g. 25) → faster, noisier. 50 is a reasonable middle ground for hundreds of merge candidates per iter.
+
+### `100, 50` — composite tiebreak weights for canonical-tag selection
+
+In `_pick_canonical` (line ~870). When merging tags A and B, score each:
+```
+score(t) = row_count(t)
+         + 100 * mean_top_quartile_cos_to_medoid(t)  ← the 100
+         - 50 * (1 - cos(medoid, centroid))(t)        ← the 50
+```
+Higher score wins.
+
+**Why these magnitudes.**
+- `row_count`: ranges 5..500 typically. Small tag = ~10 score, large tag = ~250.
+- `100 * neighborhood_support`: support is ~0.85..0.95, so this term contributes 85..95.
+- `50 * medoid_centroid_disagreement`: disagreement ~0.01..0.20, so this term subtracts 0.5..10.
+
+Net effect: row_count and neighborhood support are roughly equal-weighted contributors to canonical choice; outlier-penalty is a smaller deciding factor on close calls.
+
+When to change: if you find canonical choices favoring tiny-but-tight tags over larger but slightly looser tags, lower the `100` to `50`. If outlier-heavy tags are winning canonicalization, raise the `50` to `100`.
+
 ## To loosen further (push past the 16% pct_neg_margin floor)
 
 The `xray_cleanup.csv` in this repo was produced at default thresholds. To clean more aggressively:
